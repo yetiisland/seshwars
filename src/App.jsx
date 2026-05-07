@@ -1,0 +1,512 @@
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { supabase } from './lib/supabase'
+import { useSpots, useSavedSpots } from './hooks/useSpots'
+import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
+import TabBar from './components/TabBar'
+import Logo from './components/Logo'
+import { PlusIcon, ListIcon, MapPinIcon, StarIcon, ProfileIcon } from './components/Icons'
+import ListView from './pages/ListView'
+import MapView from './pages/MapView'
+import SavedView from './pages/SavedView'
+import ProfileView from './pages/ProfileView'
+import SpotDetail from './pages/SpotDetail'
+import AddSpot from './pages/AddSpot'
+import SearchPage from './pages/SearchPage'
+import HomeScreenBanner from './components/HomeScreenBanner'
+
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
+const SEARCH_RADIUS_MILES = 100 / 1.60934
+
+const TABS = [
+  { id: 'list', label: 'List', Icon: ListIcon },
+  { id: 'map', label: 'Map', Icon: MapPinIcon },
+  { id: 'saved', label: 'Saved', Icon: StarIcon },
+  { id: 'profile', label: 'Profile', Icon: ProfileIcon },
+]
+
+function SafeAreaTop() {
+  return (
+    <div style={{
+      position: 'absolute', top: 0, left: 0, right: 0,
+      height: 'env(safe-area-inset-top)',
+      background: '#FDF8F0', zIndex: 300, pointerEvents: 'none', flexShrink: 0,
+    }} />
+  )
+}
+
+function AuthPromptModal({ onClose, onGoProfile }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <div style={{ padding: '0 20px 8px', textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Save Spots</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            Create an account to save spots and sync them across devices.
+          </div>
+        </div>
+        <div style={{ padding: '8px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button className="btn-salmon" onClick={onGoProfile}>Create Account / Sign In</button>
+        </div>
+        <div className="modal-cancel" onClick={onClose}>Not now</div>
+      </div>
+    </div>
+  )
+}
+
+function LocationChip({ location, onClear }) {
+  return (
+    <div style={{ padding: '6px 16px', flexShrink: 0 }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', borderRadius: 6, padding: '5px 10px 5px 8px' }}>
+        <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
+          <path d="M5 0C2.25 0 0 2.25 0 5C0 7.75 5 12 5 12C5 12 10 7.75 10 5C10 2.25 7.75 0 5 0Z" fill="#d4785a" />
+          <circle cx="5" cy="5" r="2" fill="#fff" />
+        </svg>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+          Near {location.name}
+        </span>
+        <div onClick={onClear} style={{ marginLeft: 2, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="5" fill="rgba(212,120,90,0.15)" />
+            <line x1="4" y1="4" x2="8" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
+            <line x1="8" y1="4" x2="4" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SearchBtn({ onClick }) {
+  return (
+    <div onClick={onClick} style={{ width: 34, height: 34, borderRadius: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+      <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
+        <circle cx="6" cy="6" r="4" stroke="#d4785a" strokeWidth="1.3" />
+        <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    </div>
+  )
+}
+
+function DesktopSearchBar({ spots, searchLocation, onSelect, onClear }) {
+  const [query, setQuery] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const timer = useRef(null)
+  const skipRef = useRef(false)
+  const wrapperRef = useRef(null)
+
+  useEffect(() => {
+    skipRef.current = true
+    setQuery(searchLocation ? searchLocation.name : '')
+    setSuggestions([])
+    setOpen(false)
+  }, [searchLocation])
+
+  useEffect(() => {
+    if (skipRef.current) { skipRef.current = false; return }
+    clearTimeout(timer.current)
+    if (!query.trim()) { setSuggestions([]); setLoading(false); setOpen(false); return }
+    setLoading(true)
+    setOpen(true)
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?types=place,region,postcode&country=US&access_token=${MAPBOX_TOKEN}&limit=5`
+        )
+        const data = await res.json()
+        setSuggestions((data.features || []).map(f => ({
+          id: f.id,
+          name: f.text,
+          placeName: f.place_name,
+          longitude: f.geometry.coordinates[0],
+          latitude: f.geometry.coordinates[1],
+        })))
+      } catch { setSuggestions([]) }
+      setLoading(false)
+    }, 300)
+    return () => clearTimeout(timer.current)
+  }, [query])
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleSelect = (item) => {
+    skipRef.current = true
+    setQuery(item.name)
+    setOpen(false)
+    setSuggestions([])
+    onSelect({ name: item.name, placeName: item.placeName, longitude: item.longitude, latitude: item.latitude })
+  }
+
+  const handleClear = () => {
+    skipRef.current = true
+    setQuery('')
+    setOpen(false)
+    setSuggestions([])
+    onClear()
+  }
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', maxWidth: 400, width: '100%' }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', left: 10, pointerEvents: 'none', display: 'flex' }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="6" cy="6" r="4" stroke="#d4785a" strokeWidth="1.3" />
+            <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+        </div>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onFocus={() => { if (suggestions.length > 0) setOpen(true) }}
+          placeholder="Search by city or area..."
+          style={{
+            width: '100%', background: '#ECEDF2', border: '1px solid #C8CAD4',
+            borderRadius: 6, padding: '7px 30px 7px 28px',
+            fontSize: 12, color: 'var(--text-primary)', fontFamily: 'Barlow, sans-serif',
+            outline: 'none',
+          }}
+        />
+        {query && (
+          <div onClick={handleClear} style={{ position: 'absolute', right: 8, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="7" fill="#C8CAD4" />
+              <line x1="5" y1="5" x2="11" y2="11" stroke="#6a6c7a" strokeWidth="1.3" strokeLinecap="round" />
+              <line x1="11" y1="5" x2="5" y2="11" stroke="#6a6c7a" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+          </div>
+        )}
+      </div>
+      {open && (suggestions.length > 0 || loading) && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+          background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 8,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 2000, overflow: 'hidden',
+        }}>
+          {loading && (
+            <div style={{ padding: '10px 14px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>Searching…</div>
+          )}
+          {suggestions.map((item, i) => (
+            <div
+              key={item.id || i}
+              onClick={() => handleSelect(item)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '9px 14px', cursor: 'pointer',
+                borderTop: i > 0 ? '1px solid #ECEDF2' : 'none',
+                background: 'transparent',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#FDF8F0' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+            >
+              <svg width="12" height="16" viewBox="0 0 20 24" fill="none">
+                <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill={i === 0 ? '#d4785a' : 'none'} stroke="#d4785a" strokeWidth="1.8" />
+                <circle cx="10" cy="10" r="4" fill={i === 0 ? '#fff' : 'none'} stroke={i === 0 ? 'none' : '#d4785a'} strokeWidth="1.8" />
+              </svg>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{item.name}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.placeName?.split(', ').slice(1).join(', ')}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function matchesFilters(s, filters) {
+  if (filters.includes('All') || filters.length === 0) return true
+  return filters.some(f => s.type === f || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))
+}
+
+export default function App() {
+  const [tab, setTab] = useState('list')
+  const [user, setUser] = useState(null)
+  const [selectedSpot, setSelectedSpot] = useState(null)
+  const [showAdd, setShowAdd] = useState(false)
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchLocation, setSearchLocation] = useState(null)
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
+
+  const { spots, loading, refetch } = useSpots()
+  const { saved, toggleSave } = useSavedSpots(user?.id)
+  const userLocation = useGeolocation()
+
+  useEffect(() => {
+    const handler = () => setIsDesktop(window.innerWidth >= 769)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  const spotsWithDistance = useMemo(() => {
+    const baseSpots = spots.map(s => {
+      if (!s.latitude || !s.longitude) return s
+      if (searchLocation) {
+        const dist = haversineDistance(searchLocation.latitude, searchLocation.longitude, s.latitude, s.longitude)
+        return { ...s, distance: parseFloat(dist.toFixed(1)) }
+      }
+      if (!userLocation) return s
+      const dist = haversineDistance(userLocation.latitude, userLocation.longitude, s.latitude, s.longitude)
+      return { ...s, distance: parseFloat(dist.toFixed(1)) }
+    })
+    if (searchLocation) {
+      return baseSpots
+        .filter(s => s.latitude && s.longitude && s.distance <= SEARCH_RADIUS_MILES)
+        .sort((a, b) => a.distance - b.distance)
+    }
+    if (userLocation) {
+      return [...baseSpots].sort((a, b) => {
+        if (a.distance == null && b.distance == null) return 0
+        if (a.distance == null) return 1
+        if (b.distance == null) return -1
+        return a.distance - b.distance
+      })
+    }
+    return baseSpots
+  }, [spots, userLocation, searchLocation])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const openSearch = () => setShowSearch(true)
+  const closeSearch = () => setShowSearch(false)
+  const handleSelectLocation = (entry) => { setSearchLocation(entry); closeSearch() }
+  const handleClearSearch = () => setSearchLocation(null)
+  const handleToggleSave = toggleSave
+  const handleAddSuccess = () => { setShowAdd(false); refetch() }
+  const openAdd = () => { setShowAdd(true); closeSearch() }
+
+  const handleSpotClick = (spot) => setSelectedSpot(spot)
+  const handleBack = () => { setSelectedSpot(null); closeSearch() }
+
+  const handleTabChange = (t) => { setTab(t); closeSearch() }
+
+  const goToProfile = () => {
+    setShowAuthPrompt(false)
+    setSelectedSpot(null)
+    closeSearch()
+    setTab('profile')
+  }
+
+  // Desktop layout
+  if (isDesktop) {
+    return (
+      <>
+        {/* Fixed top nav */}
+        <div className="desktop-top-nav">
+          <div className="desktop-nav-left">
+            <Logo />
+          </div>
+          <div className="desktop-nav-center">
+            <DesktopSearchBar spots={spots} searchLocation={searchLocation} onSelect={handleSelectLocation} onClear={handleClearSearch} />
+          </div>
+          <div className="desktop-nav-right">
+            <button className="btn-drop-spot" onClick={openAdd}>
+              <PlusIcon color="#fff" />
+              <span>DROP A SPOT</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Content area */}
+        <div className="desktop-content">
+          {tab === 'list' && (
+            <ListView
+              spots={spotsWithDistance}
+              loading={loading}
+              saved={saved}
+              onToggleSave={handleToggleSave}
+              onSpotClick={handleSpotClick}
+              onAddSpot={openAdd}
+              onSearch={openSearch}
+              searchLocation={searchLocation}
+              onClearSearch={handleClearSearch}
+              showNav={false}
+            />
+          )}
+          {tab === 'map' && (
+            <MapView
+              spots={spotsWithDistance}
+              saved={saved}
+              onToggleSave={handleToggleSave}
+              onSpotClick={handleSpotClick}
+              onAddSpot={openAdd}
+              userLocation={userLocation}
+              searchLocation={searchLocation}
+              showNav={false}
+            />
+          )}
+          {tab === 'saved' && (
+            <SavedView
+              spots={spotsWithDistance}
+              saved={saved}
+              onToggleSave={handleToggleSave}
+              onSpotClick={handleSpotClick}
+              onAddSpot={openAdd}
+              onSearch={openSearch}
+              showNav={false}
+            />
+          )}
+          {tab === 'profile' && (
+            <ProfileView
+              user={user}
+              spots={spots}
+              onAddSpot={openAdd}
+              onSearch={openSearch}
+              showNav={false}
+              saved={saved}
+              onToggleSave={handleToggleSave}
+              onSpotClick={handleSpotClick}
+            />
+          )}
+        </div>
+
+        {/* Floating bottom nav pill */}
+        <div className="desktop-float-nav">
+          {TABS.map(({ id, label, Icon }) => (
+            <div
+              key={id}
+              className={`tab-item ${tab === id ? 'active' : ''}`}
+              onClick={() => handleTabChange(id)}
+              style={{ flex: 1 }}
+            >
+              <Icon color="#ffffff" size={22} filled={tab === id} />
+              <div className="tab-label">{label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Spot detail overlay */}
+        {selectedSpot && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }} onClick={handleBack}>
+            <div style={{ background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+              <SpotDetail
+                spot={selectedSpot}
+                saved={saved.has(selectedSpot.id)}
+                onToggleSave={handleToggleSave}
+                onBack={handleBack}
+                onEditSuccess={() => { refetch(); handleBack() }}
+                onSearch={openSearch}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Add spot overlay */}
+        {showAdd && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }} onClick={() => setShowAdd(false)}>
+            <div style={{ background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+              <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} />
+            </div>
+          </div>
+        )}
+
+      </>
+    )
+  }
+
+  // Mobile layout — spot detail
+  if (selectedSpot) {
+    return (
+      <>
+        <SafeAreaTop />
+        <SpotDetail
+          spot={selectedSpot}
+          saved={saved.has(selectedSpot.id)}
+          onToggleSave={handleToggleSave}
+          onBack={handleBack}
+          onEditSuccess={() => { refetch(); handleBack() }}
+          onSearch={openSearch}
+        />
+        <TabBar active={tab} onChange={t => { handleTabChange(t); setSelectedSpot(null) }} />
+        {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
+        {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
+      </>
+    )
+  }
+
+  // Mobile layout — add spot
+  if (showAdd) {
+    return (
+      <>
+        <SafeAreaTop />
+        <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} />
+      </>
+    )
+  }
+
+  // Mobile layout — main tabs
+  return (
+    <>
+      <SafeAreaTop />
+      {tab === 'list' && (
+        <ListView
+          spots={spotsWithDistance}
+          loading={loading}
+          saved={saved}
+          onToggleSave={handleToggleSave}
+          onSpotClick={handleSpotClick}
+          onAddSpot={openAdd}
+          onSearch={openSearch}
+          searchLocation={searchLocation}
+          onClearSearch={handleClearSearch}
+        />
+      )}
+      {tab === 'map' && (
+        <MapView
+          spots={spotsWithDistance}
+          saved={saved}
+          onToggleSave={handleToggleSave}
+          onSpotClick={handleSpotClick}
+          onAddSpot={openAdd}
+          userLocation={userLocation}
+          searchLocation={searchLocation}
+          onSearch={openSearch}
+        />
+      )}
+      {tab === 'saved' && (
+        <SavedView
+          spots={spotsWithDistance}
+          saved={saved}
+          onToggleSave={handleToggleSave}
+          onSpotClick={handleSpotClick}
+          onAddSpot={openAdd}
+          onSearch={openSearch}
+        />
+      )}
+      {tab === 'profile' && (
+        <ProfileView
+          user={user}
+          spots={spots}
+          onAddSpot={openAdd}
+          onSearch={openSearch}
+          saved={saved}
+          onToggleSave={handleToggleSave}
+          onSpotClick={handleSpotClick}
+        />
+      )}
+      <HomeScreenBanner />
+      <TabBar active={tab} onChange={handleTabChange} />
+      {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
+      {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
+    </>
+  )
+}

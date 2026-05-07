@@ -1,0 +1,607 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,400;0,700;0,900;1,400&display=swap');
+@import 'mapbox-gl/dist/mapbox-gl.css';
+
+:root {
+  --bg-primary: #FDF8F0;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #ECEDF2;
+  --border-primary: #EAD8C8;
+  --border-input: #C8CAD4;
+  --border-active: #2e3344;
+  --green-active-bg: #3D4454;
+  --green-active-border: #2e3344;
+  --green-active-text: #FFFFFF;
+  --text-primary: #2a1e14;
+  --text-secondary: #9a8878;
+  --text-muted: #6a6c7a;
+  --text-dim: #b0a090;
+  --salmon: #d4785a;
+  --salmon-light: #f5ede0;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+html {
+  background: #FDF8F0;
+}
+
+body {
+  background: #FDF8F0;
+  font-family: 'Barlow', sans-serif;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#root {
+  width: 100%;
+  max-width: 430px;
+  height: 100%;
+  background: var(--bg-primary);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollable content areas */
+.scroll-area {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+}
+
+.scroll-area::-webkit-scrollbar { display: none; }
+
+/* Shared chip styles */
+.chip {
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 10px;
+  border: 1px solid #C8CAD4;
+  color: #6a6c7a;
+  background: #ECEDF2;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chip.active {
+  background: #3D4454;
+  border-color: #2e3344;
+  color: #FFFFFF;
+}
+
+/* Shared button */
+.btn-salmon {
+  width: 100%;
+  padding: 13px;
+  border-radius: 6px;
+  background: var(--salmon);
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+}
+
+/* Cream navbar (list, map, saved, profile screens) */
+.navbar-cream {
+  padding: 10px 16px 12px;
+  padding-top: calc(env(safe-area-inset-top) + 10px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FDF8F0;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(212, 120, 90, 0.12);
+  position: relative;
+  z-index: 1000;
+}
+
+/* DROP A SPOT button */
+.btn-drop-spot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px 8px 10px;
+  border-radius: 4px;
+  background: #d4785a;
+  border: none;
+  color: #fff;
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.btn-drop-spot:active {
+  opacity: 0.85;
+}
+
+/* Legacy navbar */
+.navbar {
+  padding: 10px 16px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.nav-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  background: rgba(212, 120, 90, 0.13);
+  border: 1px solid rgba(212, 120, 90, 0.33);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  background: var(--salmon);
+  flex-shrink: 0;
+  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  position: relative;
+  z-index: 1000;
+}
+
+/* Desktop top nav — hidden on mobile */
+.desktop-top-nav {
+  display: none;
+}
+
+/* Desktop floating bottom nav — hidden on mobile */
+.desktop-float-nav {
+  display: none;
+}
+
+/* Desktop responsive layout */
+@media (min-width: 769px) {
+  #root {
+    max-width: 100%;
+  }
+
+  /* Hide mobile tab bar on desktop */
+  .tab-bar {
+    display: none;
+  }
+
+  /* Fixed top nav */
+  .desktop-top-nav {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: #FDF8F0;
+    border-bottom: 1px solid #E8DDD0;
+    z-index: 1000;
+    align-items: center;
+    padding: 0 24px;
+    gap: 0;
+  }
+
+  .desktop-nav-left {
+    display: flex;
+    align-items: center;
+    flex: 1;
+  }
+
+  .desktop-nav-center {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .desktop-nav-center-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 18px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: opacity 0.15s;
+  }
+
+  .desktop-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  /* Floating bottom nav pill */
+  .desktop-float-nav {
+    display: flex;
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 480px;
+    width: calc(100% - 48px);
+    background: #d4785a;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    padding: 10px 16px;
+    z-index: 999;
+  }
+
+  .desktop-float-nav .tab-item {
+    padding: 6px 0;
+  }
+
+  /* Content area offset for fixed top nav */
+  .desktop-content {
+    flex: 1;
+    padding-top: 64px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Extra bottom scroll clearance for floating nav */
+  .scroll-area {
+    padding-bottom: 100px;
+  }
+}
+
+.tab-item {
+  flex: 1;
+  padding: 10px 0 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.tab-item.active {
+  opacity: 1;
+}
+
+.tab-label {
+  font-size: 8px;
+  color: #ffffff;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+/* Type/feature badge */
+.spot-badge {
+  background: #3D4454;
+  color: #FFFFFF;
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: 1px solid #2e3344;
+}
+
+/* Tag pill */
+.tag {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #ECEDF2;
+  color: #6a6c7a;
+  border: 1px solid #C8CAD4;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Section label */
+.section-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: #E8DDD0;
+  margin: 14px 0;
+}
+
+/* Star button */
+.star-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: #ECEDF2;
+  border: 1px solid #C8CAD4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.star-btn--saved {
+  background: #3D4454;
+  border-color: #2e3344;
+}
+
+/* Map pin SVG reusable */
+.pin-icon {
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+/* Form inputs */
+.form-input {
+  background: #ECEDF2;
+  border: 1px solid #C8CAD4;
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  font-family: 'Barlow', sans-serif;
+  width: 100%;
+  outline: none;
+}
+
+.form-input::placeholder { color: var(--text-muted); }
+.form-input:focus { border-color: var(--border-active); }
+
+textarea.form-input {
+  resize: none;
+  min-height: 72px;
+  line-height: 1.5;
+}
+
+/* Arrow button on cards */
+.arrow-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: var(--salmon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* Distance text */
+.dist-text {
+  font-size: 10px;
+  color: var(--salmon);
+  font-weight: 700;
+}
+
+/* Modal overlay */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 9999;
+  display: flex;
+  align-items: flex-end;
+}
+
+.modal-sheet {
+  background: #FFFFFF;
+  border-radius: 12px 12px 0 0;
+  width: 100%;
+  border-top: 1px solid #EAD8C8;
+  padding-bottom: 16px;
+}
+
+.modal-handle {
+  width: 32px;
+  height: 3px;
+  background: #C8CAD4;
+  border-radius: 2px;
+  margin: 10px auto 14px;
+}
+
+.modal-title {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.modal-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 20px;
+  cursor: pointer;
+  border-top: 1px solid #ECEDF2;
+}
+
+.modal-cancel {
+  margin: 8px 14px 0;
+  padding: 12px;
+  border-radius: 6px;
+  background: #ECEDF2;
+  text-align: center;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Auth screen */
+.auth-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  gap: 16px;
+}
+
+/* Loading */
+.loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Spot card */
+.spot-card {
+  margin: 0 12px 10px;
+  border-radius: 6px;
+  background: #FFFFFF;
+  border: 1px solid #EAD8C8;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.spot-card:hover { border-color: #C8CAD4; }
+
+.spot-card-img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #F0E8DE;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spot-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.spot-card-body {
+  padding: 10px 12px 12px;
+}
+
+.spot-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 3px;
+  gap: 8px;
+}
+
+.spot-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.spot-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.spot-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.tags-wrap {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* Hide scrollbars on filter chips row */
+.hide-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hide-scroll::-webkit-scrollbar { display: none; }
+
+/* Pulsing user location dot */
+@keyframes user-loc-pulse {
+  0%   { transform: scale(0.85); opacity: 0.7; }
+  60%  { transform: scale(1.35); opacity: 0.15; }
+  100% { transform: scale(0.85); opacity: 0; }
+}
+
+.user-loc-pulse {
+  animation: user-loc-pulse 2s ease-out infinite;
+}
+
+/* Fix mapbox marker clipping at map edges */
+.mapboxgl-map { overflow: visible !important; }
+
+/* Desktop list view 3-column grid */
+@media (min-width: 769px) {
+  .spots-list-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .spots-list-grid .spot-card {
+    margin: 0;
+  }
+
+  .spots-list-grid .spot-card:hover {
+    border-color: #d4785a;
+  }
+}
