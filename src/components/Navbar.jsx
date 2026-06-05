@@ -18,7 +18,7 @@ export default function Navbar({ onAddSpot, onSearch }) {
         {onSearch && (
           <div
             onClick={onSearch}
-            style={{ width: 34, height: 34, borderRadius: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            style={{ width: 34, height: 34, borderRadius: 6, background: '#FDF8F0', border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
           >
             <SearchIcon />
           </div>

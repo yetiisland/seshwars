@@ -1,10 +1,10 @@
-import { ListIcon, MapPinIcon, StarIcon, ProfileIcon } from './Icons'
+import { ListIcon, MapPinIcon, BookmarkIcon, ProfileIcon } from './Icons'
 
 export default function TabBar({ active, onChange }) {
   const tabs = [
     { id: 'list', label: 'List', Icon: ListIcon },
     { id: 'map', label: 'Map', Icon: MapPinIcon },
-    { id: 'saved', label: 'Saved', Icon: StarIcon },
+    { id: 'saved', label: 'Saved', Icon: BookmarkIcon },
     { id: 'profile', label: 'Profile', Icon: ProfileIcon },
   ]
 
@@ -16,10 +16,7 @@ export default function TabBar({ active, onChange }) {
           className={`tab-item ${active === id ? 'active' : ''}`}
           onClick={() => onChange(id)}
         >
-          <div className="tab-icon">
-            <Icon color="#ffffff" size={22} filled={active === id} />
-          </div>
-          <div className="tab-label">{label}</div>
+          <Icon color="#ffffff" size={36} filled={active === id} />
         </div>
       ))}
     </div>

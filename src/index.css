@@ -26,10 +26,23 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Prevent iOS from auto-zooming when focusing inputs */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
 html, body, #root {
   height: 100%;
   width: 100%;
   overflow: hidden;
+}
+
+/* Use dynamic viewport height so content never hides behind Safari browser chrome.
+   Falls back to 100% (= 100vh) on browsers that don't support dvh. */
+@supports (height: 100dvh) {
+  html {
+    height: 100dvh;
+  }
 }
 
 html {
@@ -168,7 +181,9 @@ body {
   display: flex;
   background: var(--salmon);
   flex-shrink: 0;
-  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  /* max() picks the largest: physical safe area (notch/home bar) or 24px floor.
+     Combined with 100dvh on html, this prevents overlap with Safari's bottom toolbar. */
+  padding-bottom: max(env(safe-area-inset-bottom), 24px);
   position: relative;
   z-index: 1000;
 }
@@ -261,7 +276,7 @@ body {
   }
 
   .desktop-float-nav .tab-item {
-    padding: 6px 0;
+    padding: 8px 0;
   }
 
   /* Content area offset for fixed top nav */
@@ -281,11 +296,11 @@ body {
 
 .tab-item {
   flex: 1;
-  padding: 10px 0 9px;
+  padding: 11px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 0;
   cursor: pointer;
   opacity: 0.55;
   transition: opacity 0.15s;
@@ -346,13 +361,13 @@ body {
   margin: 14px 0;
 }
 
-/* Star button */
+/* Bookmark button */
 .star-btn {
   width: 26px;
   height: 26px;
   border-radius: 6px;
-  background: #ECEDF2;
-  border: 1px solid #C8CAD4;
+  background: #f5e6e0;
+  border: 1px solid #e8c0b0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -361,8 +376,8 @@ body {
 }
 
 .star-btn--saved {
-  background: #3D4454;
-  border-color: #2e3344;
+  background: #d4785a;
+  border-color: #c06040;
 }
 
 /* Map pin SVG reusable */
@@ -427,7 +442,7 @@ textarea.form-input {
   border-radius: 12px 12px 0 0;
   width: 100%;
   border-top: 1px solid #EAD8C8;
-  padding-bottom: 16px;
+  padding-bottom: max(env(safe-area-inset-bottom), 16px);
 }
 
 .modal-handle {

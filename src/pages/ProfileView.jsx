@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import SpotCard from '../components/SpotCard'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onToggleSave, onSpotClick }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -15,15 +15,21 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [showMySpots, setShowMySpots] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
+
+  useEffect(() => {
+    const handler = () => setIsDesktop(window.innerWidth >= 769)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   const [profile, setProfile] = useState({ username: '', first_name: '', last_name: '', avatar_url: '' })
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [showAddToHome, setShowAddToHome] = useState(false)
   const avatarRef = useRef()
 
   const identifier = user?.email?.split('@')[0] || ''
-  const mySpots = spots.filter(s => s.added_by === identifier)
+  const mySpots = spots.filter(s => s.added_by === identifier || s.added_by === user?.id)
 
   useEffect(() => {
     if (!user?.id) return
@@ -142,11 +148,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   return (
     <>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <div className="scroll-area">
         <div style={{ padding: '24px 14px 0', maxWidth: 480, margin: '0 auto', width: '100%' }}>
 
           {/* Avatar + name */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <div
                 onClick={() => avatarRef.current?.click()}
@@ -172,8 +179,24 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>@{profile.username || identifier}</div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{user.email}</div>
             </div>
-            <div onClick={() => setEditMode(e => !e)} style={{ fontSize: 10, color: 'var(--salmon)', fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', textTransform: 'uppercase' }}>
-              {editMode ? 'Cancel' : 'Edit'}
+          </div>
+
+          {/* Edit button below name */}
+          <div style={{ marginBottom: 20 }}>
+            <div
+              onClick={() => setEditMode(e => !e)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                border: '1px solid rgba(212,120,90,0.5)', borderRadius: 6,
+                padding: '5px 12px', cursor: 'pointer',
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                <path d="M9.5 2L12 4.5L5 11.5H2.5V9L9.5 2Z" stroke="#d4785a" strokeWidth="1.3" strokeLinejoin="round" />
+              </svg>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--salmon)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                {editMode ? 'Cancel' : 'Edit Profile'}
+              </span>
             </div>
           </div>
 
@@ -204,9 +227,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               onClick={() => setShowMySpots(true)}
               style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             >
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{mySpots.length}</div>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Spots Added</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <svg width="18" height="22" viewBox="0 0 20 24" fill="none">
+                  <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
+                  <circle cx="10" cy="10" r="4" fill="#fff" />
+                </svg>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{mySpots.length}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Spots Added</div>
+                </div>
               </div>
               <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
                 <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -216,13 +245,13 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
           <div className="divider" />
 
-          {/* Add to home screen */}
           <button
-            onClick={() => setShowAddToHome(true)}
-            style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', marginBottom: 14 }}
+            onClick={() => window.open('https://venmo.com/taylorselgas', '_blank')}
+            style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', marginBottom: 8 }}
           >
-            Add App to Home Screen
+            Donate
           </button>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center', marginBottom: 14 }}>Thanks for helping me keep this app running 🤘</div>
 
           <div onClick={handleSignOut} style={{ padding: '12px 0', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}>
             Sign Out
@@ -231,24 +260,23 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         </div>
       </div>
 
-      {/* My Spots full-screen overlay */}
+      {/* My Spots overlay — scoped to content area (does not cover TabBar) */}
       {showMySpots && (
-        <div style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 500, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
           <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
+            display: 'flex', alignItems: 'center',
+            padding: '12px 16px',
             background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
           }}>
-            <div style={{ width: 36 }} />
-            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-              My Spots
-            </div>
-            <div onClick={() => setShowMySpots(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <div onClick={() => setShowMySpots(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
+            <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+              My Spots
+            </div>
+            <div style={{ width: 36 }} />
           </div>
           <div className="scroll-area" style={{ paddingTop: 14 }}>
             {mySpots.length === 0 ? (
@@ -261,7 +289,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   key={spot.id}
                   spot={spot}
                   saved={saved?.has(spot.id) ?? false}
-                  onToggleSave={onToggleSave}
+                  onSavePress={onSavePress}
                   onClick={s => { setShowMySpots(false); onSpotClick?.(s) }}
                 />
               ))
@@ -270,46 +298,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           </div>
         </div>
       )}
+      </div>{/* end content wrapper */}
 
-      {/* Add to home screen modal */}
-      {showAddToHome && (
-        <div className="modal-overlay" onClick={() => setShowAddToHome(false)}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-            <div className="modal-handle" />
-            <div className="modal-title">Add App to Home Screen</div>
-            <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                Get the full app experience by adding Seshwars to your home screen:
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <div style={{ width: 24, height: 24, borderRadius: 4, background: '#ECEDF2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 900, color: '#6a6c7a' }}>1</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                  Tap the <strong>Share Button</strong> <svg width="11" height="11" viewBox="0 0 14 14" fill="none" style={{ display: 'inline', verticalAlign: 'middle' }}><path d="M7 1V9" stroke="var(--text-primary)" strokeWidth="1.5" strokeLinecap="round" /><path d="M4 4L7 1L10 4" stroke="var(--text-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M2 8V12C2 12.6 2.4 13 3 13H11C11.6 13 12 12.6 12 12V8" stroke="var(--text-primary)" strokeWidth="1.5" strokeLinecap="round" /></svg> on your web browser
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <div style={{ width: 24, height: 24, borderRadius: 4, background: '#ECEDF2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 900, color: '#6a6c7a' }}>2</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                  Scroll down and tap <strong>"Add to Home Screen"</strong>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <div style={{ width: 24, height: 24, borderRadius: 4, background: '#ECEDF2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 900, color: '#6a6c7a' }}>3</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                  Tap <strong>Add</strong> — the app will appear on your home screen
-                </div>
-              </div>
-            </div>
-            <div className="modal-cancel" onClick={() => setShowAddToHome(false)}>Done</div>
-          </div>
-        </div>
-      )}
     </>
   )
 }

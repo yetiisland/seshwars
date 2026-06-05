@@ -9,11 +9,37 @@ export function useSpots() {
 
   const fetchSpots = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('spots')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (!error && data) setSpots(data)
+    const [spotsRes, reviewsRes, reportsRes] = await Promise.all([
+      supabase.from('spots').select('*').order('created_at', { ascending: false }),
+      supabase.from('spot_reviews').select('spot_id, rating'),
+      supabase.from('spot_reports').select('spot_id, report_type, custom_text').order('created_at', { ascending: false }),
+    ])
+    if (!spotsRes.error && spotsRes.data) {
+      const rMap = {}
+      for (const r of (reviewsRes.data || [])) {
+        if (!rMap[r.spot_id]) rMap[r.spot_id] = { sum: 0, count: 0 }
+        rMap[r.spot_id].sum += r.rating
+        rMap[r.spot_id].count++
+      }
+      const repMap = {}
+      for (const r of (reportsRes.data || [])) {
+        if (!repMap[r.spot_id]) repMap[r.spot_id] = { count: 0, most_recent: r.report_type, most_recent_custom: r.custom_text }
+        repMap[r.spot_id].count++
+      }
+      const merged = spotsRes.data.map(s => {
+        const r = rMap[s.id]
+        const rep = repMap[s.id]
+        return {
+          ...s,
+          avg_rating: r ? parseFloat((r.sum / r.count).toFixed(1)) : null,
+          rating_count: r ? r.count : 0,
+          report_count: rep?.count || 0,
+          most_recent_report: rep?.most_recent || null,
+          most_recent_report_custom: rep?.most_recent_custom || null,
+        }
+      })
+      setSpots(merged)
+    }
     setLoading(false)
   }, [])
 
@@ -24,7 +50,6 @@ export function useSpots() {
 
 export function useSavedSpots(userId) {
   const [saved, setSaved] = useState(() => {
-    // Initialize from localStorage immediately so guests never start with empty set
     try {
       const stored = JSON.parse(localStorage.getItem(LS_SAVED_KEY) || '[]')
       return new Set(stored)
@@ -33,19 +58,19 @@ export function useSavedSpots(userId) {
     }
   })
 
+  // Fetch ALL saved spot_ids for this user, regardless of list — used for icon state
+  const refetchSaved = useCallback(async () => {
+    if (!userId) return
+    const { data, error } = await supabase
+      .from('saved_spots')
+      .select('spot_id')
+      .eq('user_id', userId)
+    if (!error && data) setSaved(new Set(data.map(d => d.spot_id)))
+  }, [userId])
+
   useEffect(() => {
     if (userId) {
-      supabase
-        .from('saved_spots')
-        .select('spot_id')
-        .eq('user_id', userId)
-        .then(({ data, error }) => {
-          if (error) {
-            console.error('[saved_spots] fetch error:', error)
-          } else if (data) {
-            setSaved(new Set(data.map(d => d.spot_id)))
-          }
-        })
+      refetchSaved()
     } else {
       try {
         const stored = JSON.parse(localStorage.getItem(LS_SAVED_KEY) || '[]')
@@ -54,37 +79,7 @@ export function useSavedSpots(userId) {
         setSaved(new Set())
       }
     }
-  }, [userId])
+  }, [userId, refetchSaved])
 
-  const toggle = useCallback(async (spotId) => {
-    if (userId) {
-      setSaved(prev => {
-        const next = new Set(prev)
-        if (next.has(spotId)) {
-          next.delete(spotId)
-          supabase.from('saved_spots')
-            .delete()
-            .eq('user_id', userId)
-            .eq('spot_id', spotId)
-            .then(({ error }) => { if (error) console.error('[saved_spots] delete error:', error) })
-        } else {
-          next.add(spotId)
-          supabase.from('saved_spots')
-            .insert({ user_id: userId, spot_id: spotId })
-            .then(({ error }) => { if (error) console.error('[saved_spots] insert error:', error) })
-        }
-        return next
-      })
-    } else {
-      setSaved(prev => {
-        const next = new Set(prev)
-        if (next.has(spotId)) next.delete(spotId)
-        else next.add(spotId)
-        try { localStorage.setItem(LS_SAVED_KEY, JSON.stringify([...next])) } catch {}
-        return next
-      })
-    }
-  }, [userId])
-
-  return { saved, toggleSave: toggle }
+  return { saved, refetchSaved }
 }

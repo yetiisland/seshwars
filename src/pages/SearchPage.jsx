@@ -19,12 +19,12 @@ function getState(context = []) {
 
 function PinSVG({ filled }) {
   return filled ? (
-    <svg width="16" height="20" viewBox="0 0 20 24" fill="none">
+    <svg width="18" height="22" viewBox="-2 -2 24 28" fill="none" style={{ overflow: 'visible' }}>
       <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
       <circle cx="10" cy="10" r="4" fill="#fff" />
     </svg>
   ) : (
-    <svg width="14" height="18" viewBox="0 0 20 24" fill="none">
+    <svg width="16" height="20" viewBox="-2 -2 24 28" fill="none" style={{ overflow: 'visible' }}>
       <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" stroke="#d4785a" strokeWidth="1.6" fill="none" />
       <circle cx="10" cy="10" r="4" stroke="#d4785a" strokeWidth="1.6" fill="none" />
     </svg>
@@ -187,7 +187,7 @@ export default function SearchPage({ spots, onSelect, onClose }) {
               background: (showSuggestions && i === 0) ? '#FDF8F0' : 'transparent',
             }}
           >
-            <div style={{ flexShrink: 0, width: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ flexShrink: 0, width: 22, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
               {showSuggestions ? <PinSVG filled={i === 0} /> : <ClockSVG />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>

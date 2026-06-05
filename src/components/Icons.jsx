@@ -9,35 +9,60 @@ export function ListIcon({ color = '#ffffff', size = 22, filled = false }) {
         </>
       ) : (
         <>
-          <rect x="4" y="7" width="40" height="10" rx="3" stroke={color} strokeWidth="3" fill="none" />
-          <rect x="4" y="21" width="40" height="10" rx="3" stroke={color} strokeWidth="3" fill="none" />
-          <rect x="4" y="35" width="40" height="10" rx="3" stroke={color} strokeWidth="3" fill="none" />
+          {/* Inset by strokeWidth/2 so stroke sits fully inside the original rect bounds */}
+          <rect x="5.5" y="8.5" width="37" height="7" rx="1.5" stroke={color} strokeWidth="3" fill="none" />
+          <rect x="5.5" y="22.5" width="37" height="7" rx="1.5" stroke={color} strokeWidth="3" fill="none" />
+          <rect x="5.5" y="36.5" width="37" height="7" rx="1.5" stroke={color} strokeWidth="3" fill="none" />
         </>
       )}
     </svg>
   )
 }
 
-// Folded map icon — two parallelogram panels with crease lines
-const MAP_LEFT = 'M5 10L24 4L24 40L5 46Z'
-const MAP_RIGHT = 'M24 4L43 10L43 46L24 40Z'
-
 export function MapPinIcon({ color = '#ffffff', size = 22, filled = false }) {
   if (filled) {
     return (
-      <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
-        <path d={MAP_LEFT} fill={color} />
-        <path d={MAP_RIGHT} fill={color} fillOpacity={0.75} />
-        <line x1="24" y1="4" x2="24" y2="40" stroke="rgba(0,0,0,0.18)" strokeWidth="2" />
-        <polyline points="5,27 24,21 43,27" stroke="rgba(0,0,0,0.13)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      // viewBox padded 1.5px on all sides to prevent edge clipping
+      // fillRule="evenodd" punches the inner circle as transparent negative space
+      <svg width={size * 0.83} height={size} viewBox="-1.5 -1.5 23 27" fill="none">
+        <path
+          fillRule="evenodd"
+          d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z M14 10A4 4 0 1 0 6 10A4 4 0 1 0 14 10Z"
+          fill={color}
+        />
       </svg>
     )
   }
   return (
+    // viewBox padded 1.5px on all sides; clipPath clips stroke to inside the pin shape
+    <svg width={size * 0.83} height={size} viewBox="-1.5 -1.5 23 27" fill="none">
+      <defs>
+        <clipPath id="sw-pin-clip">
+          <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" />
+        </clipPath>
+      </defs>
+      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" stroke={color} strokeWidth="3" fill="none" clipPath="url(#sw-pin-clip)" />
+      <circle cx="10" cy="10" r="3.25" stroke={color} strokeWidth="1.5" fill="none" />
+    </svg>
+  )
+}
+
+export function BookmarkIcon({ color = '#6a6c7a', size = 22, filled = false }) {
+  const path = 'M8,4 H40 V46 L24,34 L8,46 Z'
+  return (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
-      <path d={MAP_LEFT} stroke={color} strokeWidth="2.5" strokeLinejoin="round" fill="none" />
-      <path d={MAP_RIGHT} stroke={color} strokeWidth="2.5" strokeLinejoin="round" fill="none" />
-      <polyline points="5,27 24,21 43,27" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {filled ? (
+        <path d={path} fill={color} />
+      ) : (
+        <>
+          <defs>
+            <clipPath id="sw-bm-clip">
+              <path d={path} />
+            </clipPath>
+          </defs>
+          <path d={path} stroke={color} strokeWidth="7" strokeLinejoin="round" fill="none" clipPath="url(#sw-bm-clip)" />
+        </>
+      )}
     </svg>
   )
 }
@@ -80,7 +105,14 @@ export function ProfileIcon({ color = '#ffffff', size = 22, filled = false }) {
       {filled ? (
         <path d={PROFILE_PATH} fill={color} />
       ) : (
-        <path d={PROFILE_PATH} stroke={color} strokeWidth="2.5" fill="none" strokeLinejoin="round" />
+        <>
+          <defs>
+            <clipPath id="sw-prof-clip">
+              <path d={PROFILE_PATH} />
+            </clipPath>
+          </defs>
+          <path d={PROFILE_PATH} stroke={color} strokeWidth="5" fill="none" strokeLinejoin="round" clipPath="url(#sw-prof-clip)" />
+        </>
       )}
     </svg>
   )

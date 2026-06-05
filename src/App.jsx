@@ -1,18 +1,19 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
+import AuthScreen from './pages/AuthScreen'
 import { useSpots, useSavedSpots } from './hooks/useSpots'
 import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
 import TabBar from './components/TabBar'
 import Logo from './components/Logo'
-import { PlusIcon, ListIcon, MapPinIcon, StarIcon, ProfileIcon } from './components/Icons'
+import { PlusIcon, ListIcon, MapPinIcon, BookmarkIcon, ProfileIcon } from './components/Icons'
+import SaveToListModal from './components/SaveToListModal'
 import ListView from './pages/ListView'
 import MapView from './pages/MapView'
 import SavedView from './pages/SavedView'
 import ProfileView from './pages/ProfileView'
-import SpotDetail from './pages/SpotDetail'
 import AddSpot from './pages/AddSpot'
 import SearchPage from './pages/SearchPage'
-import HomeScreenBanner from './components/HomeScreenBanner'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const SEARCH_RADIUS_MILES = 100 / 1.60934
@@ -20,18 +21,28 @@ const SEARCH_RADIUS_MILES = 100 / 1.60934
 const TABS = [
   { id: 'list', label: 'List', Icon: ListIcon },
   { id: 'map', label: 'Map', Icon: MapPinIcon },
-  { id: 'saved', label: 'Saved', Icon: StarIcon },
+  { id: 'saved', label: 'Saved', Icon: BookmarkIcon },
   { id: 'profile', label: 'Profile', Icon: ProfileIcon },
 ]
 
+const IS_STANDALONE = window.navigator.standalone === true ||
+  window.matchMedia('(display-mode: standalone)').matches
+
 function SafeAreaTop() {
-  return (
-    <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0,
-      height: 'env(safe-area-inset-top)',
-      background: '#FDF8F0', zIndex: 300, pointerEvents: 'none', flexShrink: 0,
-    }} />
-  )
+  // In standalone PWA mode the status bar sits above the content — only need
+  // to fill env(safe-area-inset-top) so the background colour shows through.
+  // In browser mode the browser renders its own chrome above the page so this
+  // component isn't needed (content already starts below the address bar).
+  if (IS_STANDALONE) {
+    return (
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0,
+        height: 'env(safe-area-inset-top)',
+        background: '#FDF8F0', zIndex: 300, pointerEvents: 'none', flexShrink: 0,
+      }} />
+    )
+  }
+  return null
 }
 
 function AuthPromptModal({ onClose, onGoProfile }) {
@@ -79,7 +90,7 @@ function LocationChip({ location, onClear }) {
 
 function SearchBtn({ onClick }) {
   return (
-    <div onClick={onClick} style={{ width: 34, height: 34, borderRadius: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+    <div onClick={onClick} style={{ width: 34, height: 34, borderRadius: 6, background: '#FDF8F0', border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
       <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
         <circle cx="6" cy="6" r="4" stroke="#d4785a" strokeWidth="1.3" />
         <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
@@ -224,24 +235,29 @@ function DesktopSearchBar({ spots, searchLocation, onSelect, onClear }) {
   )
 }
 
+const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 function matchesFilters(s, filters) {
   if (filters.includes('All') || filters.length === 0) return true
-  return filters.some(f => s.type === f || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))
+  return filters.some(f => normalizeType(s.type) === normalizeType(f) || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))
 }
 
 export default function App() {
-  const [tab, setTab] = useState('list')
+  const navigate = useNavigate()
+  const [tab, setTab] = useState(() => sessionStorage.getItem('activeTab') || 'list')
   const [user, setUser] = useState(null)
-  const [selectedSpot, setSelectedSpot] = useState(null)
+  const [authLoaded, setAuthLoaded] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchLocation, setSearchLocation] = useState(null)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
 
+  const [filters, setFilters] = useState(['All'])
   const { spots, loading, refetch } = useSpots()
-  const { saved, toggleSave } = useSavedSpots(user?.id)
+  const { saved, refetchSaved } = useSavedSpots(user?.id)
+  const [saveModalSpot, setSaveModalSpot] = useState(null)
   const userLocation = useGeolocation()
+  const isAdmin = user?.email?.includes('taylorselgas') ?? false
 
   useEffect(() => {
     const handler = () => setIsDesktop(window.innerWidth >= 769)
@@ -276,35 +292,79 @@ export default function App() {
     return baseSpots
   }, [spots, userLocation, searchLocation])
 
+  const visibleSpots = useMemo(() => {
+    if (isAdmin) return spotsWithDistance
+    return spotsWithDistance.filter(s => {
+      const status = s.moderation_status
+      if (!status || status === 'approved') return true
+      if (status === 'pending' && user?.id && s.added_by === user.id) return true
+      return false
+    })
+  }, [spotsWithDistance, isAdmin, user])
+
   useEffect(() => {
+    let mounted = true
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
       setUser(session?.user ?? null)
+      setAuthLoaded(true)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
       setUser(session?.user ?? null)
+      setAuthLoaded(true)
+      if (event === 'SIGNED_IN' && session?.user) {
+        const u = session.user
+        const provider = u.app_metadata?.provider
+        if (provider && provider !== 'email') {
+          const { data: profile } = await supabase.from('profiles').select('id').eq('id', u.id).maybeSingle()
+          if (!profile) {
+            const meta = u.user_metadata || {}
+            const fullName = (meta.full_name || meta.name || '').trim()
+            const parts = fullName.split(' ')
+            const firstName = meta.given_name || parts[0] || ''
+            const lastName = meta.family_name || parts.slice(1).join(' ') || ''
+            const base = firstName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'skater'
+            const uname = base + '_' + Math.floor(Math.random() * 9000 + 1000)
+            await supabase.from('profiles').insert({ id: u.id, username: uname, first_name: firstName, last_name: lastName || null }).catch(() => {})
+          }
+        }
+      }
     })
-    return () => subscription.unsubscribe()
+    return () => { mounted = false; subscription.unsubscribe() }
   }, [])
+
+  useEffect(() => {
+    const handler = () => refetch()
+    window.addEventListener('seshwars:spots-changed', handler)
+    return () => window.removeEventListener('seshwars:spots-changed', handler)
+  }, [refetch])
 
   const openSearch = () => setShowSearch(true)
   const closeSearch = () => setShowSearch(false)
   const handleSelectLocation = (entry) => { setSearchLocation(entry); closeSearch() }
   const handleClearSearch = () => setSearchLocation(null)
-  const handleToggleSave = toggleSave
+  const handleSavePress = (spot) => setSaveModalSpot(spot)
   const handleAddSuccess = () => { setShowAdd(false); refetch() }
   const openAdd = () => { setShowAdd(true); closeSearch() }
 
-  const handleSpotClick = (spot) => setSelectedSpot(spot)
-  const handleBack = () => { setSelectedSpot(null); closeSearch() }
+  const handleSpotClick = (spot) => {
+    const id = spot.slug || spot.id
+    sessionStorage.setItem('activeTab', tab)
+    navigate(`/spots/${id}`, { state: { spot, prevTab: tab } })
+  }
 
-  const handleTabChange = (t) => { setTab(t); closeSearch() }
+  const handleTabChange = (t) => { setTab(t); sessionStorage.setItem('activeTab', t); closeSearch() }
 
   const goToProfile = () => {
     setShowAuthPrompt(false)
-    setSelectedSpot(null)
+    setSaveModalSpot(null)
     closeSearch()
     setTab('profile')
   }
+
+  if (!authLoaded) return <div className="loading" />
+  if (!user) return <AuthScreen />
 
   // Desktop layout
   if (isDesktop) {
@@ -330,39 +390,44 @@ export default function App() {
         <div className="desktop-content">
           {tab === 'list' && (
             <ListView
-              spots={spotsWithDistance}
+              spots={visibleSpots}
               loading={loading}
               saved={saved}
-              onToggleSave={handleToggleSave}
+              onSavePress={handleSavePress}
               onSpotClick={handleSpotClick}
               onAddSpot={openAdd}
               onSearch={openSearch}
               searchLocation={searchLocation}
               onClearSearch={handleClearSearch}
               showNav={false}
+              filters={filters}
+              onFiltersChange={setFilters}
             />
           )}
           {tab === 'map' && (
             <MapView
-              spots={spotsWithDistance}
+              spots={visibleSpots}
               saved={saved}
-              onToggleSave={handleToggleSave}
+              onSavePress={handleSavePress}
               onSpotClick={handleSpotClick}
               onAddSpot={openAdd}
               userLocation={userLocation}
               searchLocation={searchLocation}
               showNav={false}
+              filters={filters}
+              onFiltersChange={setFilters}
             />
           )}
           {tab === 'saved' && (
             <SavedView
-              spots={spotsWithDistance}
+              spots={visibleSpots}
               saved={saved}
-              onToggleSave={handleToggleSave}
+              onSavePress={handleSavePress}
               onSpotClick={handleSpotClick}
               onAddSpot={openAdd}
               onSearch={openSearch}
               showNav={false}
+              user={user}
             />
           )}
           {tab === 'profile' && (
@@ -373,7 +438,7 @@ export default function App() {
               onSearch={openSearch}
               showNav={false}
               saved={saved}
-              onToggleSave={handleToggleSave}
+              onSavePress={handleSavePress}
               onSpotClick={handleSpotClick}
             />
           )}
@@ -381,132 +446,110 @@ export default function App() {
 
         {/* Floating bottom nav pill */}
         <div className="desktop-float-nav">
-          {TABS.map(({ id, label, Icon }) => (
+          {TABS.map(({ id, Icon }) => (
             <div
               key={id}
               className={`tab-item ${tab === id ? 'active' : ''}`}
               onClick={() => handleTabChange(id)}
               style={{ flex: 1 }}
             >
-              <Icon color="#ffffff" size={22} filled={tab === id} />
-              <div className="tab-label">{label}</div>
+              <Icon color="#ffffff" size={36} filled={tab === id} />
             </div>
           ))}
         </div>
 
-        {/* Spot detail overlay */}
-        {selectedSpot && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }} onClick={handleBack}>
-            <div style={{ background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-              <SpotDetail
-                spot={selectedSpot}
-                saved={saved.has(selectedSpot.id)}
-                onToggleSave={handleToggleSave}
-                onBack={handleBack}
-                onEditSuccess={() => { refetch(); handleBack() }}
-                onSearch={openSearch}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Add spot overlay */}
         {showAdd && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }} onClick={() => setShowAdd(false)}>
-            <div style={{ background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-              <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} />
+            <div style={{ background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', position: 'relative' }} onClick={e => e.stopPropagation()}>
+              <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} onGoProfile={goToProfile} />
             </div>
           </div>
+        )}
+
+        {saveModalSpot && (
+          <SaveToListModal
+            spot={saveModalSpot}
+            user={user}
+            onClose={() => { setSaveModalSpot(null); refetchSaved() }}
+          />
         )}
 
       </>
     )
   }
 
-  // Mobile layout — spot detail
-  if (selectedSpot) {
-    return (
-      <>
-        <SafeAreaTop />
-        <SpotDetail
-          spot={selectedSpot}
-          saved={saved.has(selectedSpot.id)}
-          onToggleSave={handleToggleSave}
-          onBack={handleBack}
-          onEditSuccess={() => { refetch(); handleBack() }}
-          onSearch={openSearch}
-        />
-        <TabBar active={tab} onChange={t => { handleTabChange(t); setSelectedSpot(null) }} />
-        {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
-        {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
-      </>
-    )
-  }
-
-  // Mobile layout — add spot
-  if (showAdd) {
-    return (
-      <>
-        <SafeAreaTop />
-        <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} />
-      </>
-    )
-  }
-
-  // Mobile layout — main tabs
+  // Mobile layout — always show TabBar; AddSpot overlays content area
   return (
     <>
       <SafeAreaTop />
-      {tab === 'list' && (
-        <ListView
-          spots={spotsWithDistance}
-          loading={loading}
-          saved={saved}
-          onToggleSave={handleToggleSave}
-          onSpotClick={handleSpotClick}
-          onAddSpot={openAdd}
-          onSearch={openSearch}
-          searchLocation={searchLocation}
-          onClearSearch={handleClearSearch}
-        />
+      {showAdd ? (
+        <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} onGoProfile={goToProfile} />
+      ) : (
+        <>
+          {tab === 'list' && (
+            <ListView
+              spots={visibleSpots}
+              loading={loading}
+              saved={saved}
+              onSavePress={handleSavePress}
+              onSpotClick={handleSpotClick}
+              onAddSpot={openAdd}
+              onSearch={openSearch}
+              searchLocation={searchLocation}
+              onClearSearch={handleClearSearch}
+              filters={filters}
+              onFiltersChange={setFilters}
+            />
+          )}
+          {tab === 'map' && (
+            <MapView
+              spots={visibleSpots}
+              saved={saved}
+              onSavePress={handleSavePress}
+              onSpotClick={handleSpotClick}
+              onAddSpot={openAdd}
+              userLocation={userLocation}
+              searchLocation={searchLocation}
+              onSearch={openSearch}
+              filters={filters}
+              onFiltersChange={setFilters}
+            />
+          )}
+          {tab === 'saved' && (
+            <SavedView
+              spots={visibleSpots}
+              saved={saved}
+              onSavePress={handleSavePress}
+              onSpotClick={handleSpotClick}
+              onAddSpot={openAdd}
+              onSearch={openSearch}
+              user={user}
+            />
+          )}
+          {tab === 'profile' && (
+            <ProfileView
+              user={user}
+              spots={spots}
+              onAddSpot={openAdd}
+              onSearch={openSearch}
+              saved={saved}
+              onSavePress={handleSavePress}
+              onSpotClick={handleSpotClick}
+            />
+          )}
+        </>
       )}
-      {tab === 'map' && (
-        <MapView
-          spots={spotsWithDistance}
-          saved={saved}
-          onToggleSave={handleToggleSave}
-          onSpotClick={handleSpotClick}
-          onAddSpot={openAdd}
-          userLocation={userLocation}
-          searchLocation={searchLocation}
-          onSearch={openSearch}
-        />
-      )}
-      {tab === 'saved' && (
-        <SavedView
-          spots={spotsWithDistance}
-          saved={saved}
-          onToggleSave={handleToggleSave}
-          onSpotClick={handleSpotClick}
-          onAddSpot={openAdd}
-          onSearch={openSearch}
-        />
-      )}
-      {tab === 'profile' && (
-        <ProfileView
-          user={user}
-          spots={spots}
-          onAddSpot={openAdd}
-          onSearch={openSearch}
-          saved={saved}
-          onToggleSave={handleToggleSave}
-          onSpotClick={handleSpotClick}
-        />
-      )}
-      <HomeScreenBanner />
       <TabBar active={tab} onChange={handleTabChange} />
       {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
       {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
+      {saveModalSpot && (
+        <SaveToListModal
+          spot={saveModalSpot}
+          user={user}
+          onClose={() => { setSaveModalSpot(null); refetchSaved() }}
+        />
+      )}
     </>
   )
 }

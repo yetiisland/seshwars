@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Navbar from '../components/Navbar'
-import FilterChips from '../components/FilterChips'
+import FiltersModal from '../components/FiltersModal'
 import SpotCard from '../components/SpotCard'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
@@ -28,13 +28,17 @@ function LocationChip({ location, onClear }) {
   )
 }
 
-export default function ListView({ spots, loading, saved, onToggleSave, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true }) {
-  const [filters, setFilters] = useState(['All'])
+const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
+
+export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange }) {
+  const [localFilters, setLocalFilters] = useState(['All'])
+  const filters = propFilters ?? localFilters
+  const handleFiltersChange = onFiltersChange ?? setLocalFilters
 
   const filtered = spots.filter(s => {
     if (filters.includes('All') || filters.length === 0) return true
     return filters.some(f =>
-      s.type === f || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase())
+      normalizeType(s.type) === normalizeType(f) || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase())
     )
   })
 
@@ -42,7 +46,7 @@ export default function ListView({ spots, loading, saved, onToggleSave, onSpotCl
     <>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
       {searchLocation && <LocationChip location={searchLocation} onClear={onClearSearch} />}
-      <FilterChips active={filters} onChange={setFilters} />
+      <FiltersModal active={filters} onChange={handleFiltersChange} />
       <div className="scroll-area">
         <div style={{ padding: '0 0 2px', fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', paddingLeft: 16, marginBottom: 8 }}>
           {loading ? 'Loading...' : `${filtered.length} spot${filtered.length !== 1 ? 's' : ''}`}
@@ -54,7 +58,7 @@ export default function ListView({ spots, loading, saved, onToggleSave, onSpotCl
         ) : (
           <div className="spots-list-grid">
             {filtered.map(spot => (
-              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onToggleSave={onToggleSave} onClick={onSpotClick} />
+              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={onSpotClick} />
             ))}
           </div>
         )}

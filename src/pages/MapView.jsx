@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Map, { Marker, NavigationControl, Source, Layer } from 'react-map-gl'
 import Navbar from '../components/Navbar'
-import FilterChips from '../components/FilterChips'
-import { StarFilledIcon, StarIcon, ArrowIcon } from '../components/Icons'
+import FiltersModal from '../components/FiltersModal'
+import { BookmarkIcon, ArrowIcon } from '../components/Icons'
 import TagsRow from '../components/TagsRow'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
@@ -11,18 +11,50 @@ const STYLE_CUSTOM = 'mapbox://styles/yetiisland/standard-map'
 const STYLE_LIGHT = 'mapbox://styles/mapbox/light-v11'
 const STYLE_SAT = 'mapbox://styles/mapbox/satellite-streets-v12'
 
+const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
+
 function bustStyle(rating) {
   if (!rating) return null
+  if (rating === 'No Bust') return { background: '#4a7a3a', color: '#ffffff', border: '1px solid #3d6830' }
+  if (rating === 'Bust') return { background: '#c0453a', color: '#ffffff', border: '1px solid #a83830' }
+  if (rating === 'Medium Bust' || rating === 'Weekends Only' || rating === 'Weekdays Only') return { background: '#c8a020', color: '#ffffff', border: '1px solid #b08818' }
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
 }
 
-function StarPinSVG({ active = false }) {
+function HeartPinSVG({ active = false }) {
   const fill = active ? '#fff' : '#d4785a'
   const stroke = active ? '#d4785a' : '#fff'
+  const strokeW = active ? 2 : 1.2
   const size = active ? 36 : 28
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.45))', display: 'block', overflow: 'visible' }}>
-      <path d="M12 2L14.4 8.8L21.5 8.9L15.8 13.2L17.9 20.1L12 16L6.1 20.1L8.2 13.2L2.5 8.9L9.6 8.8Z" fill={fill} stroke={stroke} strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M12 20.5C12 20.5 3 15 3 8.5C3 5.5 5.5 3 8.5 3C10 3 11.3 3.7 12 4.8C12.7 3.7 14 3 15.5 3C18.5 3 21 5.5 21 8.5C21 15 12 20.5 12 20.5Z" fill={fill} stroke={stroke} strokeWidth={strokeW} strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ShopPinSVG({ active = false }) {
+  const color = active ? '#fff' : '#3D4454'
+  const stroke = active ? '#3D4454' : '#fff'
+  const strokeW = active ? 2.5 : 1.5
+  const size = active ? 36 : 28
+  return (
+    <svg width={size * 0.83} height={size} viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.45))', display: 'block', overflow: 'visible' }}>
+      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill={color} stroke={stroke} strokeWidth={strokeW} />
+      <circle cx="10" cy="10" r="4" fill={active ? '#3D4454' : '#fff'} />
+    </svg>
+  )
+}
+
+function ParkPinSVG({ active = false }) {
+  const color = active ? '#fff' : '#d4785a'
+  const stroke = active ? '#d4785a' : '#fff'
+  const strokeW = active ? 2.5 : 1.5
+  const size = active ? 36 : 28
+  return (
+    <svg width={size * 0.83} height={size} viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.45))', display: 'block', overflow: 'visible' }}>
+      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill={color} stroke={stroke} strokeWidth={strokeW} />
+      <circle cx="10" cy="10" r="4" fill={active ? '#d4785a' : '#fff'} />
     </svg>
   )
 }
@@ -89,8 +121,34 @@ const unclusteredPointLayer = {
   paint: { 'circle-radius': 0, 'circle-opacity': 0 },
 }
 
-export default function MapView({ spots, saved, onToggleSave, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showPeekCard = true, externalFilters, searchLocation, highlightedSpotId, onSearch }) {
-  const [filters, setFilters] = useState(['All'])
+function CautionChip({ report, reportCustom, small = false }) {
+  const text = report === 'Other' ? (reportCustom || 'Spot Reported') : report
+  if (small) {
+    return (
+      <div style={{ position: 'absolute', bottom: 3, left: 3, right: 3, background: '#f5c518', borderRadius: 4, padding: '2px 4px', display: 'flex', alignItems: 'center', gap: 2 }}>
+        <svg width="7" height="6" viewBox="0 0 18 16" fill="none">
+          <path d="M9 1L17 15H1L9 1Z" stroke="#000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+          <line x1="9" y1="5.5" x2="9" y2="10" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="9" cy="12.5" r="0.9" fill="#000" />
+        </svg>
+        <span style={{ fontSize: 7, fontWeight: 700, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
+      </div>
+    )
+  }
+  return (
+    <div style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 3, background: '#f5c518', borderRadius: 5, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3, maxWidth: 'calc(100% - 12px)' }}>
+      <svg width="8" height="7" viewBox="0 0 18 16" fill="none">
+        <path d="M9 1L17 15H1L9 1Z" stroke="#000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+        <line x1="9" y1="5.5" x2="9" y2="10" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="9" cy="12.5" r="0.9" fill="#000" />
+      </svg>
+      <span style={{ fontSize: 8, fontWeight: 700, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
+    </div>
+  )
+}
+
+export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, searchLocation, highlightedSpotId, onSearch }) {
+  const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
   const [viewState, setViewState] = useState(FALLBACK)
   const [satellite, setSatellite] = useState(false)
@@ -120,10 +178,14 @@ export default function MapView({ spots, saved, onToggleSave, onSpotClick, onAdd
     }
   }, [searchLocation])
 
-  const activeFilters = externalFilters || filters
+  const activeFilters = propFilters ?? externalFilters ?? localFilters
+  const handleFiltersChange = (next) => {
+    setLocalFilters(next)
+    onFiltersChange?.(next)
+  }
   const filtered = spots.filter(s => {
     if (activeFilters.includes('All') || activeFilters.length === 0) return true
-    return activeFilters.some(f => s.type === f || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))
+    return activeFilters.some(f => normalizeType(s.type) === normalizeType(f) || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))
   })
 
   const geojson = useMemo(() => ({
@@ -179,6 +241,16 @@ export default function MapView({ spots, saved, onToggleSave, onSpotClick, onAdd
 
   const mapStyle = satellite ? STYLE_SAT : baseStyle
 
+  const btnStyle = (active) => ({
+    display: 'flex', alignItems: 'center', gap: 5,
+    background: active ? '#d4785a' : '#FDF8F0',
+    border: '1.5px solid #d4785a', borderRadius: 6,
+    padding: '5px 10px', cursor: 'pointer',
+    fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+    color: active ? '#fff' : '#d4785a', textTransform: 'uppercase',
+    fontFamily: 'Barlow, sans-serif',
+  })
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
@@ -199,7 +271,7 @@ export default function MapView({ spots, saved, onToggleSave, onSpotClick, onAdd
         >
           <NavigationControl position="bottom-right" showCompass={false} />
 
-          <Source id="spots" type="geojson" data={geojson} cluster={true} clusterMaxZoom={14} clusterRadius={50}>
+          <Source id="spots" type="geojson" data={geojson} cluster={true} clusterMaxZoom={9} clusterRadius={50}>
             <Layer {...clusterCircleLayer} />
             <Layer {...clusterCountLayer} />
             <Layer {...unclusteredPointLayer} />
@@ -221,44 +293,46 @@ export default function MapView({ spots, saved, onToggleSave, onSpotClick, onAdd
                 onClick={e => { e.originalEvent.stopPropagation(); handlePinClick(spot) }}
                 style={{ overflow: 'visible' }}
               >
-                {saved.has(spot.id)
-                  ? <StarPinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />
-                  : <PinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />}
+                {spot.type === 'Skate Shop'
+                  ? <ShopPinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />
+                  : (spot.type === 'Park' || spot.type === 'Skatepark')
+                    ? <ParkPinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />
+                    : saved.has(spot.id)
+                      ? <HeartPinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />
+                      : <PinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />}
               </Marker>
             ) : null
           )}
         </Map>
 
-        {/* Filter chips */}
+        {/* Filters row — top left */}
         {showFilterChips && (
-          <div style={{ position: 'absolute', top: 5, left: 0, right: 0, zIndex: 10 }}>
-            <FilterChips active={filters} onChange={setFilters} compact />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <FiltersModal active={activeFilters} onChange={handleFiltersChange} />
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Satellite toggle */}
-        <div
-          onClick={() => setSatellite(s => !s)}
-          style={{
-            position: 'absolute', top: 46, right: 10, zIndex: 10,
-            background: satellite ? 'rgba(255,255,255,0.95)' : '#d4785a',
-            border: satellite ? '1px solid rgba(0,0,0,0.14)' : 'none', borderRadius: 6,
-            padding: '6px 10px', cursor: 'pointer',
-            fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
-            color: satellite ? '#2a1e14' : '#fff', textTransform: 'uppercase',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.22)',
-            display: 'flex', alignItems: 'center', gap: 5,
-          }}
-        >
-          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-            <rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
-            <line x1="4" y1="1" x2="4" y2="11" stroke="currentColor" strokeWidth="0.8"/>
-            <line x1="8" y1="1" x2="8" y2="11" stroke="currentColor" strokeWidth="0.8"/>
-            <line x1="1" y1="4" x2="11" y2="4" stroke="currentColor" strokeWidth="0.8"/>
-            <line x1="1" y1="8" x2="11" y2="8" stroke="currentColor" strokeWidth="0.8"/>
-          </svg>
-          {satellite ? 'Default' : 'Satellite'}
-        </div>
+        {/* Satellite toggle — bottom left, above tab bar / floating nav */}
+        {showFilterChips && (
+          <div style={{
+            position: 'absolute',
+            bottom: isDesktop ? 100 : 16,
+            left: 16,
+            zIndex: 10,
+          }}>
+            <div onClick={() => setSatellite(s => !s)} style={btnStyle(satellite)}>
+              <svg width="14" height="10" viewBox="0 0 20 14" fill="none">
+                <path d="M10 1C5.5 1 1.5 7 1.5 7C1.5 7 5.5 13 10 13C14.5 13 18.5 7 18.5 7C18.5 7 14.5 1 10 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                <circle cx="10" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+              {satellite ? 'Default' : 'Satellite'}
+            </div>
+          </div>
+        )}
 
         {/* Peek card — desktop: compact floating, mobile: full-width */}
         {showPeekCard && selected && (
@@ -268,7 +342,7 @@ export default function MapView({ spots, saved, onToggleSave, onSpotClick, onAdd
                 style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex' }}
                 onClick={() => onSpotClick(selected)}
               >
-                <div style={{ width: 80, flexShrink: 0, position: 'relative', background: '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+                <div style={{ width: 80, flexShrink: 0, position: 'relative', background: '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80, overflow: 'hidden' }}>
                   {selected.photos?.[0] ? (
                     <img src={selected.photos[0]} alt={selected.title} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
                   ) : (
@@ -278,13 +352,16 @@ export default function MapView({ spots, saved, onToggleSave, onSpotClick, onAdd
                       <rect x="6" y="2" width="28" height="5" rx="1" fill="#e8d8c8" />
                     </svg>
                   )}
+                  {selected.most_recent_report && selected.most_recent_report !== 'Skateable Again' && (
+                    <CautionChip report={selected.most_recent_report} reportCustom={selected.most_recent_report_custom} small />
+                  )}
                 </div>
                 <div style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 3 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.title}</div>
                     {selected.distance != null && <div className="dist-text" style={{ flexShrink: 0 }}>{selected.distance} mi</div>}
                   </div>
-                  <div className="spot-badge" style={{ alignSelf: 'flex-start', marginBottom: 4 }}>{selected.type}</div>
+                  <div className="spot-badge" style={{ alignSelf: 'flex-start', marginBottom: 4 }}>{normalizeType(selected.type)}</div>
                   {selected.description ? (
                     <div style={{ fontSize: 10, color: '#9a8878', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {selected.description}
@@ -293,11 +370,10 @@ export default function MapView({ spots, saved, onToggleSave, onSpotClick, onAdd
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 12px 10px 0', flexShrink: 0 }}>
                   <div
-                    className={`star-btn ${saved.has(selected.id) ? 'star-btn--saved' : ''}`}
-                    style={{ width: 24, height: 24 }}
-                    onClick={e => { e.stopPropagation(); onToggleSave(selected.id) }}
+                    style={{ width: 24, height: 24, borderRadius: 5, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                    onClick={e => { e.stopPropagation(); onSavePress?.(selected) }}
                   >
-                    {saved.has(selected.id) ? <StarFilledIcon /> : <StarIcon />}
+                    <BookmarkIcon color="#d4785a" size={12} filled={saved.has(selected.id)} />
                   </div>
                   <div className="arrow-btn" style={{ width: 24, height: 24, flexShrink: 0 }}>
                     <ArrowIcon size={10} />
@@ -325,19 +401,23 @@ export default function MapView({ spots, saved, onToggleSave, onSpotClick, onAdd
                     </div>
                   )}
                   <div style={{ position: 'absolute', top: 6, left: 6, display: 'flex', gap: 4 }}>
-                    <div className="spot-badge">{selected.type}</div>
+                    <div className="spot-badge">{normalizeType(selected.type)}</div>
                     {bustStyle(selected.bust_rating) && (
                       <div style={{ ...bustStyle(selected.bust_rating), fontSize: 9, padding: '3px 7px', borderRadius: 6, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
                         {selected.bust_rating}
                       </div>
                     )}
                   </div>
-                  <div
-                    className={`star-btn ${saved.has(selected.id) ? 'star-btn--saved' : ''}`}
-                    style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22 }}
-                    onClick={e => { e.stopPropagation(); onToggleSave(selected.id) }}
-                  >
-                    {saved.has(selected.id) ? <StarFilledIcon /> : <StarIcon />}
+                  {selected.most_recent_report && selected.most_recent_report !== 'Skateable Again' && (
+                    <CautionChip report={selected.most_recent_report} reportCustom={selected.most_recent_report_custom} />
+                  )}
+                  <div style={{ position: 'absolute', top: 6, right: 6 }}>
+                    <div
+                      style={{ width: 22, height: 22, borderRadius: 5, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                      onClick={e => { e.stopPropagation(); onSavePress?.(selected) }}
+                    >
+                      <BookmarkIcon color="#d4785a" size={12} filled={saved.has(selected.id)} />
+                    </div>
                   </div>
                 </div>
                 <div style={{ padding: '8px 10px 10px' }}>

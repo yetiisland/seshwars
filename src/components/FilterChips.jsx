@@ -1,4 +1,12 @@
-const FILTERS = ['All', 'Street', 'DIY', 'Park', 'Ledges', 'Stairs', 'Banks', 'Hubba', 'Gap', 'Hand Rail', 'Flat Bar', 'No Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
+const FILTERS = ['All', 'Street', 'DIY', 'Park', 'Ledges', 'Stairs', 'Banks', 'Hubba', 'Gap', 'Hand Rail', 'Flat Bar', 'No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
+const BUST_RATINGS = new Set(['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only'])
+
+function bustActiveStyle(f) {
+  if (f === 'No Bust') return { background: '#4a7a3a', borderColor: '#3d6830', color: '#ffffff' }
+  if (f === 'Medium Bust' || f === 'Weekends Only' || f === 'Weekdays Only') return { background: '#c8a020', borderColor: '#b08818', color: '#ffffff' }
+  if (f === 'Bust') return { background: '#c0453a', borderColor: '#a83830', color: '#ffffff' }
+  return {}
+}
 
 export default function FilterChips({ active, onChange, compact = false }) {
   const activeArr = Array.isArray(active) ? active : [active]
@@ -24,15 +32,20 @@ export default function FilterChips({ active, onChange, compact = false }) {
       style={{ display: 'flex', gap: 6, padding: compact ? '5px 16px 6px' : '10px 16px 12px', overflowX: 'auto' }}
       className="hide-scroll"
     >
-      {FILTERS.map(f => (
-        <div
-          key={f}
-          className={`chip ${isActive(f) ? 'active' : ''}`}
-          onClick={() => handleClick(f)}
-        >
-          {f}
-        </div>
-      ))}
+      {FILTERS.map(f => {
+        const active = isActive(f)
+        const isBust = BUST_RATINGS.has(f)
+        return (
+          <div
+            key={f}
+            className={`chip ${active ? 'active' : ''}`}
+            style={active && isBust ? bustActiveStyle(f) : undefined}
+            onClick={() => handleClick(f)}
+          >
+            {f}
+          </div>
+        )
+      })}
     </div>
   )
 }
