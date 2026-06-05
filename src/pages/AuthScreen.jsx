@@ -153,13 +153,7 @@ export default function AuthScreen() {
       paddingTop: 'calc(env(safe-area-inset-top, 0px) + 48px)',
       paddingBottom: 40,
     }}>
-      {/* Stacked logo */}
-      <img
-        src="/sesh-wars_logo_stacked_salmon.png"
-        alt="Seshwars"
-        style={{ display: 'block', margin: '0 auto', maxWidth: 240, width: '100%', height: 'auto', marginBottom: 40 }}
-        onError={e => { console.error('[AuthScreen] logo failed to load:', e.currentTarget.src) }}
-      />
+      <img src="/sesh-wars_logo_stacked_salmon.png" alt="Seshwars" style={{ maxWidth: '240px', width: '100%', height: 'auto', display: 'block', margin: '0 auto', marginBottom: 40 }} />
 
       {/* Mode tabs */}
       <div style={{
