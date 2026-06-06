@@ -291,7 +291,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           {/* Feedback bottom sheet */}
           {showFeedbackSheet && (
             <div className="modal-overlay" onClick={() => setShowFeedbackSheet(false)}>
-              <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ paddingLeft: 20, paddingRight: 20 }}>
                 <div className="modal-handle" />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <div className="modal-title">Send Feedback</div>
