@@ -63,6 +63,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
   const [clips, setClips] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [activeClip, setActiveClip] = useState(null)
+  const [activeIndex, setActiveIndex] = useState(0)
   const [uploadMode, setUploadMode] = useState(null)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkTitle, setLinkTitle] = useState('')
@@ -77,6 +78,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
   const [showVideoOverlay, setShowVideoOverlay] = useState(true)
   const fileInputRef = useRef(null)
   const lbTouchStartY = useRef(null)
+  const lbTouchStartX = useRef(null)
   const videoRef = useRef(null)
   const overlayTimerRef = useRef(null)
 
@@ -232,8 +234,16 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
     e.stopPropagation()
     if (!deleteConfirm) { setDeleteConfirm(true); return }
     await supabase.from('spot_clips').delete().eq('id', activeClip.id)
-    setClips(prev => prev.filter(c => c.id !== activeClip.id))
-    setActiveClip(null); setDeleteConfirm(false)
+    const newClips = clips.filter(c => c.id !== activeClip.id)
+    setClips(newClips)
+    if (newClips.length === 0) {
+      closeLightbox()
+    } else {
+      const newI = Math.min(activeIndex, newClips.length - 1)
+      setActiveClip(newClips[newI])
+      setActiveIndex(newI)
+      setDeleteConfirm(false)
+    }
   }
 
   const closeModal = () => {
@@ -244,8 +254,20 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
 
   const closeLightbox = () => {
     clearTimeout(overlayTimerRef.current)
-    setActiveClip(null); setDeleteConfirm(false); setVideoError(false)
+    setActiveClip(null); setActiveIndex(0); setDeleteConfirm(false); setVideoError(false)
     setVideoPlaying(false); setShowVideoOverlay(true)
+  }
+
+  const goToClip = (index) => {
+    if (clips.length === 0) return
+    const i = ((index % clips.length) + clips.length) % clips.length
+    clearTimeout(overlayTimerRef.current)
+    setActiveClip(clips[i])
+    setActiveIndex(i)
+    setDeleteConfirm(false)
+    setVideoError(false)
+    setVideoPlaying(false)
+    setShowVideoOverlay(true)
   }
 
   return (
@@ -267,7 +289,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
               return (
                 <div key={clip.id} style={{ flexShrink: 0, width: 140, display: 'flex', flexDirection: 'column' }}>
                   <div
-                    onClick={() => { setActiveClip(clip); setDeleteConfirm(false); setVideoError(false) }}
+                    onClick={() => { const i = clips.indexOf(clip); setActiveClip(clip); setActiveIndex(i); setDeleteConfirm(false); setVideoError(false) }}
                     style={{ width: 140, height: 100, borderRadius: 8, overflow: 'hidden', background: '#2a352a', position: 'relative', cursor: 'pointer' }}
                   >
                     {thumb && <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
@@ -373,8 +395,22 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
         <div
           style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
           onClick={closeLightbox}
-          onTouchStart={e => { lbTouchStartY.current = e.touches[0].clientY }}
-          onTouchEnd={e => { if (lbTouchStartY.current !== null && e.changedTouches[0].clientY - lbTouchStartY.current > 80) closeLightbox(); lbTouchStartY.current = null }}
+          onTouchStart={e => {
+            lbTouchStartY.current = e.touches[0].clientY
+            lbTouchStartX.current = e.touches[0].clientX
+          }}
+          onTouchEnd={e => {
+            if (lbTouchStartY.current === null) return
+            const deltaY = e.changedTouches[0].clientY - lbTouchStartY.current
+            const deltaX = e.changedTouches[0].clientX - lbTouchStartX.current
+            lbTouchStartY.current = null
+            lbTouchStartX.current = null
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 40) {
+              deltaX < 0 ? goToClip(activeIndex + 1) : goToClip(activeIndex - 1)
+            } else if (deltaY > 80 && Math.abs(deltaY) > Math.abs(deltaX)) {
+              closeLightbox()
+            }
+          }}
         >
           {/* X close button */}
           <div
@@ -386,6 +422,28 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
               <line x1="16" y1="4" x2="4" y2="16" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
+
+          {/* Left/right nav arrows (only when multiple clips) */}
+          {clips.length > 1 && (
+            <>
+              <div
+                onClick={e => { e.stopPropagation(); goToClip(activeIndex - 1) }}
+                style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100001 }}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M13 4L7 10L13 16" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div
+                onClick={e => { e.stopPropagation(); goToClip(activeIndex + 1) }}
+                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100001 }}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M7 4L13 10L7 16" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </>
+          )}
 
           {/* Delete button (own clips only) */}
           {user?.id === activeClip.user_id && (
@@ -490,6 +548,11 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
             style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 16px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
             onClick={e => e.stopPropagation()}
           >
+            {clips.length > 1 && (
+              <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: 1, marginBottom: 8 }}>
+                {activeIndex + 1} / {clips.length}
+              </div>
+            )}
             {activeClip.title && <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 5 }}>{activeClip.title}</div>}
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>

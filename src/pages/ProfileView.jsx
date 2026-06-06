@@ -16,6 +16,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [message, setMessage] = useState('')
   const [showMySpots, setShowMySpots] = useState(false)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [feedbackSending, setFeedbackSending] = useState(false)
+  const [feedbackSent, setFeedbackSent] = useState(false)
 
   useEffect(() => {
     const handler = () => setIsDesktop(window.innerWidth >= 769)
@@ -102,6 +105,20 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
+  }
+
+  const handleSendFeedback = async () => {
+    if (!feedbackText.trim() || feedbackSending) return
+    setFeedbackSending(true)
+    const senderEmail = user?.email || 'Anonymous'
+    try {
+      await supabase.functions.invoke('send-feedback', {
+        body: { feedback: feedbackText.trim(), senderEmail },
+      })
+    } catch {}
+    setFeedbackSending(false)
+    setFeedbackSent(true)
+    setFeedbackText('')
   }
 
   if (!user) {
@@ -245,13 +262,43 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
           <div className="divider" />
 
-          <button
-            onClick={() => window.open('https://venmo.com/taylorselgas', '_blank')}
-            style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', marginBottom: 8 }}
-          >
-            Donate
-          </button>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center', marginBottom: 14 }}>Thanks for helping me keep this app running 🤘</div>
+          {/* Support section */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', textAlign: 'center', marginBottom: 14, letterSpacing: 0.3 }}>
+              Help Keep This App Running 🤘
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <textarea
+                className="form-input"
+                placeholder="Share your feedback, ideas, or report a bug..."
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+                disabled={feedbackSent}
+                style={{ marginBottom: 8, minHeight: 80, resize: 'none' }}
+              />
+              {feedbackSent ? (
+                <div style={{ fontSize: 12, color: '#4a9a5a', fontWeight: 700, textAlign: 'center', padding: '6px 0 8px' }}>
+                  Thanks! Your feedback was sent.
+                </div>
+              ) : (
+                <button
+                  onClick={handleSendFeedback}
+                  disabled={feedbackSending || !feedbackText.trim()}
+                  style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: (!feedbackText.trim() || feedbackSending) ? 0.5 : 1, marginBottom: 8 }}
+                >
+                  {feedbackSending ? 'Sending...' : 'Send Feedback'}
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => window.open('https://venmo.com/taylorselgas', '_blank')}
+              style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+            >
+              Donate
+            </button>
+          </div>
 
           <div onClick={handleSignOut} style={{ padding: '12px 0', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}>
             Sign Out
