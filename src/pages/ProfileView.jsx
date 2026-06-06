@@ -16,6 +16,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [message, setMessage] = useState('')
   const [showMySpots, setShowMySpots] = useState(false)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
+  const [showFeedbackSheet, setShowFeedbackSheet] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
   const [feedbackSending, setFeedbackSending] = useState(false)
   const [feedbackSent, setFeedbackSent] = useState(false)
@@ -119,6 +120,10 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     setFeedbackSending(false)
     setFeedbackSent(true)
     setFeedbackText('')
+    setTimeout(() => {
+      setShowFeedbackSheet(false)
+      setFeedbackSent(false)
+    }, 1800)
   }
 
   if (!user) {
@@ -268,29 +273,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               Help Keep This App Running 🤘
             </div>
 
-            <div style={{ marginBottom: 12 }}>
-              <textarea
-                className="form-input"
-                placeholder="Share your feedback, ideas, or report a bug..."
-                value={feedbackText}
-                onChange={e => setFeedbackText(e.target.value)}
-                disabled={feedbackSent}
-                style={{ marginBottom: 8, minHeight: 80, resize: 'none' }}
-              />
-              {feedbackSent ? (
-                <div style={{ fontSize: 12, color: '#4a9a5a', fontWeight: 700, textAlign: 'center', padding: '6px 0 8px' }}>
-                  Thanks! Your feedback was sent.
-                </div>
-              ) : (
-                <button
-                  onClick={handleSendFeedback}
-                  disabled={feedbackSending || !feedbackText.trim()}
-                  style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: (!feedbackText.trim() || feedbackSending) ? 0.5 : 1, marginBottom: 8 }}
-                >
-                  {feedbackSending ? 'Sending...' : 'Send Feedback'}
-                </button>
-              )}
-            </div>
+            <button
+              onClick={() => setShowFeedbackSheet(true)}
+              style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', marginBottom: 6 }}
+            >
+              Send Feedback
+            </button>
 
             <button
               onClick={() => window.open('https://venmo.com/taylorselgas', '_blank')}
@@ -299,6 +287,50 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               Donate
             </button>
           </div>
+
+          {/* Feedback bottom sheet */}
+          {showFeedbackSheet && (
+            <div className="modal-overlay" onClick={() => setShowFeedbackSheet(false)}>
+              <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+                <div className="modal-handle" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div className="modal-title">Send Feedback</div>
+                  <div
+                    onClick={() => setShowFeedbackSheet(false)}
+                    style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                      <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+                {feedbackSent ? (
+                  <div style={{ fontSize: 13, color: '#4a9a5a', fontWeight: 700, textAlign: 'center', padding: '20px 0' }}>
+                    Thanks! Your feedback was sent.
+                  </div>
+                ) : (
+                  <>
+                    <textarea
+                      className="form-input"
+                      placeholder="Share your feedback, ideas, or report a bug..."
+                      value={feedbackText}
+                      onChange={e => setFeedbackText(e.target.value)}
+                      style={{ marginBottom: 12, minHeight: 100, resize: 'none' }}
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleSendFeedback}
+                      disabled={feedbackSending || !feedbackText.trim()}
+                      style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: (!feedbackText.trim() || feedbackSending) ? 0.5 : 1 }}
+                    >
+                      {feedbackSending ? 'Sending...' : 'Send'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           <div onClick={handleSignOut} style={{ padding: '12px 0', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}>
             Sign Out
