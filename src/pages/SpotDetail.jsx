@@ -23,15 +23,6 @@ const VISIBILITY_OPTIONS = [
 ]
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
-function DetailPinSVG() {
-  return (
-    <svg width="24" height="29" viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.35))', overflow: 'visible' }}>
-      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
-      <circle cx="10" cy="10" r="4" fill="#fff" />
-    </svg>
-  )
-}
-
 async function reverseGeocode(lng, lat) {
   try {
     const res = await fetch(
@@ -665,24 +656,6 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
 
           <div className="divider" />
 
-          {/* Location */}
-          <div className="section-label">Location</div>
-          <div style={{ width: '100%', height: 160, borderRadius: 6, overflow: 'hidden', marginBottom: 6, background: '#ECEDF2', position: 'relative' }}>
-            {hasCoords ? (
-              <Map longitude={spot.longitude} latitude={spot.latitude} zoom={15}
-                mapStyle="mapbox://styles/mapbox/satellite-streets-v12" mapboxAccessToken={MAPBOX_TOKEN}
-                style={{ width: '100%', height: '100%' }} interactive={false} attributionControl={false}>
-                <Marker longitude={spot.longitude} latitude={spot.latitude} anchor="bottom">
-                  <DetailPinSVG />
-                </Marker>
-              </Map>
-            ) : (
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>No coordinates</span>
-              </div>
-            )}
-          </div>
-          {spot.address && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>{spot.address}</div>}
           <div onClick={() => setShowMapsModal(true)} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginBottom: 16 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 1, textTransform: 'uppercase' }}>Get Directions</span>
           </div>
