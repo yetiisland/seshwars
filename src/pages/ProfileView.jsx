@@ -364,13 +364,24 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               </div>
             ) : (
               mySpots.map(spot => (
-                <SpotCard
-                  key={spot.id}
-                  spot={spot}
-                  saved={saved?.has(spot.id) ?? false}
-                  onSavePress={onSavePress}
-                  onClick={s => { setShowMySpots(false); onSpotClick?.(s) }}
-                />
+                <div key={spot.id} style={{ position: 'relative' }}>
+                  <SpotCard
+                    spot={spot}
+                    saved={saved?.has(spot.id) ?? false}
+                    onSavePress={onSavePress}
+                    onClick={s => { setShowMySpots(false); onSpotClick?.(s) }}
+                  />
+                  {spot.visibility && spot.visibility !== 'public' && (
+                    <div style={{
+                      position: 'absolute', top: 8, right: 44, zIndex: 5,
+                      background: spot.visibility === 'private' ? 'rgba(42,30,20,0.78)' : 'rgba(70,55,35,0.72)',
+                      color: '#fff', fontSize: 8, fontWeight: 700, letterSpacing: 1,
+                      textTransform: 'uppercase', padding: '3px 7px', borderRadius: 4,
+                    }}>
+                      {spot.visibility}
+                    </div>
+                  )}
+                </div>
               ))
             )}
             <div style={{ height: BOTTOM_PAD }} />

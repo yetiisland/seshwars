@@ -16,6 +16,11 @@ const TYPES = ['Street', 'DIY', 'Skatepark', 'Skate Shop']
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar']
 const BUST_OPTIONS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
+const VISIBILITY_OPTIONS = [
+  { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
+  { value: 'unlisted', label: 'Unlisted', desc: 'Only people with the link can see it' },
+  { value: 'private', label: 'Private', desc: 'Only you can see it' },
+]
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
 function DetailPinSVG() {
@@ -324,6 +329,7 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
       address: spot.address || '',
       latitude: spot.latitude,
       longitude: spot.longitude,
+      visibility: spot.visibility || 'public',
     })
     setEditPhotos([...(spot.photos || [])])
     setEditGeoQuery(spot.address || '')
@@ -402,6 +408,7 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
       longitude: editForm.longitude ? parseFloat(editForm.longitude) : null,
       photos: editPhotos,
       moderation_status: newModerationStatus,
+      visibility: editForm.visibility || 'public',
     }
     const { data, error } = await supabase.from('spots').update(payload).eq('id', spot.id).select()
     setEditSaving(false)
@@ -635,6 +642,19 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
             </div>
           )}
 
+          {(isOwner || isAdmin) && spot.visibility && spot.visibility !== 'public' && (
+            <div style={{ background: spot.visibility === 'private' ? '#f5ece8' : '#f0ede5', border: `1px solid ${spot.visibility === 'private' ? '#ddc0b0' : '#d8cdb8'}`, borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 7 }}>
+              {spot.visibility === 'private' ? (
+                <svg width="11" height="13" viewBox="0 0 14 16" fill="none"><rect x="3" y="7" width="8" height="8" rx="1.5" stroke="#9a5838" strokeWidth="1.4"/><path d="M4.5 7V5a2.5 2.5 0 015 0v2" stroke="#9a5838" strokeWidth="1.4" strokeLinecap="round"/></svg>
+              ) : (
+                <svg width="13" height="10" viewBox="0 0 18 12" fill="none"><path d="M9 1C5 1 1.73 3.89 1 6c.73 2.11 4 5 8 5s7.27-2.89 8-5c-.73-2.11-4-5-8-5z" stroke="#8a7848" strokeWidth="1.4" fill="none"/><circle cx="9" cy="6" r="2.5" stroke="#8a7848" strokeWidth="1.4"/></svg>
+              )}
+              <span style={{ fontSize: 11, fontWeight: 700, color: spot.visibility === 'private' ? '#7a4028' : '#6a5828' }}>
+                {spot.visibility === 'private' ? 'Private — only you can see this spot' : 'Unlisted — only visible via direct link'}
+              </span>
+            </div>
+          )}
+
           <div className="divider" />
 
           {/* About */}
@@ -829,6 +849,28 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
                 ? <div style={{ fontSize: 10, color: 'var(--salmon)', marginTop: 5, fontWeight: 700 }}>{editForm.latitude.toFixed(5)}, {editForm.longitude.toFixed(5)}</div>
                 : <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 5 }}>Tap the map or search to pin a location</div>
               }
+            </div>
+            <div className="divider" />
+            <div style={{ marginBottom: 14 }}>
+              <div className="section-label">Visibility</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {VISIBILITY_OPTIONS.map(opt => {
+                  const isActive = (editForm.visibility || 'public') === opt.value
+                  return (
+                    <div
+                      key={opt.value}
+                      onClick={() => setEditForm(p => ({ ...p, visibility: opt.value }))}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 6, cursor: 'pointer', background: isActive ? '#3D4454' : '#F5F0EA', border: `1px solid ${isActive ? '#3D4454' : '#E0D5C8'}` }}
+                    >
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${isActive ? '#fff' : '#b0a090'}`, background: isActive ? '#fff' : 'transparent', flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#fff' : '#2a1e14' }}>{opt.label}</div>
+                        <div style={{ fontSize: 10, color: isActive ? 'rgba(255,255,255,0.65)' : '#9a8878', marginTop: 1 }}>{opt.desc}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
             {editError && <div style={{ fontSize: 11, color: '#e07070', marginBottom: 10, fontWeight: 700 }}>{editError}</div>}
             <button className="btn-salmon" onClick={handleEditSave} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save Changes'}</button>

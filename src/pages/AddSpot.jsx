@@ -11,6 +11,11 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const TYPES = ['Street', 'DIY', 'Skatepark', 'Skate Shop']
 const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar']
 const BUST_OPTIONS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
+const VISIBILITY_OPTIONS = [
+  { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
+  { value: 'unlisted', label: 'Unlisted', desc: 'Only people with the link can see it' },
+  { value: 'private', label: 'Private', desc: 'Only you can see it' },
+]
 
 function bustChipActiveStyle(rating) {
   if (rating === 'No Bust') return { background: '#4a7a3a', borderColor: '#3d6830', color: '#ffffff' }
@@ -35,7 +40,7 @@ async function reverseGeocode(lng, lat) {
 export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [form, setForm] = useState({
     title: '', type: '', features: [], bust_rating: '', description: '', address: '',
-    latitude: null, longitude: null,
+    latitude: null, longitude: null, visibility: 'public',
   })
   const [photos, setPhotos] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -159,6 +164,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
       photos,
       added_by: user?.id || 'anon',
       moderation_status,
+      visibility: form.visibility,
     })
     setUploading(false)
     if (error) { setError(error.message); return }
@@ -355,6 +361,30 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
             ? <div style={{ fontSize: 10, color: 'var(--salmon)', marginTop: 5, fontWeight: 700 }}>{form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}</div>
             : <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 5 }}>Tap the map or search to pin a location</div>
           }
+        </div>
+
+        <div className="divider" />
+
+        <div style={{ marginBottom: 14 }}>
+          <div className="section-label">Visibility</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {VISIBILITY_OPTIONS.map(opt => {
+              const isActive = form.visibility === opt.value
+              return (
+                <div
+                  key={opt.value}
+                  onClick={() => setForm(p => ({ ...p, visibility: opt.value }))}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 6, cursor: 'pointer', background: isActive ? '#3D4454' : '#F5F0EA', border: `1px solid ${isActive ? '#3D4454' : '#E0D5C8'}` }}
+                >
+                  <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${isActive ? '#fff' : '#b0a090'}`, background: isActive ? '#fff' : 'transparent', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#fff' : '#2a1e14' }}>{opt.label}</div>
+                    <div style={{ fontSize: 10, color: isActive ? 'rgba(255,255,255,0.65)' : '#9a8878', marginTop: 1 }}>{opt.desc}</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {error && <div style={{ fontSize: 11, color: '#e07070', marginBottom: 10, fontWeight: 700 }}>{error}</div>}

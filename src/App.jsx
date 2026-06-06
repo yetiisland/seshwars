@@ -296,9 +296,12 @@ export default function App() {
     if (isAdmin) return spotsWithDistance
     return spotsWithDistance.filter(s => {
       const status = s.moderation_status
-      if (!status || status === 'approved') return true
-      if (status === 'pending' && user?.id && s.added_by === user.id) return true
-      return false
+      const passesModeration = !status || status === 'approved' ||
+        (status === 'pending' && user?.id && s.added_by === user.id)
+      if (!passesModeration) return false
+      // Only public spots appear in list/map/search — private and unlisted are link-only
+      const vis = s.visibility || 'public'
+      return vis === 'public'
     })
   }, [spotsWithDistance, isAdmin, user])
 

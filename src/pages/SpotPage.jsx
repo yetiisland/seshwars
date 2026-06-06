@@ -14,6 +14,7 @@ export default function SpotPage() {
   const [spot, setSpot] = useState(location.state?.spot || null)
   const [loading, setLoading] = useState(!location.state?.spot)
   const [user, setUser] = useState(null)
+  const [authLoaded, setAuthLoaded] = useState(!!location.state?.spot)
   const [saveModalSpot, setSaveModalSpot] = useState(null)
 
   const prevTab = location.state?.prevTab || sessionStorage.getItem('activeTab') || 'list'
@@ -22,6 +23,7 @@ export default function SpotPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
+      setAuthLoaded(true)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null)
@@ -58,7 +60,7 @@ export default function SpotPage() {
     navigate('/')
   }
 
-  if (loading) {
+  if (loading || !authLoaded) {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#FDF8F0' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#9a8878', fontWeight: 700 }}>
@@ -75,6 +77,28 @@ export default function SpotPage() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#2a1e14', fontFamily: 'Barlow, sans-serif' }}>This spot is no longer available.</div>
           <button onClick={() => navigate('/')} style={{ fontSize: 11, color: '#d4785a', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontFamily: 'Barlow, sans-serif' }}>
+            ← Back to map
+          </button>
+        </div>
+        <TabBar active={prevTab} onChange={handleTabChange} />
+      </div>
+    )
+  }
+
+  const isOwner = !!user && (user.id === spot.added_by || user.email?.split('@')[0] === spot.added_by)
+  const isAdmin = user?.email?.includes('taylorselgas') ?? false
+
+  if (spot.visibility === 'private' && !isOwner && !isAdmin) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#FDF8F0' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '0 32px', textAlign: 'center' }}>
+          <svg width="36" height="42" viewBox="0 0 14 16" fill="none">
+            <rect x="3" y="7" width="8" height="8" rx="1.5" stroke="#b0906a" strokeWidth="1.4"/>
+            <path d="M4.5 7V5a2.5 2.5 0 015 0v2" stroke="#b0906a" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#2a1e14', fontFamily: 'Barlow, sans-serif' }}>This spot is private.</div>
+          <div style={{ fontSize: 11, color: '#9a8878', fontFamily: 'Barlow, sans-serif', fontWeight: 600 }}>Only the owner can view this spot.</div>
+          <button onClick={() => navigate('/')} style={{ fontSize: 11, color: '#d4785a', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontFamily: 'Barlow, sans-serif', marginTop: 4 }}>
             ← Back to map
           </button>
         </div>
