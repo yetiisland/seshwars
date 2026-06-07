@@ -17,7 +17,8 @@ export default function SpotPage() {
   const [authLoaded, setAuthLoaded] = useState(!!location.state?.spot)
   const [saveModalSpot, setSaveModalSpot] = useState(null)
 
-  const prevTab = location.state?.prevTab || sessionStorage.getItem('activeTab') || 'list'
+  const rawTab = location.state?.prevTab || sessionStorage.getItem('activeTab') || 'spots'
+  const prevTab = (rawTab === 'list' || rawTab === 'map') ? 'spots' : rawTab
   const { saved, refetchSaved } = useSavedSpots(user?.id)
 
   useEffect(() => {

@@ -147,7 +147,7 @@ function CautionChip({ report, reportCustom, small = false }) {
   )
 }
 
-export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, searchLocation, highlightedSpotId, onSearch }) {
+export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, searchLocation, highlightedSpotId, onSearch }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
   const [viewState, setViewState] = useState(FALLBACK)
@@ -183,6 +183,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     setLocalFilters(next)
     onFiltersChange?.(next)
   }
+  const handleDistanceChange = (d) => { onDistanceChange?.(d) }
   const filtered = spots.filter(s => {
     if (activeFilters.includes('All') || activeFilters.length === 0) return true
     return activeFilters.some(f => normalizeType(s.type) === normalizeType(f) || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))
@@ -305,31 +306,43 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           )}
         </Map>
 
-        {/* Filters row — top left */}
+        {/* Filters row — top */}
         {showFilterChips && (
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <FiltersModal active={activeFilters} onChange={handleFiltersChange} />
-              </div>
-            </div>
+            <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} />
           </div>
         )}
 
-        {/* Satellite toggle — bottom left, above tab bar / floating nav */}
+        {/* Satellite toggle — bottom right, above NavigationControl */}
         {showFilterChips && (
           <div style={{
             position: 'absolute',
-            bottom: isDesktop ? 100 : 16,
-            left: 16,
+            bottom: isDesktop ? 102 : 80,
+            right: 10,
             zIndex: 10,
           }}>
-            <div onClick={() => setSatellite(s => !s)} style={btnStyle(satellite)}>
-              <svg width="14" height="10" viewBox="0 0 20 14" fill="none">
-                <path d="M10 1C5.5 1 1.5 7 1.5 7C1.5 7 5.5 13 10 13C14.5 13 18.5 7 18.5 7C18.5 7 14.5 1 10 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                <circle cx="10" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+            <div
+              onClick={() => setSatellite(s => !s)}
+              title={satellite ? 'Default map' : 'Satellite view'}
+              style={{
+                width: 29, height: 29,
+                background: satellite ? '#d4785a' : '#fff',
+                border: satellite ? '1.5px solid #d4785a' : '1.5px solid rgba(0,0,0,0.2)',
+                borderRadius: 4,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 0 0 2px rgba(0,0,0,0.08)',
+              }}
+            >
+              <svg width="17" height="17" viewBox="0 0 20 20" fill="none">
+                <rect x="8" y="8" width="4" height="4" rx="0.8" fill={satellite ? '#fff' : '#333'} />
+                <rect x="1" y="7" width="5.5" height="6" rx="0.5" stroke={satellite ? '#fff' : '#333'} strokeWidth="1.3" fill="none" />
+                <line x1="3.5" y1="7" x2="3.5" y2="13" stroke={satellite ? '#fff' : '#333'} strokeWidth="0.7" />
+                <rect x="13.5" y="7" width="5.5" height="6" rx="0.5" stroke={satellite ? '#fff' : '#333'} strokeWidth="1.3" fill="none" />
+                <line x1="16" y1="7" x2="16" y2="13" stroke={satellite ? '#fff' : '#333'} strokeWidth="0.7" />
+                <line x1="10" y1="3" x2="10" y2="8" stroke={satellite ? '#fff' : '#333'} strokeWidth="1.2" strokeLinecap="round" />
+                <circle cx="10" cy="2.2" r="1.3" fill={satellite ? '#fff' : '#333'} />
               </svg>
-              {satellite ? 'Default' : 'Satellite'}
             </div>
           </div>
         )}

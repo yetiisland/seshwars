@@ -128,6 +128,7 @@ export default function AuthScreen() {
       />
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => setShowPass(v => !v)}
         style={{
           position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',

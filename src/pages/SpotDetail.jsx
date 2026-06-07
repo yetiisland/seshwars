@@ -114,6 +114,8 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
   const [liveReport, setLiveReport] = useState(null)
   const [modStatus, setModStatus] = useState(spot.moderation_status || 'approved')
   const scrollAreaRef = useRef()
+  const directionsRef = useRef()
+  const [directionsInView, setDirectionsInView] = useState(true)
 
   const photos = spot.photos || []
   const isAdmin = !!user && (
@@ -143,6 +145,17 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
       })
     }
   }, [spot.id, user?.id])
+
+  // ── Sticky directions button observer ────────────────────────
+  useEffect(() => {
+    if (!directionsRef.current || !scrollAreaRef.current) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setDirectionsInView(entry.isIntersecting),
+      { root: scrollAreaRef.current, threshold: 0.5 }
+    )
+    observer.observe(directionsRef.current)
+    return () => observer.disconnect()
+  }, [spot.id])
 
   // ── Edit geocode ──────────────────────────────────────────────
   useEffect(() => {
@@ -694,7 +707,7 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
           </div>
           {spot.address && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>{spot.address}</div>}
 
-          <div onClick={() => setShowMapsModal(true)} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginBottom: 16 }}>
+          <div ref={directionsRef} onClick={() => setShowMapsModal(true)} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginBottom: 16 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 1, textTransform: 'uppercase' }}>Get Directions</span>
           </div>
           <ReportSection spotId={spot.id} spot={spot} user={user} onGoProfile={onGoProfile} onReported={handleReported} />
@@ -703,6 +716,19 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
           <div style={{ height: BOTTOM_PAD }} />
         </div>
       </div>
+
+      {/* ── Sticky Get Directions ────────────────────────────── */}
+      {hasCoords && !directionsInView && !showMapsModal && !showMapFullscreen && createPortal(
+        <div
+          onClick={() => setShowMapsModal(true)}
+          style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 68px)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 430, padding: '0 16px', zIndex: 200, cursor: 'pointer' }}
+        >
+          <div style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.22)' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 1, textTransform: 'uppercase' }}>Get Directions</span>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Fullscreen map ───────────────────────────────── */}
       {showMapFullscreen && hasCoords && createPortal(

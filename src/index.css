@@ -180,11 +180,11 @@ body {
 .tab-bar {
   display: flex;
   background: var(--salmon);
-  flex-shrink: 0;
-  /* max() picks the largest: physical safe area (notch/home bar) or 24px floor.
-     Combined with 100dvh on html, this prevents overlap with Safari's bottom toolbar. */
   padding-bottom: max(env(safe-area-inset-bottom), 24px);
-  position: relative;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 1000;
 }
 

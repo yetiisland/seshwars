@@ -30,7 +30,7 @@ function LocationChip({ location, onClear }) {
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
-export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange }) {
+export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const filters = propFilters ?? localFilters
   const handleFiltersChange = onFiltersChange ?? setLocalFilters
@@ -46,7 +46,7 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
     <>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
       {searchLocation && <LocationChip location={searchLocation} onClear={onClearSearch} />}
-      <FiltersModal active={filters} onChange={handleFiltersChange} />
+      <FiltersModal active={filters} onChange={handleFiltersChange} distance={distance} onDistanceChange={onDistanceChange} />
       <div className="scroll-area">
         <div style={{ padding: '0 0 2px', fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', paddingLeft: 16, marginBottom: 8 }}>
           {loading ? 'Loading...' : `${filtered.length} spot${filtered.length !== 1 ? 's' : ''}`}
