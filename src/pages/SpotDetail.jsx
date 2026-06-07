@@ -91,6 +91,7 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
 
   // ── Edit state ────────────────────────────────────────────────
   const [showMapsModal, setShowMapsModal] = useState(false)
+  const [showMapFullscreen, setShowMapFullscreen] = useState(false)
   const [showEditAuth, setShowEditAuth] = useState(false)
   const [editPassword, setEditPassword] = useState('')
   const [authError, setAuthError] = useState('')
@@ -656,6 +657,43 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
 
           <div className="divider" />
 
+          {/* Location */}
+          <div className="section-label">Location</div>
+          <div style={{ width: '100%', height: 180, borderRadius: 6, overflow: 'hidden', marginBottom: 6, background: '#ECEDF2', position: 'relative' }}>
+            {hasCoords ? (
+              <>
+                <Map
+                  longitude={spot.longitude} latitude={spot.latitude} zoom={15}
+                  mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+                  mapboxAccessToken={MAPBOX_TOKEN}
+                  style={{ width: '100%', height: '100%' }}
+                  attributionControl={false}
+                >
+                  <NavigationControl position="bottom-right" showCompass={false} />
+                  <Marker longitude={spot.longitude} latitude={spot.latitude} anchor="bottom">
+                    <svg width="20" height="24" viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.35))' }}>
+                      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
+                      <circle cx="10" cy="10" r="4" fill="#fff" />
+                    </svg>
+                  </Marker>
+                </Map>
+                <div
+                  onClick={() => setShowMapFullscreen(true)}
+                  style={{ position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 6, background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M1 5V1H5M9 1H13V5M13 9V13H9M5 13H1V9" stroke="#2a1e14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </>
+            ) : (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>No coordinates</span>
+              </div>
+            )}
+          </div>
+          {spot.address && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>{spot.address}</div>}
+
           <div onClick={() => setShowMapsModal(true)} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginBottom: 16 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 1, textTransform: 'uppercase' }}>Get Directions</span>
           </div>
@@ -665,6 +703,36 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
           <div style={{ height: BOTTOM_PAD }} />
         </div>
       </div>
+
+      {/* ── Fullscreen map ───────────────────────────────── */}
+      {showMapFullscreen && hasCoords && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: '#000' }}>
+          <Map
+            longitude={spot.longitude} latitude={spot.latitude} zoom={15}
+            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+            mapboxAccessToken={MAPBOX_TOKEN}
+            style={{ width: '100%', height: '100%' }}
+          >
+            <NavigationControl position="bottom-right" showCompass={false} />
+            <Marker longitude={spot.longitude} latitude={spot.latitude} anchor="bottom">
+              <svg width="24" height="29" viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.5))' }}>
+                <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
+                <circle cx="10" cy="10" r="4" fill="#fff" />
+              </svg>
+            </Marker>
+          </Map>
+          <div
+            onClick={() => setShowMapFullscreen(false)}
+            style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <line x1="3" y1="3" x2="15" y2="15" stroke="#2a1e14" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="15" y1="3" x2="3" y2="15" stroke="#2a1e14" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Maps modal ────────────────────────────────────── */}
       {showMapsModal && (
