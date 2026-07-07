@@ -148,7 +148,7 @@ function CautionChip({ report, reportCustom, small = false }) {
   )
 }
 
-export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, searchLocation, highlightedSpotId, onSearch, fitOnMount = false }) {
+export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, searchLocation, highlightedSpotId, onSearch, fitOnMount = false, onHidePress }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
   const [viewState, setViewState] = useState(FALLBACK)
@@ -409,6 +409,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
                 saved={saved.has(selected.id)}
                 onSavePress={onSavePress}
                 onClick={onSpotClick}
+                onHidePress={onHidePress}
               />
             </div>
           ) : (

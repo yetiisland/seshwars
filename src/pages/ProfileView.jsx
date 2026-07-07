@@ -35,6 +35,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showPrivacy, setShowPrivacy] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [hiddenSpotIds, setHiddenSpotIds] = useState(new Set())
+  const [showHiddenSpots, setShowHiddenSpots] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
@@ -52,6 +54,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
   const identifier = user?.email?.split('@')[0] || ''
   const mySpots = spots.filter(s => s.added_by === identifier || s.added_by === user?.id)
+  const hiddenSpots = spots.filter(s => hiddenSpotIds.has(s.id))
+
+  const loadHiddenSpots = useCallback(async () => {
+    if (!user?.id) return
+    const { data } = await supabase.from('hidden_spots').select('spot_id').eq('user_id', user.id)
+    if (data) setHiddenSpotIds(new Set(data.map(d => d.spot_id)))
+  }, [user?.id])
+
+  useEffect(() => { loadHiddenSpots() }, [loadHiddenSpots])
 
   useEffect(() => {
     if (!showMySpots) { mySpotsScrollRestoredRef.current = false; return }
@@ -305,8 +316,26 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
           )}
 
-          {/* Stats — clickable My Spots box */}
+          {/* Stats */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+            <div
+              onClick={() => setShowHiddenSpots(true)}
+              style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="#d4785a" strokeWidth="1.8" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="3" stroke="#d4785a" strokeWidth="1.8" />
+                </svg>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{hiddenSpots.length}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Hidden</div>
+                </div>
+              </div>
+              <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
             <div
               onClick={() => { sessionStorage.setItem('mySpots:open', '1'); setShowMySpots(true) }}
               style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
@@ -479,6 +508,47 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           )}
         </div>
       </div>
+
+      {/* Hidden Spots overlay — full screen */}
+      {showHiddenSpots && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '14px 14px 10px', paddingTop: 'calc(env(safe-area-inset-top) + 14px)',
+            background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
+          }}>
+            <div onClick={() => setShowHiddenSpots(false)} style={{ width: 32, height: 32, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: 1, textTransform: 'uppercase' }}>Hidden Spots</div>
+          </div>
+          <div className="scroll-area">
+            {hiddenSpots.length === 0 ? (
+              <div style={{ padding: '40px 24px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No hidden spots.</div>
+            ) : (
+              hiddenSpots.map(spot => (
+                <div key={spot.id} style={{ position: 'relative' }}>
+                  <SpotCard spot={spot} saved={false} onSavePress={() => {}} onClick={onSpotClick} />
+                  <div style={{ position: 'absolute', bottom: 14, right: 14, zIndex: 10 }}>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        await supabase.from('hidden_spots').delete().eq('user_id', user.id).eq('spot_id', spot.id)
+                        loadHiddenSpots()
+                      }}
+                      style={{ padding: '6px 14px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+                    >
+                      Unhide
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+            <div style={{ height: BOTTOM_PAD }} />
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* My Spots overlay — full screen, covers top nav */}
       {showMySpots && createPortal(

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { getProfiles } from '../utils/profileCache'
+import InitialsAvatar from './InitialsAvatar'
 
 function relativeTime(ts) {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
@@ -13,25 +14,18 @@ function relativeTime(ts) {
 }
 
 function Avatar({ profile, size = 32 }) {
-  if (profile?.avatar_url) {
+  const [imgError, setImgError] = useState(false)
+  if (profile?.avatar_url && !imgError) {
     return (
       <img
         src={profile.avatar_url}
         alt=""
         style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #EAD8C8' }}
+        onError={() => setImgError(true)}
       />
     )
   }
-  const initial = (profile?.username || profile?.first_name || '?')[0].toUpperCase()
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', background: '#3D4454',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, border: '1px solid #2e3344',
-    }}>
-      <span style={{ fontSize: size * 0.38, fontWeight: 900, color: '#fff', fontFamily: 'Barlow, sans-serif' }}>{initial}</span>
-    </div>
-  )
+  return <InitialsAvatar profile={profile} size={size} />
 }
 
 export default function CommentsSection({ spotId, user, onGoProfile }) {

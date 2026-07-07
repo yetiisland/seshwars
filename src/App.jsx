@@ -5,7 +5,7 @@ import { supabase } from './lib/supabase'
 import { loadProfile, clearProfile, useProfileStore } from './lib/profileStore'
 import { isAdminUser } from './lib/admin'
 import AuthScreen from './pages/AuthScreen'
-import { useSpots, useSavedSpots } from './hooks/useSpots'
+import { useSpots, useSavedSpots, useHiddenSpots } from './hooks/useSpots'
 import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
 import TabBar from './components/TabBar'
 import Logo from './components/Logo'
@@ -251,14 +251,17 @@ function DesktopSearchBar({ spots, searchLocation, onSelect, onClear }) {
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 const _FILTER_TYPES = new Set(['Street', 'DIY', 'Skatepark', 'Skate Shop'])
 const _FILTER_BUSTS = new Set(['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only'])
+const _FILTER_LIGHTS = new Set(['Lights', 'No Lights'])
 function matchesFilters(s, filters) {
   if (filters.includes('All') || filters.length === 0) return true
   const selTypes = filters.filter(f => _FILTER_TYPES.has(f))
   const selBusts = filters.filter(f => _FILTER_BUSTS.has(f))
-  const selFeats = filters.filter(f => !_FILTER_TYPES.has(f) && !_FILTER_BUSTS.has(f) && f !== 'All')
+  const selLights = filters.filter(f => _FILTER_LIGHTS.has(f))
+  const selFeats = filters.filter(f => !_FILTER_TYPES.has(f) && !_FILTER_BUSTS.has(f) && !_FILTER_LIGHTS.has(f) && f !== 'All')
   if (selTypes.length > 0 && !selTypes.some(t => normalizeType(s.type) === normalizeType(t))) return false
   if (selFeats.length > 0 && !selFeats.some(f => (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))) return false
   if (selBusts.length > 0 && !selBusts.includes(s.bust_rating)) return false
+  if (selLights.length > 0 && !selLights.includes(s.lighting)) return false
   return true
 }
 
@@ -284,6 +287,10 @@ export default function App() {
   const [distanceRadius, setDistanceRadius] = useState(null)
   const { spots, loading, refetch } = useSpots()
   const { saved, refetchSaved } = useSavedSpots(user?.id)
+  const { hiddenIds, refetchHidden } = useHiddenSpots(user?.id)
+  const [hideTarget, setHideTarget] = useState(null)
+  const [showHideConfirm, setShowHideConfirm] = useState(false)
+  const [hideConfirmClosing, setHideConfirmClosing] = useState(false)
   const [saveModalSpot, setSaveModalSpot] = useState(null)
   const userLocation = useGeolocation()
   const isAdmin = isAdminUser(user)
@@ -330,6 +337,7 @@ export default function App() {
   const visibleSpots = useMemo(() => {
     if (isAdmin) return spotsWithDistance
     return spotsWithDistance.filter(s => {
+      if (hiddenIds.has(s.id)) return false
       const status = s.moderation_status
       const passesModeration = !status || status === 'approved' ||
         (status === 'pending' && user?.id && s.added_by === user.id)
@@ -338,7 +346,7 @@ export default function App() {
       const vis = s.visibility || 'public'
       return vis === 'public'
     })
-  }, [spotsWithDistance, isAdmin, user])
+  }, [spotsWithDistance, isAdmin, user, hiddenIds])
 
   const filteredByDistance = useMemo(() => {
     if (!distanceRadius || (!userLocation && !searchLocation)) return visibleSpots
@@ -429,6 +437,24 @@ export default function App() {
   const handleAddSuccess = () => { setShowAdd(false); refetch() }
   const openAdd = () => { if (!user) { setShowAuth(true); return } setShowAdd(true); closeSearch() }
 
+  const handleHidePress = (spot) => {
+    if (!user) { setShowAuth(true); return }
+    setHideTarget(spot)
+    setShowHideConfirm(true)
+  }
+
+  const closeHideConfirm = () => {
+    setHideConfirmClosing(true)
+    setTimeout(() => { setHideConfirmClosing(false); setShowHideConfirm(false); setHideTarget(null) }, 180)
+  }
+
+  const confirmHide = async () => {
+    if (!hideTarget || !user) return
+    await supabase.from('hidden_spots').insert({ user_id: user.id, spot_id: hideTarget.id }).catch(() => {})
+    refetchHidden()
+    closeHideConfirm()
+  }
+
   const handleSpotClick = (spot) => {
     const id = spot.slug || spot.id
     sessionStorage.setItem('activeTab', tab)
@@ -504,6 +530,7 @@ export default function App() {
               onFiltersChange={setFilters}
               distance={distanceRadius}
               onDistanceChange={setDistanceRadius}
+              onHidePress={handleHidePress}
             />
           )}
           {effectiveTab === 'spots' && spotsView === 'map' && (
@@ -520,6 +547,7 @@ export default function App() {
               onFiltersChange={setFilters}
               distance={distanceRadius}
               onDistanceChange={setDistanceRadius}
+              onHidePress={handleHidePress}
             />
           )}
           {effectiveTab === 'saved' && (
@@ -595,6 +623,29 @@ export default function App() {
           />
         )}
 
+        {(showHideConfirm || hideConfirmClosing) && createPortal(
+          <div className="modal-overlay" onClick={closeHideConfirm}>
+            <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideConfirmClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+              <div className="modal-handle" />
+              <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Hide This Spot?
+              </div>
+              <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                This spot won't show up in your feed anymore. You can unhide it anytime from your profile.
+              </div>
+              <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={confirmHide} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                  Hide Spot
+                </button>
+                <button onClick={closeHideConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
         {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
 
       </>
@@ -624,6 +675,7 @@ export default function App() {
               onFiltersChange={setFilters}
               distance={distanceRadius}
               onDistanceChange={setDistanceRadius}
+              onHidePress={handleHidePress}
             />
           )}
           {effectiveTab === 'spots' && spotsView === 'map' && (
@@ -640,6 +692,7 @@ export default function App() {
               onFiltersChange={setFilters}
               distance={distanceRadius}
               onDistanceChange={setDistanceRadius}
+              onHidePress={handleHidePress}
             />
           )}
           {effectiveTab === 'saved' && (
@@ -687,6 +740,28 @@ export default function App() {
 
       {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
       {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
+      {(showHideConfirm || hideConfirmClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeHideConfirm}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideConfirmClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Hide This Spot?
+            </div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              This spot won't show up in your feed anymore. You can unhide it anytime from your profile.
+            </div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={confirmHide} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                Hide Spot
+              </button>
+              <button onClick={closeHideConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
       {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
       {saveModalSpot && (
         <SaveToListModal

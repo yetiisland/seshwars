@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { getProfiles } from '../utils/profileCache'
+import InitialsAvatar from './InitialsAvatar'
+
+function SmallLikerAvatar({ profile }) {
+  const [imgError, setImgError] = useState(false)
+  if (profile?.avatar_url && !imgError) {
+    return <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setImgError(true)} />
+  }
+  return <InitialsAvatar profile={profile} size={20} />
+}
 
 function Heart({ filled, color = '#d4785a', size = 20 }) {
   return (
@@ -81,12 +90,9 @@ export default function LikesRow({ spotId, user }) {
             {likers.map((p, i) => (
               <div
                 key={p.id}
-                style={{ width: 20, height: 20, borderRadius: '50%', border: '1.5px solid #FDF8F0', overflow: 'hidden', marginLeft: i === 0 ? 0 : -6, background: '#3D4454', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: likers.length - i }}
+                style={{ width: 20, height: 20, borderRadius: '50%', border: '1.5px solid #FDF8F0', overflow: 'hidden', marginLeft: i === 0 ? 0 : -6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: likers.length - i }}
               >
-                {p.avatar_url
-                  ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <span style={{ fontSize: 7, fontWeight: 900, color: '#fff', fontFamily: 'Barlow, sans-serif' }}>{(p.username || p.full_name || '?')[0].toUpperCase()}</span>
-                }
+                <SmallLikerAvatar profile={p} />
               </div>
             ))}
             {count > 5 && (

@@ -11,8 +11,9 @@ import TermsOfService from './TermsOfService'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const TYPES = ['Street', 'DIY', 'Skatepark', 'Skate Shop']
-const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar', 'Bump']
+const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Rail', 'Bump', 'Hip', 'Ride On Grind', 'Pole Jam', 'Bowl', 'Halfpipe', 'Step Up']
 const BUST_OPTIONS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
+const LIGHTING_OPTIONS = ['Lights', 'No Lights']
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
   { value: 'unlisted', label: 'Unlisted', desc: 'Only people with the link can see it' },
@@ -41,7 +42,7 @@ async function reverseGeocode(lng, lat) {
 
 export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [form, setForm] = useState({
-    title: '', type: '', features: [], bust_rating: '', description: '', address: '',
+    title: '', type: '', features: [], bust_rating: '', lighting: '', description: '', address: '',
     latitude: null, longitude: null, visibility: 'public',
   })
   const [photos, setPhotos] = useState([])
@@ -164,6 +165,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
       type: form.type,
       features: form.features,
       bust_rating: form.bust_rating || null,
+      lighting: form.lighting || null,
       description: form.description,
       address: form.address,
       latitude: form.latitude,
@@ -277,6 +279,20 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {FEATURES.map(f => (
                 <div key={f} className={`chip ${form.features.includes(f) ? 'active' : ''}`} onClick={() => toggleFeature(f)}>{f}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(form.type === 'Street' || form.type === 'DIY' || form.type === 'Skatepark') && (
+          <div style={{ marginBottom: 14 }}>
+            <div className="section-label">Lights</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {LIGHTING_OPTIONS.map(l => (
+                <div key={l}
+                  className={`chip ${form.lighting === l ? 'active' : ''}`}
+                  onClick={() => setForm(p => ({ ...p, lighting: p.lighting === l ? '' : l }))}
+                >{l}</div>
               ))}
             </div>
           </div>

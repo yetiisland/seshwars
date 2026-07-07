@@ -114,6 +114,8 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [editMapCenter, setEditMapCenter] = useState({ longitude: -104.9903, latitude: 39.7392, zoom: 13 })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showHideModal, setShowHideModal] = useState(false)
+  const [hideModalClosing, setHideModalClosing] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [liveReport, setLiveReport] = useState(null)
   const [fsMapSatellite, setFsMapSatellite] = useState(false)
@@ -497,6 +499,18 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     else navigator.clipboard?.writeText(shareUrl)
   }
 
+  const closeHideModal = () => {
+    setHideModalClosing(true)
+    setTimeout(() => { setHideModalClosing(false); setShowHideModal(false) }, 180)
+  }
+
+  const confirmHide = async () => {
+    closeHideModal()
+    if (!user?.id) return
+    await supabase.from('hidden_spots').insert({ user_id: user.id, spot_id: spot.id }).catch(() => {})
+    onBack?.()
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative' }}>
       <div className="scroll-area" ref={scrollAreaRef}>
@@ -547,9 +561,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             <div
               onClick={e => { e.stopPropagation(); onSavePress?.(spot) }}
               onTouchStart={e => e.stopPropagation()}
-              style={{ width: 30, height: 30, borderRadius: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              style={{ width: 34, height: 34, borderRadius: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
             >
-              <BookmarkIcon color="#d4785a" size={14} filled={saved} />
+              <BookmarkIcon color="#d4785a" size={16} filled={saved} />
             </div>
           </div>
 
@@ -603,6 +617,17 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
               )}
               {spot.distance != null && <span className="dist-text">{spot.distance} mi</span>}
+              {user && (
+                <div
+                  onClick={() => setShowHideModal(true)}
+                  style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 2 }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="#d4785a" strokeWidth="1.8" strokeLinejoin="round" />
+                    <circle cx="12" cy="12" r="3" stroke="#d4785a" strokeWidth="1.8" />
+                  </svg>
+                </div>
+              )}
               <div
                 onClick={handleShare}
                 style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 2 }}
@@ -1147,6 +1172,28 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         document.body
       )}
       {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
+      {(showHideModal || hideModalClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeHideModal}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Hide This Spot?
+            </div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              This spot won't show up in your feed anymore. You can unhide it anytime from your profile.
+            </div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={confirmHide} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                Hide Spot
+              </button>
+              <button onClick={closeHideModal} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 })

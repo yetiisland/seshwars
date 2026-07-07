@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 
 const TYPES = ['All', 'Street', 'DIY', 'Skatepark', 'Skate Shop']
-const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar', 'Bump']
+const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Rail', 'Bump', 'Hip', 'Ride On Grind', 'Pole Jam', 'Bowl', 'Halfpipe', 'Step Up']
+const LIGHTING_OPTIONS = ['Lights', 'No Lights']
 const SKATEPARK_FEATURES = FEATURES
 const BUST_RATINGS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
 const DISTANCE_OPTIONS = [null, 5, 10, 25, 50, 100]
@@ -135,6 +136,14 @@ export default function FiltersModal({ active, onChange, compact = false, distan
                     <div className="section-label" style={{ marginBottom: 8 }}>Features</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {FEATURES.map(f => (
+                        <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="section-label" style={{ marginBottom: 8 }}>Lights</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {LIGHTING_OPTIONS.map(f => (
                         <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
                       ))}
                     </div>

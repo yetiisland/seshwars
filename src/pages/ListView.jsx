@@ -33,7 +33,7 @@ function LocationChip({ location, onClear }) {
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
-export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange }) {
+export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const filters = propFilters ?? localFilters
   const handleFiltersChange = onFiltersChange ?? setLocalFilters
@@ -80,7 +80,7 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
         ) : (
           <div className="spots-list-grid">
             {filtered.map(spot => (
-              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} />
+              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} onHidePress={onHidePress} />
             ))}
           </div>
         )}

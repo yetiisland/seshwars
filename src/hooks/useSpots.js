@@ -89,3 +89,17 @@ export function useSavedSpots(userId) {
 
   return { saved, refetchSaved }
 }
+
+export function useHiddenSpots(userId) {
+  const [hiddenIds, setHiddenIds] = useState(new Set())
+
+  const refetchHidden = useCallback(async () => {
+    if (!userId) { setHiddenIds(new Set()); return }
+    const { data } = await supabase.from('hidden_spots').select('spot_id').eq('user_id', userId)
+    if (data) setHiddenIds(new Set(data.map(d => d.spot_id)))
+  }, [userId])
+
+  useEffect(() => { refetchHidden() }, [refetchHidden])
+
+  return { hiddenIds, refetchHidden }
+}

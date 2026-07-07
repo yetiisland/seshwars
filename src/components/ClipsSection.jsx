@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { checkImageModeration } from '../utils/moderation'
+import InitialsAvatar from './InitialsAvatar'
 
 function relativeTime(ts) {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
@@ -62,15 +63,11 @@ function getThumbnail(clip) {
 }
 
 function SmallAvatar({ profile }) {
-  const initial = (profile?.username || profile?.first_name || 'A')[0].toUpperCase()
-  if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt="" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #EAD8C8' }} />
+  const [imgError, setImgError] = useState(false)
+  if (profile?.avatar_url && !imgError) {
+    return <img src={profile.avatar_url} alt="" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #EAD8C8' }} onError={() => setImgError(true)} />
   }
-  return (
-    <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#3D4454', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <span style={{ fontSize: 8, fontWeight: 900, color: '#fff', fontFamily: 'Barlow, sans-serif' }}>{initial}</span>
-    </div>
-  )
+  return <InitialsAvatar profile={profile} size={20} />
 }
 
 export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = false }) {

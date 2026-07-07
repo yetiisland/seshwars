@@ -30,7 +30,7 @@ export default function TabBar({ active, onChange, user, profileAvatar, profileI
                 <img src={profileAvatar} alt="Profile" onError={() => setAvatarError(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>
-                  {profileInitials || user?.email?.[0]?.toUpperCase() || '?'}
+                  {profileInitials || user?.email?.[0]?.toUpperCase() || 'U'}
                 </span>
               )}
             </div>
