@@ -625,6 +625,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="#d4785a" strokeWidth="1.8" strokeLinejoin="round" />
                     <circle cx="12" cy="12" r="3" stroke="#d4785a" strokeWidth="1.8" />
+                    <line x1="3" y1="3" x2="21" y2="21" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </div>
               )}

@@ -490,6 +490,29 @@ export default function App() {
 
   const effectiveTab = user ? tab : (tab === 'saved' || tab === 'profile' ? 'spots' : tab)
 
+  const hideConfirmModal = (showHideConfirm || hideConfirmClosing) ? createPortal(
+    <div className="modal-overlay" onClick={closeHideConfirm}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideConfirmClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+        <div className="modal-handle" />
+        <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          Hide This Spot?
+        </div>
+        <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          This spot won't show up in your feed anymore. You can unhide it anytime from your profile.
+        </div>
+        <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button onClick={confirmHide} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+            Hide Spot
+          </button>
+          <button onClick={closeHideConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  ) : null
+
   // Desktop layout
   if (isDesktop) {
     return (
@@ -623,28 +646,7 @@ export default function App() {
           />
         )}
 
-        {(showHideConfirm || hideConfirmClosing) && createPortal(
-          <div className="modal-overlay" onClick={closeHideConfirm}>
-            <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideConfirmClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
-              <div className="modal-handle" />
-              <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Hide This Spot?
-              </div>
-              <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                This spot won't show up in your feed anymore. You can unhide it anytime from your profile.
-              </div>
-              <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <button onClick={confirmHide} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
-                  Hide Spot
-                </button>
-                <button onClick={closeHideConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+        {hideConfirmModal}
 
         {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
 
@@ -740,28 +742,7 @@ export default function App() {
 
       {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
       {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
-      {(showHideConfirm || hideConfirmClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeHideConfirm}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideConfirmClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
-            <div className="modal-handle" />
-            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Hide This Spot?
-            </div>
-            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              This spot won't show up in your feed anymore. You can unhide it anytime from your profile.
-            </div>
-            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button onClick={confirmHide} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
-                Hide Spot
-              </button>
-              <button onClick={closeHideConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {hideConfirmModal}
       {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
       {saveModalSpot && (
         <SaveToListModal

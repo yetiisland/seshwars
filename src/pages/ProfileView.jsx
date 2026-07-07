@@ -326,6 +326,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="#d4785a" strokeWidth="1.8" strokeLinejoin="round" />
                   <circle cx="12" cy="12" r="3" stroke="#d4785a" strokeWidth="1.8" />
+                  <line x1="3" y1="3" x2="21" y2="21" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" />
                 </svg>
                 <div>
                   <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{hiddenSpots.length}</div>
@@ -520,7 +521,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             <div onClick={() => setShowHiddenSpots(false)} style={{ width: 32, height: 32, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: 1, textTransform: 'uppercase' }}>Hidden Spots</div>
+            <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: 1, textTransform: 'uppercase' }}>Hidden Spots</div>
+            <div style={{ width: 32 }} />
           </div>
           <div className="scroll-area">
             {hiddenSpots.length === 0 ? (

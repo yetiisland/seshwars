@@ -321,6 +321,9 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
           Your Saved Spots
         </div>
+        <div style={{ fontSize: 11, color: '#9a8878', fontWeight: 600, marginTop: 4 }}>
+          Create and share lists to help plan a future skate sesh.
+        </div>
       </div>
       <div className="scroll-area">
         <div style={{ padding: '8px 16px 0' }}>
