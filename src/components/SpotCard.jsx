@@ -76,7 +76,20 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
       <div className="spot-card-body">
         <div className="spot-title-row">
           <div className="spot-title" style={isShop ? { color: '#FFFFFF', fontWeight: 900 } : undefined}>{spot.title}</div>
-          {spot.distance != null && <div className="dist-text">{spot.distance} mi</div>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+            {spot.avg_rating != null && spot.rating_count > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#3D4454" />
+                </svg>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#3D4454' }}>{spot.avg_rating.toFixed(1)}</span>
+              </div>
+            )}
+            {spot.avg_rating != null && spot.rating_count > 0 && spot.distance != null && (
+              <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
+            )}
+            {spot.distance != null && <div className="dist-text">{spot.distance} mi</div>}
+          </div>
         </div>
         <div className="spot-desc" style={isShop ? { color: 'rgba(255,255,255,0.85)' } : undefined}>{spot.description}</div>
         <div className="spot-footer">

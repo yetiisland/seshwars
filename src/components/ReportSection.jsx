@@ -1,9 +1,9 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 
 const REPORT_TYPES = [
   'No Longer Skateable',
-  'Skateable Again',
   'Skate Stopped',
   'Spot Destroyed',
   'Temporarily Closed',
@@ -28,6 +28,7 @@ function CautionSVG({ size = 13, color = '#c8a020' }) {
 
 export default function ReportSection({ spotId, spot, user, onGoProfile, onReported }) {
   const [open, setOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
   const [selectedType, setSelectedType] = useState(null)
   const [customText, setCustomText] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -35,10 +36,14 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
   const [error, setError] = useState('')
 
   const closeModal = () => {
-    setOpen(false)
-    setSelectedType(null)
-    setCustomText('')
-    setError('')
+    setClosing(true)
+    setTimeout(() => {
+      setClosing(false)
+      setOpen(false)
+      setSelectedType(null)
+      setCustomText('')
+      setError('')
+    }, 180)
   }
 
   const handleSubmit = async () => {
@@ -65,7 +70,7 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
     setSubmitting(false)
     setSubmitted(true)
     closeModal()
-    onReported?.()
+    onReported?.(selectedType, selectedType === 'Other' ? customText.trim() : null)
   }
 
   return (
@@ -87,24 +92,15 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
       </div>
 
       {/* Bottom sheet modal */}
-      {open && (
+      {(open || closing) && createPortal(
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', overflowY: 'auto', ...(closing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : {}) }}>
             <div className="modal-handle" />
 
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', padding: '4px 16px 12px', position: 'relative' }}>
               <div style={{ flex: 1, fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Report This Spot
-              </div>
-              <div
-                onClick={closeModal}
-                style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-              >
-                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                  <line x1="1.5" y1="1.5" x2="9.5" y2="9.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                  <line x1="9.5" y1="1.5" x2="1.5" y2="9.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
               </div>
             </div>
 
@@ -160,7 +156,8 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

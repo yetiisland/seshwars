@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 function DragHandle() {
   return (
@@ -19,6 +20,19 @@ export default function DraggablePhotos({ photos, setPhotos, onAdd, uploading, u
   const [desktopDragIdx, setDesktopDragIdx] = useState(null)
   const [touchFromIdx, setTouchFromIdx] = useState(null)
   const [dropIdx, setDropIdx] = useState(null)
+  const [pendingDeleteIdx, setPendingDeleteIdx] = useState(null)
+  const [deleteModalClosing, setDeleteModalClosing] = useState(false)
+
+  const closeDeleteModal = () => {
+    setDeleteModalClosing(true)
+    setTimeout(() => { setDeleteModalClosing(false); setPendingDeleteIdx(null) }, 180)
+  }
+
+  const confirmDeletePhoto = () => {
+    if (pendingDeleteIdx === null) return
+    setPhotos(prev => prev.filter((_, j) => j !== pendingDeleteIdx))
+    closeDeleteModal()
+  }
 
   const itemRefs = useRef([])
   const longPressTimer = useRef(null)
@@ -150,40 +164,46 @@ export default function DraggablePhotos({ photos, setPhotos, onAdd, uploading, u
   const dragFromIdx = desktopDragIdx ?? touchFromIdx
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    <div style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {photos.map((url, i) => (
           <div
             key={url + i}
-            ref={el => { itemRefs.current[i] = el }}
-            draggable
-            onDragStart={() => onDragStart(i)}
-            onDragEnd={onDragEnd}
-            onDragOver={e => onDragOver(e, i)}
-            onDrop={e => onDrop(e, i)}
-            onTouchStart={e => onTouchStart(e, i)}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-            style={{
-              width: 72, height: 72, borderRadius: 4, overflow: 'hidden', position: 'relative',
-              flexShrink: 0,
-              border: dropIdx === i && dragFromIdx !== i ? '2px solid #d4785a' : '1px solid #EAD8C8',
-              opacity: dragFromIdx === i ? 0.35 : 1,
-              cursor: 'grab',
-              touchAction: 'none',
-              transition: 'opacity 0.15s',
-            }}
+            style={{ position: 'relative', flexShrink: 0, width: 72, height: 72 }}
           >
-            <img src={url} alt="spot" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
-            <DragHandle />
-            {i === 0 && (
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.55)', fontSize: 7, color: '#fff', textAlign: 'center', padding: '2px 0', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', pointerEvents: 'none' }}>
-                Cover
-              </div>
-            )}
+            {/* Thumbnail box — overflow hidden clips the image only */}
             <div
-              onClick={e => { e.stopPropagation(); setPhotos(prev => prev.filter((_, j) => j !== i)) }}
-              style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 4 }}
+              ref={el => { itemRefs.current[i] = el }}
+              draggable
+              onDragStart={() => onDragStart(i)}
+              onDragEnd={onDragEnd}
+              onDragOver={e => onDragOver(e, i)}
+              onDrop={e => onDrop(e, i)}
+              onTouchStart={e => onTouchStart(e, i)}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+              style={{
+                width: 72, height: 72, borderRadius: 4, overflow: 'hidden', position: 'relative',
+                border: dropIdx === i && dragFromIdx !== i ? '2px solid #d4785a' : '1px solid #EAD8C8',
+                opacity: dragFromIdx === i ? 0.35 : 1,
+                cursor: 'grab',
+                touchAction: 'none',
+                transition: 'opacity 0.15s',
+                userSelect: 'none', WebkitUserSelect: 'none',
+              }}
+            >
+              <img src={url} alt="spot" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
+              <DragHandle />
+              {i === 0 && (
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.55)', fontSize: 7, color: '#fff', textAlign: 'center', padding: '2px 0', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', pointerEvents: 'none' }}>
+                  Cover
+                </div>
+              )}
+            </div>
+            {/* X button outside overflow:hidden so it's never clipped */}
+            <div
+              onClick={e => { e.stopPropagation(); setPendingDeleteIdx(i) }}
+              style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 4 }}
             >
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><line x1="1" y1="1" x2="7" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /><line x1="7" y1="1" x2="1" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /></svg>
             </div>
@@ -203,6 +223,21 @@ export default function DraggablePhotos({ photos, setPhotos, onAdd, uploading, u
         <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 5, fontWeight: 700 }}>
           HOLD TO DRAG · FIRST PHOTO = COVER
         </div>
+      )}
+
+      {(pendingDeleteIdx !== null || deleteModalClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeDeleteModal}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Photo</div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Remove this photo from the spot?</div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={confirmDeletePhoto} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Remove</button>
+              <button onClick={closeDeleteModal} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )

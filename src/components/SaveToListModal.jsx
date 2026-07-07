@@ -131,11 +131,11 @@ export default function SaveToListModal({ spot, user, onClose }) {
         <div className="modal-handle" />
         <div className="modal-title">Save to</div>
 
-        {/* Favorites */}
+        {/* Saved Spots (was Favorites) */}
         <div className="modal-row" onClick={toggleFavorites}>
           <BookmarkSVG filled={isFav} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Favorites</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Saved Spots</div>
           </div>
           <SquareToggle selected={isFav} />
         </div>
@@ -171,7 +171,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
               </button>
               <button
                 onClick={() => { setCreatingList(false); setNewListName('') }}
-                style={{ flex: 1, padding: 10, borderRadius: 6, background: '#ECEDF2', border: 'none', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', textTransform: 'uppercase', letterSpacing: 0.5 }}
+                style={{ flex: 1, padding: 10, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', fontSize: 12, fontWeight: 700, color: '#d4785a', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', textTransform: 'uppercase', letterSpacing: 0.5 }}
               >
                 Cancel
               </button>
@@ -179,7 +179,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
           </div>
         ) : (
           <div className="modal-row" onClick={() => setCreatingList(true)}>
-            <div style={{ width: 34, height: 34, borderRadius: 6, background: '#f5ede0', border: '1px solid #e8d0c0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <line x1="7" y1="2" x2="7" y2="12" stroke="#d4785a" strokeWidth="1.5" strokeLinecap="round" />
                 <line x1="2" y1="7" x2="12" y2="7" stroke="#d4785a" strokeWidth="1.5" strokeLinecap="round" />
@@ -192,9 +192,16 @@ export default function SaveToListModal({ spot, user, onClose }) {
         {/* Save Spot button */}
         <div style={{ padding: '10px 14px 0' }}>
           <button
-            className="btn-salmon"
             onClick={onClose}
-            style={{ background: anySelected ? '#d4785a' : '#C8CAD4', transition: 'background 0.2s' }}
+            style={{
+              width: '100%', padding: 13, borderRadius: 6, cursor: 'pointer',
+              fontFamily: 'Barlow, sans-serif', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase',
+              background: anySelected ? '#d4785a' : 'transparent',
+              border: anySelected ? 'none' : '1.5px solid #d4785a',
+              color: anySelected ? '#fff' : '#d4785a',
+              opacity: anySelected ? 1 : 0.5,
+              transition: 'all 0.2s',
+            }}
           >
             Save Spot
           </button>

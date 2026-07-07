@@ -1,12 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
+import { loadProfile, clearProfile, useProfileStore } from './lib/profileStore'
+import { isAdminUser } from './lib/admin'
 import AuthScreen from './pages/AuthScreen'
 import { useSpots, useSavedSpots } from './hooks/useSpots'
 import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
 import TabBar from './components/TabBar'
 import Logo from './components/Logo'
-import { PlusIcon, ListIcon, BookmarkIcon } from './components/Icons'
+import { PlusIcon, MapFoldedIcon, BookmarkIcon } from './components/Icons'
 import SaveToListModal from './components/SaveToListModal'
 import ListView from './pages/ListView'
 import MapView from './pages/MapView'
@@ -16,10 +19,15 @@ import AddSpot from './pages/AddSpot'
 import SearchPage from './pages/SearchPage'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
+
+// Module-level auth cache — survives App unmount/remount so there's no loading flash
+// when navigating back from a spot page.
+let _cachedUser = null
+let _authReady = false
 const SEARCH_RADIUS_MILES = 100 / 1.60934
 
 const TABS = [
-  { id: 'spots', label: 'Spots', Icon: ListIcon },
+  { id: 'spots', label: 'Spots', Icon: MapFoldedIcon },
   { id: 'saved', label: 'Saved', Icon: BookmarkIcon },
   { id: 'profile', label: 'Profile', Icon: null },
 ]
@@ -184,7 +192,7 @@ function DesktopSearchBar({ spots, searchLocation, onSelect, onClear }) {
           onFocus={() => { if (suggestions.length > 0) setOpen(true) }}
           placeholder="Search by city or area..."
           style={{
-            width: '100%', background: '#ECEDF2', border: '1px solid #C8CAD4',
+            width: '100%', background: '#FFFFFF', border: '1px solid #C8CAD4',
             borderRadius: 6, padding: '7px 30px 7px 28px',
             fontSize: 12, color: 'var(--text-primary)', fontFamily: 'Barlow, sans-serif',
             outline: 'none',
@@ -241,23 +249,31 @@ function DesktopSearchBar({ spots, searchLocation, onSelect, onClear }) {
 }
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
+const _FILTER_TYPES = new Set(['Street', 'DIY', 'Skatepark', 'Skate Shop'])
+const _FILTER_BUSTS = new Set(['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only'])
 function matchesFilters(s, filters) {
   if (filters.includes('All') || filters.length === 0) return true
-  return filters.some(f => normalizeType(s.type) === normalizeType(f) || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))
+  const selTypes = filters.filter(f => _FILTER_TYPES.has(f))
+  const selBusts = filters.filter(f => _FILTER_BUSTS.has(f))
+  const selFeats = filters.filter(f => !_FILTER_TYPES.has(f) && !_FILTER_BUSTS.has(f) && f !== 'All')
+  if (selTypes.length > 0 && !selTypes.some(t => normalizeType(s.type) === normalizeType(t))) return false
+  if (selFeats.length > 0 && !selFeats.some(f => (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))) return false
+  if (selBusts.length > 0 && !selBusts.includes(s.bust_rating)) return false
+  return true
 }
 
 export default function App() {
   const navigate = useNavigate()
   const [tab, setTab] = useState(() => normalizeTab(sessionStorage.getItem('activeTab') || 'spots'))
-  const [spotsView, setSpotsView] = useState(() => {
-    const v = sessionStorage.getItem('spotsView')
-    return v === 'map' ? 'map' : 'list'
-  })
-  const [user, setUser] = useState(null)
-  const [authLoaded, setAuthLoaded] = useState(false)
-  const [profileAvatar, setProfileAvatar] = useState(null)
+  const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')
+  const [user, setUser] = useState(_cachedUser)
+  const [authLoaded, setAuthLoaded] = useState(_authReady)
+  const profile = useProfileStore()
+  const profileAvatar = profile?.avatar_url || null
+  const profileInitials = profile?.initials || ''
   const [showAdd, setShowAdd] = useState(false)
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchLocation, setSearchLocation] = useState(null)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
@@ -265,12 +281,12 @@ export default function App() {
   const toastTimer = useRef(null)
 
   const [filters, setFilters] = useState(['All'])
-  const [distanceRadius, setDistanceRadius] = useState(10)
+  const [distanceRadius, setDistanceRadius] = useState(null)
   const { spots, loading, refetch } = useSpots()
   const { saved, refetchSaved } = useSavedSpots(user?.id)
   const [saveModalSpot, setSaveModalSpot] = useState(null)
   const userLocation = useGeolocation()
-  const isAdmin = user?.email?.includes('taylorselgas') ?? false
+  const isAdmin = isAdminUser(user)
 
   const showToast = (msg) => {
     setToast(msg)
@@ -283,12 +299,6 @@ export default function App() {
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
-
-  useEffect(() => {
-    if (!user?.id) { setProfileAvatar(null); return }
-    supabase.from('profiles').select('avatar_url').eq('id', user.id).single()
-      .then(({ data }) => setProfileAvatar(data?.avatar_url || null))
-  }, [user?.id])
 
   const spotsWithDistance = useMemo(() => {
     const baseSpots = spots.map(s => {
@@ -339,36 +349,48 @@ export default function App() {
     let mounted = true
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return
-      setUser(session?.user ?? null)
+      const u = session?.user ?? null
+      _cachedUser = u
+      _authReady = true
+      setUser(u)
       setAuthLoaded(true)
+      if (u) loadProfile(u)
+      else clearProfile()
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
-      setUser(session?.user ?? null)
+      const u = session?.user ?? null
+      _cachedUser = u
+      _authReady = true
+      setUser(u)
       setAuthLoaded(true)
       if (event === 'SIGNED_IN' && session?.user) {
         const u = session.user
         const provider = u.app_metadata?.provider
 
-        // Detect email confirmation redirect (URL hash contains Supabase tokens)
         const isConfirmRedirect = window.location.hash.includes('access_token') && window.location.hash.includes('type=signup')
+        const isNewSignup = sessionStorage.getItem('seshwars:newSignup') === '1'
+
         if (isConfirmRedirect) {
-          // Clean the token hash from the URL
           window.history.replaceState(null, '', window.location.pathname + '#/')
           showToast('Email confirmed — welcome to Seshwars! 🤙')
-          // Ensure profile exists (safeguard for edge cases)
           const { data: profile } = await supabase.from('profiles').select('id').eq('id', u.id).maybeSingle()
           if (!profile) {
             const meta = u.user_metadata || {}
             if (meta.username) {
-              await supabase.from('profiles').insert({
+              await supabase.from('profiles').upsert({
                 id: u.id,
                 username: meta.username,
                 first_name: meta.first_name || '',
                 last_name: meta.last_name || null,
-              }).catch(() => {})
+              }, { onConflict: 'id' }).catch(() => {})
             }
           }
+        } else if (isNewSignup) {
+          sessionStorage.removeItem('seshwars:newSignup')
+          setTab('spots')
+          sessionStorage.setItem('activeTab', 'spots')
+          // Profile is created by AuthScreen's own upsert — no creation here to avoid race
         } else if (provider && provider !== 'email') {
           const { data: profile } = await supabase.from('profiles').select('id').eq('id', u.id).maybeSingle()
           if (!profile) {
@@ -383,9 +405,15 @@ export default function App() {
           }
         }
       }
+      if (event === 'SIGNED_IN' && u) loadProfile(u)
+      if (event === 'SIGNED_OUT') { _cachedUser = null; clearProfile() }
     })
     return () => { mounted = false; subscription.unsubscribe() }
   }, [])
+
+  useEffect(() => {
+    if (user && showAuth) setShowAuth(false)
+  }, [user, showAuth])
 
   useEffect(() => {
     const handler = () => refetch()
@@ -393,13 +421,13 @@ export default function App() {
     return () => window.removeEventListener('seshwars:spots-changed', handler)
   }, [refetch])
 
-  const openSearch = () => setShowSearch(true)
+  const openSearch = () => setShowSearch(s => !s)
   const closeSearch = () => setShowSearch(false)
   const handleSelectLocation = (entry) => { setSearchLocation(entry); closeSearch() }
   const handleClearSearch = () => setSearchLocation(null)
-  const handleSavePress = (spot) => setSaveModalSpot(spot)
+  const handleSavePress = (spot) => { if (!user) { setShowAuth(true); return } setSaveModalSpot(spot) }
   const handleAddSuccess = () => { setShowAdd(false); refetch() }
-  const openAdd = () => { setShowAdd(true); closeSearch() }
+  const openAdd = () => { if (!user) { setShowAuth(true); return } setShowAdd(true); closeSearch() }
 
   const handleSpotClick = (spot) => {
     const id = spot.slug || spot.id
@@ -409,8 +437,13 @@ export default function App() {
   }
 
   const handleTabChange = (t) => {
-    setTab(normalizeTab(t))
-    sessionStorage.setItem('activeTab', normalizeTab(t))
+    const normalized = normalizeTab(t)
+    if (!user && (normalized === 'saved' || normalized === 'profile')) {
+      setShowAuth(true)
+      return
+    }
+    setTab(normalized)
+    sessionStorage.setItem('activeTab', normalized)
     closeSearch()
   }
 
@@ -423,11 +456,13 @@ export default function App() {
     setShowAuthPrompt(false)
     setSaveModalSpot(null)
     closeSearch()
+    if (!user) { setShowAuth(true); return }
     setTab('profile')
   }
 
   if (!authLoaded) return <div className="loading" />
-  if (!user) return <AuthScreen />
+
+  const effectiveTab = user ? tab : (tab === 'saved' || tab === 'profile' ? 'spots' : tab)
 
   // Desktop layout
   if (isDesktop) {
@@ -435,23 +470,25 @@ export default function App() {
       <>
         {/* Fixed top nav */}
         <div className="desktop-top-nav">
-          <div className="desktop-nav-left">
-            <Logo />
-          </div>
-          <div className="desktop-nav-center">
-            <DesktopSearchBar spots={spots} searchLocation={searchLocation} onSelect={handleSelectLocation} onClear={handleClearSearch} />
-          </div>
-          <div className="desktop-nav-right">
-            <button className="btn-drop-spot" onClick={openAdd}>
-              <PlusIcon color="#fff" />
-              <span>DROP A SPOT</span>
-            </button>
+          <div className="desktop-nav-inner">
+            <div className="desktop-nav-left">
+              <Logo />
+            </div>
+            <div className="desktop-nav-center">
+              <DesktopSearchBar spots={spots} searchLocation={searchLocation} onSelect={handleSelectLocation} onClear={handleClearSearch} />
+            </div>
+            <div className="desktop-nav-right">
+              <button className="btn-drop-spot" onClick={openAdd}>
+                <PlusIcon color="#fff" />
+                <span>DROP A SPOT</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Content area */}
-        <div className="desktop-content">
-          {tab === 'spots' && spotsView === 'list' && (
+        {/* Content area — map is full-width exception; everything else constrained to 1200px */}
+        <div className={`desktop-content${effectiveTab === 'spots' && spotsView === 'map' ? '' : ' desktop-content-constrained'}`}>
+          {effectiveTab === 'spots' && spotsView === 'list' && (
             <ListView
               spots={filteredByDistance}
               loading={loading}
@@ -469,7 +506,7 @@ export default function App() {
               onDistanceChange={setDistanceRadius}
             />
           )}
-          {tab === 'spots' && spotsView === 'map' && (
+          {effectiveTab === 'spots' && spotsView === 'map' && (
             <MapView
               spots={filteredByDistance}
               saved={saved}
@@ -485,7 +522,7 @@ export default function App() {
               onDistanceChange={setDistanceRadius}
             />
           )}
-          {tab === 'saved' && (
+          {effectiveTab === 'saved' && (
             <SavedView
               spots={visibleSpots}
               saved={saved}
@@ -497,7 +534,7 @@ export default function App() {
               user={user}
             />
           )}
-          {tab === 'profile' && (
+          {effectiveTab === 'profile' && (
             <ProfileView
               user={user}
               spots={spots}
@@ -512,8 +549,8 @@ export default function App() {
         </div>
 
         {/* Spots view toggle pill for desktop */}
-        {tab === 'spots' && (
-          <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
+        {effectiveTab === 'spots' && (
+          <div style={{ position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
             <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
               <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
               <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
@@ -526,13 +563,13 @@ export default function App() {
           {TABS.map(({ id, Icon }) => (
             <div
               key={id}
-              className={`tab-item ${tab === id ? 'active' : ''}`}
+              className={`tab-item ${effectiveTab === id ? 'active' : ''}`}
               onClick={() => handleTabChange(id)}
               style={{ flex: 1 }}
             >
               {id === 'profile' ? (
-                <div style={{ width: 33, height: 33, borderRadius: '50%', background: profileAvatar ? 'transparent' : 'rgba(255,255,255,0.25)', border: tab === 'profile' ? '2.5px solid #fff' : '2.5px solid rgba(255,255,255,0.3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {profileAvatar ? <img src={profileAvatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{user?.email?.[0]?.toUpperCase() || '?'}</span>}
+                <div style={{ width: 33, height: 33, borderRadius: '50%', background: profileAvatar ? 'transparent' : '#d4785a', border: tab === 'profile' ? '2.5px solid #fff' : '2.5px solid rgba(255,255,255,0.3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {profileAvatar ? <img src={profileAvatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{profileInitials}</span>}
                 </div>
               ) : (
                 <Icon color="#ffffff" size={36} filled={tab === id} />
@@ -558,6 +595,8 @@ export default function App() {
           />
         )}
 
+        {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
+
       </>
     )
   }
@@ -570,7 +609,7 @@ export default function App() {
         <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} onGoProfile={goToProfile} />
       ) : (
         <>
-          {tab === 'spots' && spotsView === 'list' && (
+          {effectiveTab === 'spots' && spotsView === 'list' && (
             <ListView
               spots={filteredByDistance}
               loading={loading}
@@ -587,7 +626,7 @@ export default function App() {
               onDistanceChange={setDistanceRadius}
             />
           )}
-          {tab === 'spots' && spotsView === 'map' && (
+          {effectiveTab === 'spots' && spotsView === 'map' && (
             <MapView
               spots={filteredByDistance}
               saved={saved}
@@ -603,7 +642,7 @@ export default function App() {
               onDistanceChange={setDistanceRadius}
             />
           )}
-          {tab === 'saved' && (
+          {effectiveTab === 'saved' && (
             <SavedView
               spots={visibleSpots}
               saved={saved}
@@ -614,7 +653,7 @@ export default function App() {
               user={user}
             />
           )}
-          {tab === 'profile' && (
+          {effectiveTab === 'profile' && (
             <ProfileView
               user={user}
               spots={spots}
@@ -629,7 +668,7 @@ export default function App() {
       )}
 
       {/* Spots view toggle pill — above tab bar, only when on spots tab */}
-      {tab === 'spots' && !showAdd && (
+      {effectiveTab === 'spots' && !showAdd && (
         <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 70px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 1001, pointerEvents: 'none' }}>
           <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
             <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
@@ -638,7 +677,7 @@ export default function App() {
         </div>
       )}
 
-      {!showAdd && <TabBar active={tab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} />}
+      {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} />}
 
       {toast && (
         <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, right: 16, zIndex: 2001, background: '#2a1e14', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, textAlign: 'center', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', letterSpacing: 0.3 }}>
@@ -648,6 +687,7 @@ export default function App() {
 
       {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
       {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
+      {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
       {saveModalSpot && (
         <SaveToListModal
           spot={saveModalSpot}
@@ -655,6 +695,7 @@ export default function App() {
           onClose={() => { setSaveModalSpot(null); refetchSaved() }}
         />
       )}
+
     </>
   )
 }

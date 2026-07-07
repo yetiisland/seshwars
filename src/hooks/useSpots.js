@@ -3,12 +3,16 @@ import { supabase } from '../lib/supabase'
 
 const LS_SAVED_KEY = 'seshwars_saved_spots'
 
+// Module-level cache so spots survive App unmount/remount (e.g. navigating back from SpotPage)
+let _cachedSpots = []
+let _spotsReady = false
+
 export function useSpots() {
-  const [spots, setSpots] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [spots, setSpots] = useState(_cachedSpots)
+  const [loading, setLoading] = useState(!_spotsReady)
 
   const fetchSpots = useCallback(async () => {
-    setLoading(true)
+    if (!_spotsReady) setLoading(true)
     const [spotsRes, reviewsRes, reportsRes] = await Promise.all([
       supabase.from('spots').select('*').order('created_at', { ascending: false }),
       supabase.from('spot_reviews').select('spot_id, rating'),
@@ -38,6 +42,8 @@ export function useSpots() {
           most_recent_report_custom: rep?.most_recent_custom || null,
         }
       })
+      _cachedSpots = merged
+      _spotsReady = true
       setSpots(merged)
     }
     setLoading(false)

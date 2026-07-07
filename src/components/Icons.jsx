@@ -1,3 +1,35 @@
+export function MapFoldedIcon({ color = '#ffffff', size = 22, filled = false }) {
+  if (filled) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+        <path d="M4 10L16 6L32 10L44 6V38L32 42L16 38L4 42V10Z" fill={color} />
+        <line x1="16" y1="6" x2="16" y2="38" stroke={filled ? '#d4785a' : color} strokeWidth="2.5" />
+        <line x1="32" y1="10" x2="32" y2="42" stroke={filled ? '#d4785a' : color} strokeWidth="2.5" />
+      </svg>
+    )
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M4 10L16 6L32 10L44 6V38L32 42L16 38L4 42V10Z" stroke={color} strokeWidth="3" strokeLinejoin="round" fill="none" />
+      <line x1="16" y1="6" x2="16" y2="38" stroke={color} strokeWidth="2.5" />
+      <line x1="32" y1="10" x2="32" y2="42" stroke={color} strokeWidth="2.5" />
+    </svg>
+  )
+}
+
+export function EyeIcon({ color = '#333', size = 17, filled = false }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <path d="M1 10C1 10 4 4 10 4C16 4 19 10 19 10C19 10 16 16 10 16C4 16 1 10 1 10Z"
+        stroke={color} strokeWidth="1.5" strokeLinejoin="round"
+        fill={filled ? color : 'none'} fillOpacity={filled ? 0.15 : 0} />
+      <circle cx="10" cy="10" r="3"
+        stroke={color} strokeWidth="1.5"
+        fill={filled ? color : 'none'} />
+    </svg>
+  )
+}
+
 export function ListIcon({ color = '#ffffff', size = 22, filled = false }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none">

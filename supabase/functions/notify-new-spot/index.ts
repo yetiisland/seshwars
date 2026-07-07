@@ -1,8 +1,22 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const TO = 'taylor@yetiisland.studio'
 const FROM = 'Seshwars <onboarding@resend.dev>'
+
+async function getUsername(userId: string): Promise<string> {
+  if (!userId) return 'Anonymous'
+  try {
+    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    const { data } = await sb.from('profiles').select('username').eq('id', userId).maybeSingle()
+    return data?.username || userId
+  } catch {
+    return userId
+  }
+}
 
 serve(async (req) => {
   try {
@@ -18,6 +32,7 @@ serve(async (req) => {
       const reportType = body.report_type as string
       const spotUrl = `https://seshwars.com/#/spots/${spot.slug || spot.id}`
       const coverPhoto = Array.isArray(spot.photos) && spot.photos.length > 0 ? spot.photos[0] : null
+      const addedBy = await getUsername(spot.added_by)
 
       const reportHtml = `
 <!DOCTYPE html>
@@ -48,7 +63,7 @@ serve(async (req) => {
         </tr>
         <tr>
           <td style="padding:8px 0;font-size:11px;font-weight:700;color:#9a8878;text-transform:uppercase;letter-spacing:0.5px;">Added by</td>
-          <td style="padding:8px 0;font-size:12px;font-weight:700;color:#2a1e14;">${spot.added_by || 'Anonymous'}</td>
+          <td style="padding:8px 0;font-size:12px;font-weight:700;color:#2a1e14;">${addedBy}</td>
         </tr>
       </table>
       <a href="${spotUrl}" style="display:block;text-align:center;background:#c0453a;color:#fff;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:14px 24px;border-radius:8px;margin-bottom:16px;">Review Spot →</a>
@@ -72,6 +87,7 @@ serve(async (req) => {
     }
 
     const spot = body.record
+    const addedBy = await getUsername(spot.added_by)
 
     const spotUrl = `https://seshwars.com/#/spots/${spot.slug || spot.id}`
     const coverPhoto = Array.isArray(spot.photos) && spot.photos.length > 0 ? spot.photos[0] : null
@@ -135,7 +151,7 @@ serve(async (req) => {
         </tr>
         <tr>
           <td style="padding:8px 0;font-size:11px;font-weight:700;color:#9a8878;text-transform:uppercase;letter-spacing:0.5px;">Added by</td>
-          <td style="padding:8px 0;font-size:12px;font-weight:700;color:#2a1e14;">${spot.added_by || 'Anonymous'}</td>
+          <td style="padding:8px 0;font-size:12px;font-weight:700;color:#2a1e14;">${addedBy}</td>
         </tr>
       </table>
 

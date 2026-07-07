@@ -2,13 +2,14 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Map, { Marker, NavigationControl, Source, Layer } from 'react-map-gl'
 import Navbar from '../components/Navbar'
 import FiltersModal from '../components/FiltersModal'
+import SpotCard from '../components/SpotCard'
 import { BookmarkIcon, ArrowIcon } from '../components/Icons'
 import TagsRow from '../components/TagsRow'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const FALLBACK = { longitude: -104.9903, latitude: 39.7392, zoom: 13 }
-const STYLE_CUSTOM = 'mapbox://styles/yetiisland/standard-map'
-const STYLE_LIGHT = 'mapbox://styles/mapbox/light-v11'
+const STYLE_CUSTOM = 'mapbox://styles/mapbox/streets-v12'
+const STYLE_LIGHT = 'mapbox://styles/mapbox/streets-v12'
 const STYLE_SAT = 'mapbox://styles/mapbox/satellite-streets-v12'
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
@@ -147,7 +148,7 @@ function CautionChip({ report, reportCustom, small = false }) {
   )
 }
 
-export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, searchLocation, highlightedSpotId, onSearch }) {
+export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, searchLocation, highlightedSpotId, onSearch, fitOnMount = false }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
   const [viewState, setViewState] = useState(FALLBACK)
@@ -155,6 +156,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
   const [baseStyle, setBaseStyle] = useState(STYLE_CUSTOM)
   const [unclusteredIds, setUnclusteredIds] = useState(() => new Set())
   const [mapReady, setMapReady] = useState(false)
+  const [fitDone, setFitDone] = useState(false)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
   const initializedRef = useRef(false)
   const mapRef = useRef()
@@ -178,6 +180,27 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     }
   }, [searchLocation])
 
+  useEffect(() => {
+    if (!fitOnMount || fitDone || !mapReady) return
+    const coords = spots.filter(s => s.latitude && s.longitude)
+    if (coords.length === 0) return
+    if (coords.length === 1) {
+      setViewState(v => ({ ...v, longitude: coords[0].longitude, latitude: coords[0].latitude, zoom: 14 }))
+      setFitDone(true)
+      return
+    }
+    const lngs = coords.map(s => s.longitude)
+    const lats = coords.map(s => s.latitude)
+    const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]]
+    const map = mapRef.current?.getMap()
+    if (map) {
+      map.fitBounds(bounds, { padding: 60, maxZoom: 15, duration: 0 })
+    } else {
+      setViewState(v => ({ ...v, longitude: (bounds[0][0] + bounds[1][0]) / 2, latitude: (bounds[0][1] + bounds[1][1]) / 2, zoom: 11 }))
+    }
+    setFitDone(true)
+  }, [fitOnMount, fitDone, mapReady, spots])
+
   const activeFilters = propFilters ?? externalFilters ?? localFilters
   const handleFiltersChange = (next) => {
     setLocalFilters(next)
@@ -186,7 +209,15 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
   const handleDistanceChange = (d) => { onDistanceChange?.(d) }
   const filtered = spots.filter(s => {
     if (activeFilters.includes('All') || activeFilters.length === 0) return true
-    return activeFilters.some(f => normalizeType(s.type) === normalizeType(f) || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))
+    const _TYPES = new Set(['Street', 'DIY', 'Skatepark', 'Skate Shop'])
+    const _BUSTS = new Set(['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only'])
+    const selTypes = activeFilters.filter(f => _TYPES.has(f))
+    const selBusts = activeFilters.filter(f => _BUSTS.has(f))
+    const selFeats = activeFilters.filter(f => !_TYPES.has(f) && !_BUSTS.has(f) && f !== 'All')
+    if (selTypes.length > 0 && !selTypes.some(t => normalizeType(s.type) === normalizeType(t))) return false
+    if (selFeats.length > 0 && !selFeats.some(f => (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))) return false
+    if (selBusts.length > 0 && !selBusts.includes(s.bust_rating)) return false
+    return true
   })
 
   const geojson = useMemo(() => ({
@@ -204,6 +235,16 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     if (!mapRef.current) return
     const map = mapRef.current.getMap()
     if (!map.isStyleLoaded() || !map.getLayer('unclustered-points')) return
+    // Hide POI / transit labels — keep place names and road labels only
+    const style = map.getStyle()
+    if (style) {
+      style.layers.forEach(layer => {
+        const sl = layer['source-layer']
+        if (sl === 'poi_label' || sl === 'transit_stop_label') {
+          try { map.setLayoutProperty(layer.id, 'visibility', 'none') } catch {}
+        }
+      })
+    }
     const features = map.queryRenderedFeatures({ layers: ['unclustered-points'] })
     setUnclusteredIds(new Set(features.map(f => String(f.properties.id))))
     setMapReady(true)
@@ -217,7 +258,18 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     }
     if (selected?.id === spot.id) { setSelected(null); return }
     setSelected(spot)
-    setViewState(v => ({ ...v, longitude: spot.longitude, latitude: spot.latitude, zoom: 15 }))
+    const map = mapRef.current?.getMap()
+    if (map) {
+      map.flyTo({
+        center: [spot.longitude, spot.latitude],
+        zoom: Math.max(mapRef.current?.getMap().getZoom() || 14, 14),
+        padding: { top: 60, bottom: isDesktop ? 320 : 280, left: 0, right: 0 },
+        duration: 400,
+        essential: true,
+      })
+    } else {
+      setViewState(v => ({ ...v, longitude: spot.longitude, latitude: spot.latitude, zoom: 15 }))
+    }
   }, [selected, showPeekCard, onSpotClick])
 
   const handleMapClick = useCallback((e) => {
@@ -227,12 +279,12 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
         const map = mapRef.current.getMap()
         map.getSource('spots').getClusterExpansionZoom(feature.properties.cluster_id)
           .then(zoom => {
-            setViewState(v => ({
-              ...v,
-              longitude: feature.geometry.coordinates[0],
-              latitude: feature.geometry.coordinates[1],
+            map.flyTo({
+              center: [feature.geometry.coordinates[0], feature.geometry.coordinates[1]],
               zoom: zoom + 0.5,
-            }))
+              duration: 500,
+              essential: true,
+            })
           })
         return
       }
@@ -253,7 +305,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
   })
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', paddingBottom: isDesktop ? 0 : 'calc(max(env(safe-area-inset-bottom), 24px) + 58px)' }}>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
 
       <div style={{ flex: 1, position: 'relative' }}>
@@ -270,8 +322,6 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           interactiveLayerIds={['clusters']}
           onError={() => { if (!satellite) setBaseStyle(STYLE_LIGHT) }}
         >
-          <NavigationControl position="bottom-right" showCompass={false} />
-
           <Source id="spots" type="geojson" data={geojson} cluster={true} clusterMaxZoom={9} clusterRadius={50}>
             <Layer {...clusterCircleLayer} />
             <Layer {...clusterCountLayer} />
@@ -309,40 +359,43 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
         {/* Filters row — top */}
         {showFilterChips && (
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-            <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} />
+            {isDesktop ? (
+              <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+                <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} />
+              </div>
+            ) : (
+              <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} />
+            )}
           </div>
         )}
 
-        {/* Satellite toggle — bottom right, above NavigationControl */}
+        {/* Eye/satellite toggle — bottom-right (within container on desktop) */}
         {showFilterChips && (
-          <div style={{
-            position: 'absolute',
-            bottom: isDesktop ? 102 : 80,
-            right: 10,
-            zIndex: 10,
-          }}>
-            <div
-              onClick={() => setSatellite(s => !s)}
-              title={satellite ? 'Default map' : 'Satellite view'}
-              style={{
-                width: 29, height: 29,
-                background: satellite ? '#d4785a' : '#fff',
-                border: satellite ? '1.5px solid #d4785a' : '1.5px solid rgba(0,0,0,0.2)',
-                borderRadius: 4,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '0 0 0 2px rgba(0,0,0,0.08)',
-              }}
-            >
-              <svg width="17" height="17" viewBox="0 0 20 20" fill="none">
-                <rect x="8" y="8" width="4" height="4" rx="0.8" fill={satellite ? '#fff' : '#333'} />
-                <rect x="1" y="7" width="5.5" height="6" rx="0.5" stroke={satellite ? '#fff' : '#333'} strokeWidth="1.3" fill="none" />
-                <line x1="3.5" y1="7" x2="3.5" y2="13" stroke={satellite ? '#fff' : '#333'} strokeWidth="0.7" />
-                <rect x="13.5" y="7" width="5.5" height="6" rx="0.5" stroke={satellite ? '#fff' : '#333'} strokeWidth="1.3" fill="none" />
-                <line x1="16" y1="7" x2="16" y2="13" stroke={satellite ? '#fff' : '#333'} strokeWidth="0.7" />
-                <line x1="10" y1="3" x2="10" y2="8" stroke={satellite ? '#fff' : '#333'} strokeWidth="1.2" strokeLinecap="round" />
-                <circle cx="10" cy="2.2" r="1.3" fill={satellite ? '#fff' : '#333'} />
-              </svg>
+          <div style={{ position: 'absolute', bottom: isDesktop ? 30 : 10, left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
+            <div style={{ maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto', display: 'flex', justifyContent: 'flex-end', paddingRight: 10, pointerEvents: 'auto' }}>
+              <div
+                onClick={() => setSatellite(s => !s)}
+                title={satellite ? 'Default map' : 'Satellite view'}
+                style={{
+                  width: 38, height: 38,
+                  background: satellite ? '#FDF8F0' : '#d4785a',
+                  border: satellite ? '2px solid #d4785a' : 'none',
+                  borderRadius: 6,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                  pointerEvents: 'auto',
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 20 20" fill="none">
+                  <path d="M1 10C1 10 4 4 10 4C16 4 19 10 19 10C19 10 16 16 10 16C4 16 1 10 1 10Z"
+                    stroke={satellite ? '#d4785a' : '#fff'} strokeWidth="1.5" strokeLinejoin="round"
+                    fill={satellite ? 'rgba(212,120,90,0.12)' : 'rgba(255,255,255,0.18)'} />
+                  <circle cx="10" cy="10" r="3"
+                    stroke={satellite ? '#d4785a' : '#fff'} strokeWidth="1.5"
+                    fill={satellite ? '#d4785a' : '#fff'} />
+                </svg>
+              </div>
             </div>
           </div>
         )}
@@ -350,52 +403,16 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
         {/* Peek card — desktop: compact floating, mobile: full-width */}
         {showPeekCard && selected && (
           isDesktop ? (
-            <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 360, padding: '0 12px', zIndex: 10 }}>
-              <div
-                style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex' }}
-                onClick={() => onSpotClick(selected)}
-              >
-                <div style={{ width: 80, flexShrink: 0, position: 'relative', background: '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80, overflow: 'hidden' }}>
-                  {selected.photos?.[0] ? (
-                    <img src={selected.photos[0]} alt={selected.title} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
-                  ) : (
-                    <svg width="32" height="20" viewBox="0 0 40 24" fill="none">
-                      <rect x="1" y="15" width="38" height="6" rx="1" fill="#ddd0bc" />
-                      <rect x="3" y="8" width="34" height="6" rx="1" fill="#e0cebc" />
-                      <rect x="6" y="2" width="28" height="5" rx="1" fill="#e8d8c8" />
-                    </svg>
-                  )}
-                  {selected.most_recent_report && selected.most_recent_report !== 'Skateable Again' && (
-                    <CautionChip report={selected.most_recent_report} reportCustom={selected.most_recent_report_custom} small />
-                  )}
-                </div>
-                <div style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 3 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.title}</div>
-                    {selected.distance != null && <div className="dist-text" style={{ flexShrink: 0 }}>{selected.distance} mi</div>}
-                  </div>
-                  <div className="spot-badge" style={{ alignSelf: 'flex-start', marginBottom: 4 }}>{normalizeType(selected.type)}</div>
-                  {selected.description ? (
-                    <div style={{ fontSize: 10, color: '#9a8878', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                      {selected.description}
-                    </div>
-                  ) : null}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 12px 10px 0', flexShrink: 0 }}>
-                  <div
-                    style={{ width: 24, height: 24, borderRadius: 5, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                    onClick={e => { e.stopPropagation(); onSavePress?.(selected) }}
-                  >
-                    <BookmarkIcon color="#d4785a" size={12} filled={saved.has(selected.id)} />
-                  </div>
-                  <div className="arrow-btn" style={{ width: 24, height: 24, flexShrink: 0 }}>
-                    <ArrowIcon size={10} />
-                  </div>
-                </div>
-              </div>
+            <div style={{ position: 'absolute', bottom: 100, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 12px', zIndex: 1100 }}>
+              <SpotCard
+                spot={selected}
+                saved={saved.has(selected.id)}
+                onSavePress={onSavePress}
+                onClick={onSpotClick}
+              />
             </div>
           ) : (
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 12px 12px', zIndex: 10 }}>
+            <div style={{ position: 'absolute', bottom: 60, left: 0, right: 0, padding: '0 12px 8px', zIndex: 10 }}>
               <div style={{ width: 32, height: 3, background: '#C8CAD4', borderRadius: 2, margin: '8px auto 10px' }} />
               <div
                 style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }}

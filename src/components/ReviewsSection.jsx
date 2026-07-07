@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 
 function relativeTime(ts) {
@@ -65,10 +66,16 @@ function StarMini({ rating }) {
 export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange }) {
   const [reviews, setReviews] = useState([])
   const [myRating, setMyRating] = useState(0)
-  const [myComment, setMyComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [myReviewId, setMyReviewId] = useState(null)
-  const [deleteConfirmId, setDeleteConfirmId] = useState(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteModalClosing, setDeleteModalClosing] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState(null)
+
+  const closeDeleteModal = () => {
+    setDeleteModalClosing(true)
+    setTimeout(() => { setDeleteModalClosing(false); setShowDeleteModal(false); setPendingDeleteId(null) }, 180)
+  }
 
   const loadReviews = useCallback(async () => {
     const { data } = await supabase
@@ -83,7 +90,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
 
     if (user?.id) {
       const own = withProfiles.find(r => r.user_id === user.id)
-      if (own) { setMyReviewId(own.id); setMyRating(own.rating); setMyComment(own.comment || '') }
+      if (own) { setMyReviewId(own.id); setMyRating(own.rating) }
       else { setMyReviewId(null) }
     }
 
@@ -103,12 +110,11 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
     if (!myRating || submitting) return
     const { data: { user: cu }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !cu) return
-    console.log('Review upsert user.id:', cu.id)
     setSubmitting(true)
     const profileMap = await fetchProfiles([cu.id])
     const { data, error } = await supabase
       .from('spot_reviews')
-      .upsert({ spot_id: spotId, user_id: cu.id, rating: myRating, comment: myComment.trim() || null }, { onConflict: 'spot_id,user_id' })
+      .upsert({ spot_id: spotId, user_id: cu.id, rating: myRating, comment: null }, { onConflict: 'spot_id,user_id' })
       .select().single()
     setSubmitting(false)
     if (!error && data) {
@@ -123,13 +129,12 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
     }
   }
 
-  const handleDelete = async (reviewId) => {
-    if (deleteConfirmId !== reviewId) { setDeleteConfirmId(reviewId); return }
-    await supabase.from('spot_reviews').delete().eq('id', reviewId)
-    const next = reviews.filter(r => r.id !== reviewId)
+  const handleDelete = async () => {
+    if (!pendingDeleteId) return
+    await supabase.from('spot_reviews').delete().eq('id', pendingDeleteId)
+    const next = reviews.filter(r => r.id !== pendingDeleteId)
     setReviews(next)
-    setDeleteConfirmId(null)
-    if (myReviewId === reviewId) { setMyReviewId(null); setMyRating(0); setMyComment('') }
+    if (myReviewId === pendingDeleteId) { setMyReviewId(null); setMyRating(0) }
     if (onStatsChange) {
       if (next.length > 0) {
         const avg = next.reduce((a, r) => a + r.rating, 0) / next.length
@@ -138,73 +143,68 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
         onStatsChange(null, 0)
       }
     }
+    closeDeleteModal()
   }
 
   return (
     <div ref={sectionRef}>
       <div className="divider" />
-      <div className="section-label">Reviews ({reviews.length})</div>
+      <div className="section-label">Rate The Spot</div>
 
       {user ? (
         <div style={{ marginBottom: 16 }}>
           <div style={{ marginBottom: 10 }}>
             <StarRow value={myRating} onChange={setMyRating} size={28} />
           </div>
-          <textarea
-            value={myComment}
-            onChange={e => setMyComment(e.target.value)}
-            placeholder="Share your experience…"
-            rows={3}
-            style={{ width: '100%', resize: 'none', border: '1px solid #E8DDD0', borderRadius: 6, padding: '8px 10px', fontSize: 16, fontFamily: 'Barlow, sans-serif', color: 'var(--text-primary)', background: '#FAF5EE', outline: 'none', lineHeight: 1.5, boxSizing: 'border-box', marginBottom: 8 }}
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={!myRating || submitting}
-            style={{ width: '100%', padding: '10px', borderRadius: 6, background: myRating ? '#d4785a' : '#E8DDD0', color: myRating ? '#fff' : '#b0a090', border: 'none', cursor: myRating ? 'pointer' : 'default', fontSize: 11, fontWeight: 700, fontFamily: 'Barlow, sans-serif', letterSpacing: 1, textTransform: 'uppercase', transition: 'background 0.15s' }}
-          >
-            {submitting ? 'Saving…' : myReviewId ? 'Update Review' : 'Post Review'}
-          </button>
+          {myRating > 0 && (
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              style={{ width: '100%', padding: '10px', borderRadius: 6, background: '#d4785a', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'Barlow, sans-serif', letterSpacing: 1, textTransform: 'uppercase', transition: 'background 0.15s' }}
+            >
+              {submitting ? 'Saving…' : myReviewId ? 'Update Rating' : 'Post Rating'}
+            </button>
+          )}
         </div>
-      ) : (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>Sign in to leave a review.</div>
-      )}
+      ) : null}
 
-      {reviews.length === 0 ? (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>No reviews yet. Be the first!</div>
-      ) : (
-        <div style={{ marginBottom: 14 }}>
-          {reviews.map((review, i) => {
+      {reviews.length === 0 ? null : (
+        <div className="hide-scroll" style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '0 0 12px', margin: '0 -14px', paddingLeft: 14, paddingRight: 14 }}>
+          {reviews.map(review => {
             const name = review.profile?.username || review.profile?.first_name || 'Anonymous'
             const isOwn = user?.id === review.user_id
-            const confirming = deleteConfirmId === review.id
             return (
-              <div key={review.id}>
-                {i > 0 && <div className="divider" style={{ margin: '10px 0' }} />}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <Avatar profile={review.profile} size={32} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#2a1e14', fontFamily: 'Barlow, sans-serif' }}>{name}</span>
-                      <StarMini rating={review.rating} />
-                      <span style={{ fontSize: 9, color: '#b0a090', marginLeft: 'auto', fontWeight: 600 }}>{relativeTime(review.created_at)}</span>
-                      {isOwn && (
-                        <span
-                          onClick={() => handleDelete(review.id)}
-                          style={{ fontSize: 10, color: confirming ? '#c0453a' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', padding: '1px 4px', marginLeft: 2 }}
-                        >
-                          {confirming ? 'Delete?' : '×'}
-                        </span>
-                      )}
-                    </div>
-                    {review.comment && (
-                      <div style={{ fontSize: 13, color: '#2a1e14', lineHeight: 1.5 }}>{review.comment}</div>
-                    )}
-                  </div>
+              <div key={review.id} style={{ flexShrink: 0, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 160, maxWidth: 220 }}>
+                <Avatar profile={review.profile} size={36} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <StarMini rating={review.rating} />
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#2a1e14', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'Barlow, sans-serif' }}>@{name}</div>
+                  <div style={{ fontSize: 9, color: '#b0a090', marginTop: 2, fontWeight: 600 }}>{relativeTime(review.created_at)}</div>
                 </div>
+                {isOwn && (
+                  <span onClick={() => { setPendingDeleteId(review.id); setShowDeleteModal(true) }} style={{ fontSize: 13, color: '#C8CAD4', fontWeight: 700, cursor: 'pointer', flexShrink: 0, alignSelf: 'flex-start' }}>
+                    ×
+                  </span>
+                )}
               </div>
             )
           })}
         </div>
+      )}
+
+      {(showDeleteModal || deleteModalClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeDeleteModal}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Rating</div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Remove your rating? This cannot be undone.</div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={handleDelete} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Delete</button>
+              <button onClick={closeDeleteModal} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )

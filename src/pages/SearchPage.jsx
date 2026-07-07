@@ -105,11 +105,11 @@ export default function SearchPage({ spots, onSelect, onClose }) {
 
   return (
     <div style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 500, display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
+      {/* Header — no borderBottom since the Navbar above provides separation */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
-        background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
+        background: '#FDF8F0', flexShrink: 0,
       }}>
         <div style={{ width: 36 }} />
         <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>

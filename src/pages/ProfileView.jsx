@@ -1,9 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { compressImage } from '../utils/compressImage'
+import { useProfileStore, setProfileDirect, reloadProfile } from '../lib/profileStore'
 import Navbar from '../components/Navbar'
 import SpotCard from '../components/SpotCard'
+import TermsOfService from './TermsOfService'
+import PrivacyPolicy from './PrivacyPolicy'
+import SupportPage from './SupportPage'
+import ImageCropModal from '../components/ImageCropModal'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
+
+let _mySpotsScrollTop = 0
 
 export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick }) {
   const [email, setEmail] = useState('')
@@ -14,12 +23,20 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [showMySpots, setShowMySpots] = useState(false)
+  const [showMySpots, setShowMySpots] = useState(() => sessionStorage.getItem('mySpots:open') === '1')
+  const mySpotsScrollRef = useRef(null)
+  const mySpotsScrollRestoredRef = useRef(false)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
   const [showFeedbackSheet, setShowFeedbackSheet] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
   const [feedbackSending, setFeedbackSending] = useState(false)
   const [feedbackSent, setFeedbackSent] = useState(false)
+  const [showTos, setShowTos] = useState(false)
+  const [showPrivacy, setShowPrivacy] = useState(false)
+  const [showSupport, setShowSupport] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     const handler = () => setIsDesktop(window.innerWidth >= 769)
@@ -27,26 +44,24 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     return () => window.removeEventListener('resize', handler)
   }, [])
 
-  const [profile, setProfile] = useState({ username: '', first_name: '', last_name: '', avatar_url: '' })
-  const [editMode, setEditMode] = useState(false)
+  const storeProfile = useProfileStore()
+  const [editDraft, setEditDraft] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [cropFile, setCropFile] = useState(null)
   const avatarRef = useRef()
 
   const identifier = user?.email?.split('@')[0] || ''
   const mySpots = spots.filter(s => s.added_by === identifier || s.added_by === user?.id)
 
   useEffect(() => {
-    if (!user?.id) return
-    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-      .then(({ data }) => {
-        if (data) setProfile({ username: data.username || '', first_name: data.first_name || '', last_name: data.last_name || '', avatar_url: data.avatar_url || '' })
-        else {
-          const defaultUsername = identifier
-          supabase.from('profiles').insert({ id: user.id, username: defaultUsername })
-          setProfile(p => ({ ...p, username: defaultUsername }))
-        }
-      })
-  }, [user?.id])
+    if (!showMySpots) { mySpotsScrollRestoredRef.current = false; return }
+    if (mySpotsScrollRestoredRef.current) return
+    if (!mySpotsScrollRef.current) return
+    if (mySpots.length > 0) {
+      mySpotsScrollRef.current.scrollTop = _mySpotsScrollTop
+      mySpotsScrollRestoredRef.current = true
+    }
+  }, [showMySpots, mySpots.length])
 
   const handleAuth = async () => {
     setLoading(true)
@@ -74,49 +89,96 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   }
 
   const handleSaveProfile = async () => {
-    if (!user?.id) return
+    if (!user?.id || !editDraft) return
     setSaving(true)
     await supabase.from('profiles').upsert({
       id: user.id,
-      username: profile.username,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
+      username: editDraft.username,
+      first_name: editDraft.first_name,
+      last_name: editDraft.last_name,
     })
+    setProfileDirect({ ...storeProfile, ...editDraft }, user)
     setSaving(false)
-    setEditMode(false)
+    setEditDraft(null)
   }
 
-  const handleAvatarUpload = async (e) => {
+  const handleAvatarUpload = (e) => {
     const file = e.target.files?.[0]
     if (!file || !user?.id) return
-    const ext = file.name.split('.').pop()
-    const path = `${user.id}.${ext}`
-    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+    e.target.value = ''
+    setCropFile(file)
+  }
+
+  const handleCropConfirm = async (croppedFile) => {
+    setCropFile(null)
+    if (!user?.id) return
+    const compressed = await compressImage(croppedFile, 250, 0.8)
+    const newPath = `${user.id}_${Date.now()}.jpg`
+    const { error: upErr } = await supabase.storage.from('avatars').upload(newPath, compressed, { contentType: 'image/jpeg' })
     if (upErr) return
-    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+    const oldUrl = storeProfile?.avatar_url
+    if (oldUrl) {
+      try {
+        const parts = oldUrl.split('/object/public/avatars/')
+        if (parts.length > 1) {
+          const oldPath = decodeURIComponent(parts[1].split('?')[0])
+          if (oldPath) await supabase.storage.from('avatars').remove([oldPath])
+        }
+      } catch {}
+    }
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(newPath)
     await supabase.from('profiles').upsert({ id: user.id, avatar_url: publicUrl })
-    setProfile(p => ({ ...p, avatar_url: publicUrl }))
+    setProfileDirect({ ...storeProfile, avatar_url: publicUrl }, user)
   }
 
   const handleRemoveAvatar = async () => {
     if (!user?.id) return
+    const oldUrl = storeProfile?.avatar_url
+    if (oldUrl) {
+      try {
+        const parts = oldUrl.split('/object/public/avatars/')
+        if (parts.length > 1) {
+          const oldPath = decodeURIComponent(parts[1].split('?')[0])
+          if (oldPath) await supabase.storage.from('avatars').remove([oldPath])
+        }
+      } catch {}
+    }
     await supabase.from('profiles').upsert({ id: user.id, avatar_url: null })
-    setProfile(p => ({ ...p, avatar_url: null }))
+    setProfileDirect({ ...storeProfile, avatar_url: null }, user)
   }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
   }
 
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true)
+    setDeleteError('')
+    try {
+      const { error } = await supabase.functions.invoke('delete-account')
+      if (error) throw error
+      await supabase.auth.signOut()
+    } catch (e) {
+      setDeleteError(e.message || 'Failed to delete account. Please try again.')
+      setDeleteLoading(false)
+    }
+  }
+
   const handleSendFeedback = async () => {
     if (!feedbackText.trim() || feedbackSending) return
     setFeedbackSending(true)
-    const senderEmail = user?.email || 'Anonymous'
     try {
-      await supabase.functions.invoke('send-feedback', {
-        body: { feedback: feedbackText.trim(), senderEmail },
+      const { data, error } = await supabase.functions.invoke('send-feedback', {
+        body: {
+          feedback: feedbackText.trim(),
+          senderEmail: user?.email || '',
+          firstName: storeProfile?.first_name || '',
+          lastName: storeProfile?.last_name || '',
+          username: storeProfile?.username || '',
+        },
       })
-    } catch {}
+    } catch {
+    }
     setFeedbackSending(false)
     setFeedbackSent(true)
     setFeedbackText('')
@@ -163,9 +225,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     )
   }
 
-  const displayName = profile.first_name && profile.last_name
-    ? `${profile.first_name} ${profile.last_name}`
-    : profile.username || identifier
+  const displayName = storeProfile?.displayName || identifier
+
+  if (!storeProfile) return null
 
   return (
     <>
@@ -181,15 +243,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 onClick={() => avatarRef.current?.click()}
                 style={{ width: 56, height: 56, borderRadius: '50%', background: '#ECEDF2', border: '2px solid #C8CAD4', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer' }}
               >
-                {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {storeProfile.avatar_url ? (
+                  <img src={storeProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <span style={{ fontSize: 22, fontWeight: 900, color: '#6a6c7a' }}>
-                    {(profile.first_name?.[0] || identifier[0] || '?').toUpperCase()}
+                    {storeProfile.initials}
                   </span>
                 )}
               </div>
-              {profile.avatar_url && (
+              {storeProfile.avatar_url && (
                 <div onClick={handleRemoveAvatar} style={{ position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: '50%', background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><line x1="1" y1="1" x2="7" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /><line x1="7" y1="1" x2="1" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /></svg>
                 </div>
@@ -198,7 +260,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>@{profile.username || identifier}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>@{storeProfile.username || identifier}</div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{user.email}</div>
             </div>
           </div>
@@ -206,7 +268,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           {/* Edit button below name */}
           <div style={{ marginBottom: 20 }}>
             <div
-              onClick={() => setEditMode(e => !e)}
+              onClick={() => editDraft ? setEditDraft(null) : setEditDraft({ username: storeProfile.username, first_name: storeProfile.first_name, last_name: storeProfile.last_name })}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 border: '1px solid rgba(212,120,90,0.5)', borderRadius: 6,
@@ -217,27 +279,27 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 <path d="M9.5 2L12 4.5L5 11.5H2.5V9L9.5 2Z" stroke="#d4785a" strokeWidth="1.3" strokeLinejoin="round" />
               </svg>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--salmon)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                {editMode ? 'Cancel' : 'Edit Profile'}
+                {editDraft ? 'Cancel' : 'Edit Profile'}
               </span>
             </div>
           </div>
 
           {/* Edit fields */}
-          {editMode && (
+          {editDraft && (
             <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', gap: 8 }}>
                 <div style={{ flex: 1 }}>
                   <div className="section-label" style={{ marginBottom: 4 }}>First Name</div>
-                  <input className="form-input" placeholder="First name" value={profile.first_name} onChange={e => setProfile(p => ({ ...p, first_name: e.target.value }))} />
+                  <input className="form-input" placeholder="First name" value={editDraft.first_name} onChange={e => setEditDraft(p => ({ ...p, first_name: e.target.value }))} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div className="section-label" style={{ marginBottom: 4 }}>Last Name</div>
-                  <input className="form-input" placeholder="Last name" value={profile.last_name} onChange={e => setProfile(p => ({ ...p, last_name: e.target.value }))} />
+                  <input className="form-input" placeholder="Last name" value={editDraft.last_name} onChange={e => setEditDraft(p => ({ ...p, last_name: e.target.value }))} />
                 </div>
               </div>
               <div>
                 <div className="section-label" style={{ marginBottom: 4 }}>Username</div>
-                <input className="form-input" placeholder="Username" value={profile.username} onChange={e => setProfile(p => ({ ...p, username: e.target.value }))} />
+                <input className="form-input" placeholder="Username" value={editDraft.username} onChange={e => setEditDraft(p => ({ ...p, username: e.target.value }))} />
               </div>
               <button className="btn-salmon" onClick={handleSaveProfile} disabled={saving}>{saving ? 'Saving...' : 'Save Profile'}</button>
             </div>
@@ -246,7 +308,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           {/* Stats — clickable My Spots box */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
             <div
-              onClick={() => setShowMySpots(true)}
+              onClick={() => { sessionStorage.setItem('mySpots:open', '1'); setShowMySpots(true) }}
               style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -269,29 +331,28 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
           {/* Support section */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', textAlign: 'center', marginBottom: 14, letterSpacing: 0.3 }}>
-              Help Keep This App Running 🤘
-            </div>
-
             <button
               onClick={() => setShowFeedbackSheet(true)}
-              style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', marginBottom: 6 }}
+              style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
             >
               Send Feedback
             </button>
-
-            <button
-              onClick={() => window.open('https://venmo.com/taylorselgas', '_blank')}
-              style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
-            >
-              Donate
-            </button>
           </div>
 
-          {/* Feedback bottom sheet */}
-          {showFeedbackSheet && (
-            <div className="modal-overlay" onClick={() => setShowFeedbackSheet(false)}>
-              <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ paddingLeft: 20, paddingRight: 20 }}>
+          <div className="divider" />
+
+          {/* Feedback bottom sheet — portalled above bottom nav */}
+          {showFeedbackSheet && createPortal(
+            <div
+              className="modal-overlay"
+              onClick={() => setShowFeedbackSheet(false)}
+              style={{ position: 'fixed', zIndex: 100000 }}
+            >
+              <div
+                className="modal-sheet"
+                onClick={e => e.stopPropagation()}
+                style={{ paddingLeft: 20, paddingRight: 20, paddingBottom: 'calc(env(safe-area-inset-bottom) + 28px)' }}
+              >
                 <div className="modal-handle" />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <div className="modal-title">Send Feedback</div>
@@ -329,25 +390,105 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   </>
                 )}
               </div>
-            </div>
+            </div>,
+            document.body
           )}
 
-          <div onClick={handleSignOut} style={{ padding: '12px 0', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}>
+          <div
+            onClick={() => setShowTos(true)}
+            style={{ padding: '12px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Terms of Service
+          </div>
+          <div
+            onClick={() => setShowPrivacy(true)}
+            style={{ padding: '4px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Privacy Policy
+          </div>
+          <div
+            onClick={() => setShowSupport(true)}
+            style={{ padding: '4px 0 8px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Support
+          </div>
+          <div onClick={handleSignOut} style={{ padding: '8px 0', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}>
             Sign Out
           </div>
+          <div className="divider" style={{ margin: '8px 0 0' }} />
+          <div
+            onClick={() => setShowDeleteConfirm(true)}
+            style={{ padding: '8px 0', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}
+          >
+            Delete Account
+          </div>
           <div style={{ height: BOTTOM_PAD }} />
+          {cropFile && <ImageCropModal imageFile={cropFile} onConfirm={handleCropConfirm} onCancel={() => setCropFile(null)} />}
+          {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
+          {showPrivacy && createPortal(<PrivacyPolicy onClose={() => setShowPrivacy(false)} />, document.body)}
+          {showSupport && createPortal(<SupportPage onClose={() => setShowSupport(false)} />, document.body)}
+          {showDeleteConfirm && createPortal(
+            <div
+              className="modal-overlay"
+              onClick={() => !deleteLoading && setShowDeleteConfirm(false)}
+              style={{ position: 'fixed', zIndex: 100000 }}
+            >
+              <div
+                className="modal-sheet"
+                onClick={e => e.stopPropagation()}
+                style={{ paddingLeft: 20, paddingRight: 20, paddingBottom: 'calc(env(safe-area-inset-bottom) + 28px)' }}
+              >
+                <div className="modal-handle" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div className="modal-title">Delete Account</div>
+                  <div
+                    onClick={() => !deleteLoading && setShowDeleteConfirm(false)}
+                    style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                      <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
+                  Are you sure? This permanently deletes your account and all your data. <strong style={{ color: 'var(--text-primary)' }}>This cannot be undone.</strong>
+                </div>
+                {deleteError && (
+                  <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 12 }}>{deleteError}</div>
+                )}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={deleteLoading}
+                    style={{ flex: 1, padding: '13px 16px', borderRadius: 6, background: 'transparent', border: '1.5px solid rgba(100,100,120,0.35)', color: 'var(--text-muted)', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: deleteLoading ? 0.5 : 1 }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleteLoading}
+                    style={{ flex: 1, padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: deleteLoading ? 0.5 : 1 }}
+                  >
+                    {deleteLoading ? 'Deleting...' : 'Confirm'}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
         </div>
       </div>
 
-      {/* My Spots overlay — scoped to content area (does not cover TabBar) */}
-      {showMySpots && (
-        <div style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
+      {/* My Spots overlay — full screen, covers top nav */}
+      {showMySpots && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center',
-            padding: '12px 16px',
+            padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
             background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
           }}>
-            <div onClick={() => setShowMySpots(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <div onClick={() => { sessionStorage.removeItem('mySpots:open'); setShowMySpots(false) }} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -357,7 +498,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
             <div style={{ width: 36 }} />
           </div>
-          <div className="scroll-area" style={{ paddingTop: 14 }}>
+          <div ref={mySpotsScrollRef} className="scroll-area" style={{ paddingTop: 14 }}>
             {mySpots.length === 0 ? (
               <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>
                 No spots added yet
@@ -369,7 +510,10 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                     spot={spot}
                     saved={saved?.has(spot.id) ?? false}
                     onSavePress={onSavePress}
-                    onClick={s => { setShowMySpots(false); onSpotClick?.(s) }}
+                    onClick={s => {
+                      _mySpotsScrollTop = mySpotsScrollRef.current?.scrollTop || 0
+                      onSpotClick?.(s)
+                    }}
                   />
                   {spot.visibility && spot.visibility !== 'public' && (
                     <div style={{
@@ -386,7 +530,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             )}
             <div style={{ height: BOTTOM_PAD }} />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       </div>{/* end content wrapper */}
 

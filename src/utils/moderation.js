@@ -28,7 +28,6 @@ export async function checkImageModeration(imageUrl) {
       erotica: nudity.erotica ?? 0,
       gore: gore.prob ?? 0,
     }
-    console.log('[moderation] scores for', imageUrl.slice(-50), scores)
     const unsafe =
       scores.sexual_activity > 0.5 ||
       scores.sexual_display > 0.5 ||

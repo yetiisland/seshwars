@@ -427,12 +427,22 @@ textarea.form-input {
   font-weight: 700;
 }
 
+@keyframes slideInUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes slideOutDown {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+
 /* Modal overlay */
 .modal-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.6);
-  z-index: 9999;
+  z-index: 99999;
   display: flex;
   align-items: flex-end;
 }
@@ -443,6 +453,7 @@ textarea.form-input {
   width: 100%;
   border-top: 1px solid #EAD8C8;
   padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  animation: slideInUp 0.25s ease-out;
 }
 
 .modal-handle {
@@ -618,5 +629,52 @@ textarea.form-input {
 
   .spots-list-grid .spot-card:hover {
     border-color: #d4785a;
+  }
+}
+
+/* ─── Desktop unified container (1200px, same as list-view grid) ─────────── */
+@media (min-width: 769px) {
+  /* Top nav: strip padding from the bar itself so the inner wrapper controls it */
+  .desktop-top-nav {
+    padding: 0;
+  }
+
+  /* Inner wrapper that constrains nav content to 1200px and aligns it with
+     the page content below */
+  .desktop-nav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    position: relative; /* so .desktop-nav-center positions within this */
+  }
+
+  /* Non-map desktop content: constrained to 1200px, centered */
+  .desktop-content-constrained {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Standalone route pages (SpotPage, SharedListPage) */
+  .desktop-page-root {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* Bottom sheets / modals: constrain to container width via flex centering */
+  .modal-overlay {
+    justify-content: center;
+  }
+
+  .modal-sheet {
+    max-width: 1200px;
   }
 }

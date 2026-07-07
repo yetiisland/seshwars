@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { CloseIcon } from '../components/Icons'
@@ -6,10 +7,11 @@ import { slugify } from '../utils/slugify'
 import DraggablePhotos from '../components/DraggablePhotos'
 import { compressImage } from '../utils/compressImage'
 import { checkPhotosSafe } from '../utils/moderation'
+import TermsOfService from './TermsOfService'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const TYPES = ['Street', 'DIY', 'Skatepark', 'Skate Shop']
-const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar']
+const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar', 'Bump']
 const BUST_OPTIONS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
@@ -49,6 +51,9 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [photoError, setPhotoError] = useState('')
   const [spotPending, setSpotPending] = useState(false)
   const [spotRejected, setSpotRejected] = useState(false)
+  const [showTos, setShowTos] = useState(false)
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
+  const [photoUploadProgress, setPhotoUploadProgress] = useState({ current: 0, total: 0 })
 
   const [geoQuery, setGeoQuery] = useState('')
   const [geoResults, setGeoResults] = useState([])
@@ -116,13 +121,14 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     const files = Array.from(e.target.files)
     if (!files.length) return
     setPhotoError('')
+    setUploadingPhotos(true)
+    setPhotoUploadProgress({ current: 0, total: files.length })
     const urls = []
     let hadError = false
-    for (const file of files) {
-      setUploading(true)
-      setUploadingText('Compressing...')
-      const compressed = await compressImage(file)
-      setUploadingText('Uploading...')
+    for (let i = 0; i < files.length; i++) {
+      setPhotoUploadProgress({ current: i + 1, total: files.length })
+      const file = files[i]
+      const compressed = await compressImage(file, 1400)
       const path = `spots/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
       const { error } = await supabase.storage.from('spot-photos').upload(path, compressed, { contentType: 'image/jpeg' })
       if (error) {
@@ -132,9 +138,10 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
         urls.push(publicUrl)
       }
     }
-    if (hadError) setPhotoError('Some photos failed to upload. Make sure you are signed in.')
+    if (hadError) setPhotoError('Some photos failed to upload.')
     setPhotos(prev => [...prev, ...urls])
-    setUploading(false)
+    setUploadingPhotos(false)
+    setPhotoUploadProgress({ current: 0, total: 0 })
   }
 
   const handleSubmit = async () => {
@@ -203,6 +210,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     )
   }
 
+
   if (spotRejected) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#FDF8F0', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: 16, textAlign: 'center' }}>
@@ -238,7 +246,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#FDF8F0' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#FDF8F0', position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
         <div style={{ width: 28 }} />
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Add a Spot</div>
@@ -263,7 +271,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
           </div>
         </div>
 
-        {(form.type === 'Street' || form.type === 'DIY') && (
+        {(form.type === 'Street' || form.type === 'DIY' || form.type === 'Skatepark') && (
           <div style={{ marginBottom: 14 }}>
             <div className="section-label">Features</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -374,12 +382,24 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
                 <div
                   key={opt.value}
                   onClick={() => setForm(p => ({ ...p, visibility: opt.value }))}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 6, cursor: 'pointer', background: isActive ? '#3D4454' : '#F5F0EA', border: `1px solid ${isActive ? '#3D4454' : '#E0D5C8'}` }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '9px 12px', borderRadius: 6, cursor: 'pointer',
+                    background: isActive ? 'rgba(212,120,90,0.06)' : '#F5F0EA',
+                    border: `1.5px solid ${isActive ? '#d4785a' : '#E0D5C8'}`,
+                  }}
                 >
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${isActive ? '#fff' : '#b0a090'}`, background: isActive ? '#fff' : 'transparent', flexShrink: 0 }} />
+                  <div style={{
+                    width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                    border: `2px solid ${isActive ? '#d4785a' : '#b0a090'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'transparent',
+                  }}>
+                    {isActive && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#d4785a' }} />}
+                  </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#fff' : '#2a1e14' }}>{opt.label}</div>
-                    <div style={{ fontSize: 10, color: isActive ? 'rgba(255,255,255,0.65)' : '#9a8878', marginTop: 1 }}>{opt.desc}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#d4785a' : '#2a1e14' }}>{opt.label}</div>
+                    <div style={{ fontSize: 10, color: '#9a8878', marginTop: 1 }}>{opt.desc}</div>
                   </div>
                 </div>
               )
@@ -389,12 +409,54 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
         {error && <div style={{ fontSize: 11, color: '#e07070', marginBottom: 10, fontWeight: 700 }}>{error}</div>}
 
+        {/* Respect The Spot note */}
+        <div style={{ background: '#F5F0EA', border: '1px solid #E8DDD0', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            Respect The Spot
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            Help us keep spots clean, don't intentionally damage property and respectfully leave if requested by owner, security, or officer. Sesh Wars is not responsible for any illegal activities.{' '}
+            <span onClick={() => setShowTos(true)} style={{ color: '#d4785a', cursor: 'pointer', textDecoration: 'underline' }}>Terms of Service</span>
+          </div>
+        </div>
+
         <button className="btn-salmon" onClick={handleSubmit} disabled={uploading}>
           {uploading ? uploadingText : 'Drop This Spot'}
         </button>
 
         <div style={{ height: BOTTOM_PAD }} />
       </div>
+
+      {/* Photo upload progress overlay */}
+      {uploadingPhotos && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <div style={{ background: '#FDF8F0', borderRadius: 12, padding: '32px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center', width: '100%', maxWidth: 300 }}>
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <circle cx="24" cy="24" r="20" stroke="#EAD8C8" strokeWidth="3" fill="none" />
+              <circle cx="24" cy="24" r="20" stroke="#d4785a" strokeWidth="3" fill="none"
+                strokeDasharray={`${(photoUploadProgress.current / Math.max(photoUploadProgress.total, 1)) * 125.6} 125.6`}
+                strokeDashoffset="0" strokeLinecap="round"
+                style={{ transform: 'rotate(-90deg)', transformOrigin: 'center', transition: 'stroke-dasharray 0.4s' }} />
+            </svg>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Uploading Your Photos</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                {photoUploadProgress.current < photoUploadProgress.total
+                  ? `${photoUploadProgress.current} of ${photoUploadProgress.total}`
+                  : 'Almost done…'
+                }
+              </div>
+            </div>
+            <div style={{ width: '100%', height: 4, borderRadius: 2, background: '#EAD8C8', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 2, background: '#d4785a', transition: 'width 0.4s',
+                width: `${photoUploadProgress.total > 0 ? (photoUploadProgress.current / photoUploadProgress.total) * 100 : 0}%`
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
+        {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
     </div>
   )
 }

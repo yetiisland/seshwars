@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Navbar from '../components/Navbar'
 import FiltersModal from '../components/FiltersModal'
 import SpotCard from '../components/SpotCard'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
+
+// Module-level scroll cache — survives App unmount/remount so position is restored on return from spot page
+let _savedScrollTop = 0
 
 function LocationChip({ location, onClear }) {
   return (
@@ -34,12 +37,31 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
   const [localFilters, setLocalFilters] = useState(['All'])
   const filters = propFilters ?? localFilters
   const handleFiltersChange = onFiltersChange ?? setLocalFilters
+  const scrollRef = useRef(null)
+
+  // Restore scroll position on mount (e.g. returning from a spot page)
+  useEffect(() => {
+    if (scrollRef.current && _savedScrollTop > 0) {
+      scrollRef.current.scrollTop = _savedScrollTop
+    }
+  }, [])
+
+  const handleSpotClick = (spot) => {
+    if (scrollRef.current) _savedScrollTop = scrollRef.current.scrollTop
+    onSpotClick(spot)
+  }
 
   const filtered = spots.filter(s => {
     if (filters.includes('All') || filters.length === 0) return true
-    return filters.some(f =>
-      normalizeType(s.type) === normalizeType(f) || s.bust_rating === f || (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase())
-    )
+    const _TYPES = new Set(['Street', 'DIY', 'Skatepark', 'Skate Shop'])
+    const _BUSTS = new Set(['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only'])
+    const selTypes = filters.filter(f => _TYPES.has(f))
+    const selBusts = filters.filter(f => _BUSTS.has(f))
+    const selFeats = filters.filter(f => !_TYPES.has(f) && !_BUSTS.has(f) && f !== 'All')
+    if (selTypes.length > 0 && !selTypes.some(t => normalizeType(s.type) === normalizeType(t))) return false
+    if (selFeats.length > 0 && !selFeats.some(f => (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))) return false
+    if (selBusts.length > 0 && !selBusts.includes(s.bust_rating)) return false
+    return true
   })
 
   return (
@@ -47,7 +69,7 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
       {searchLocation && <LocationChip location={searchLocation} onClear={onClearSearch} />}
       <FiltersModal active={filters} onChange={handleFiltersChange} distance={distance} onDistanceChange={onDistanceChange} />
-      <div className="scroll-area">
+      <div className="scroll-area" ref={scrollRef}>
         <div style={{ padding: '0 0 2px', fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', paddingLeft: 16, marginBottom: 8 }}>
           {loading ? 'Loading...' : `${filtered.length} spot${filtered.length !== 1 ? 's' : ''}`}
         </div>
@@ -58,7 +80,7 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
         ) : (
           <div className="spots-list-grid">
             {filtered.map(spot => (
-              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={onSpotClick} />
+              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} />
             ))}
           </div>
         )}

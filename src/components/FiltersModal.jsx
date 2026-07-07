@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 
-const TYPES = ['Street', 'DIY', 'Skatepark', 'Skate Shop']
-const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar']
+const TYPES = ['All', 'Street', 'DIY', 'Skatepark', 'Skate Shop']
+const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar', 'Bump']
+const SKATEPARK_FEATURES = FEATURES
 const BUST_RATINGS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
-const DISTANCE_OPTIONS = [null, 1, 5, 10, 25, 50, 100]
+const DISTANCE_OPTIONS = [null, 5, 10, 25, 50, 100]
 
 function bustActiveStyle(f) {
   if (f === 'No Bust') return { background: '#4a7a3a', borderColor: '#3d6830', color: '#ffffff' }
@@ -16,13 +17,20 @@ function bustActiveStyle(f) {
 export default function FiltersModal({ active, onChange, compact = false, distance, onDistanceChange }) {
   const [open, setOpen] = useState(false)
   const [distanceOpen, setDistanceOpen] = useState(false)
+  const [filterClosing, setFilterClosing] = useState(false)
+  const [distClosing, setDistClosing] = useState(false)
+
+  const closeFilter = () => { setFilterClosing(true); setTimeout(() => { setFilterClosing(false); setOpen(false) }, 180) }
+  const closeDist = () => { setDistClosing(true); setTimeout(() => { setDistClosing(false); setDistanceOpen(false) }, 180) }
   const activeArr = Array.isArray(active) ? active : [active]
   const activeFilters = activeArr.filter(f => f !== 'All')
   const hasActive = activeFilters.length > 0
 
   const toggle = (f) => {
     let next
-    if (activeArr.includes(f)) {
+    if (f === 'All') {
+      next = ['All']
+    } else if (activeArr.includes(f)) {
       next = activeArr.filter(x => x !== f)
       if (next.length === 0) next = ['All']
     } else {
@@ -33,6 +41,10 @@ export default function FiltersModal({ active, onChange, compact = false, distan
 
   const clearAll = () => onChange(['All'])
   const isActive = (f) => activeArr.includes(f)
+
+  const selectedTypes = activeArr.filter(f => TYPES.includes(f) && f !== 'All')
+  const showStreetDiyExtras = selectedTypes.some(t => t === 'Street' || t === 'DIY')
+  const showSkateparkExtras = selectedTypes.includes('Skatepark') && !showStreetDiyExtras
 
   const chipColor = (active) => active ? '#fff' : '#d4785a'
 
@@ -90,15 +102,15 @@ export default function FiltersModal({ active, onChange, compact = false, distan
             <circle cx="5" cy="5" r="2" fill={distance ? '#d4785a' : '#FDF8F0'} />
           </svg>
           <span style={{ fontSize: 10, fontWeight: 700, color: chipColor(!!distance), letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
-            {distance ? `${distance}mi` : 'Any'}
+            {distance ? `${distance}mi` : 'Distance'}
           </span>
         </div>
       </div>
 
       {/* Filters sheet */}
-      {open && createPortal(
-        <div className="modal-overlay" onClick={() => setOpen(false)}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+      {(open || filterClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeFilter}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '75vh', overflowY: 'auto', ...(filterClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : {}) }}>
             <div className="modal-handle" />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px 12px' }}>
               <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Filters</div>
@@ -117,33 +129,47 @@ export default function FiltersModal({ active, onChange, compact = false, distan
                 </div>
               </div>
 
-              <div>
-                <div className="section-label" style={{ marginBottom: 8 }}>Features</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {FEATURES.map(f => (
-                    <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
-                  ))}
-                </div>
-              </div>
+              {showStreetDiyExtras && (
+                <>
+                  <div>
+                    <div className="section-label" style={{ marginBottom: 8 }}>Features</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {FEATURES.map(f => (
+                        <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="section-label" style={{ marginBottom: 8 }}>Bust Rating</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {BUST_RATINGS.map(f => (
+                        <div
+                          key={f}
+                          className={`chip ${isActive(f) ? 'active' : ''}`}
+                          style={isActive(f) ? bustActiveStyle(f) : undefined}
+                          onClick={() => toggle(f)}
+                        >{f}</div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
-              <div>
-                <div className="section-label" style={{ marginBottom: 8 }}>Bust Rating</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {BUST_RATINGS.map(f => (
-                    <div
-                      key={f}
-                      className={`chip ${isActive(f) ? 'active' : ''}`}
-                      style={isActive(f) ? bustActiveStyle(f) : undefined}
-                      onClick={() => toggle(f)}
-                    >{f}</div>
-                  ))}
+              {showSkateparkExtras && (
+                <div>
+                  <div className="section-label" style={{ marginBottom: 8 }}>Features</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {SKATEPARK_FEATURES.map(f => (
+                      <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div style={{ padding: '0 16px 28px' }}>
               <button
-                onClick={() => setOpen(false)}
+                onClick={closeFilter}
                 style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
               >
                 Apply
@@ -155,14 +181,14 @@ export default function FiltersModal({ active, onChange, compact = false, distan
       )}
 
       {/* Distance sheet */}
-      {distanceOpen && createPortal(
-        <div className="modal-overlay" onClick={() => setDistanceOpen(false)}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+      {(distanceOpen || distClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeDist}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={distClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px 12px' }}>
               <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Distance</div>
               {distance && (
-                <div onClick={() => { onDistanceChange?.(null); setDistanceOpen(false) }} style={{ fontSize: 11, color: 'var(--salmon)', fontWeight: 700, cursor: 'pointer' }}>Clear</div>
+                <div onClick={() => { onDistanceChange?.(null); closeDist() }} style={{ fontSize: 11, color: 'var(--salmon)', fontWeight: 700, cursor: 'pointer' }}>Clear</div>
               )}
             </div>
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column' }}>
@@ -171,7 +197,7 @@ export default function FiltersModal({ active, onChange, compact = false, distan
                 return (
                   <div
                     key={opt ?? 'any'}
-                    onClick={() => { onDistanceChange?.(opt); setDistanceOpen(false) }}
+                    onClick={() => { onDistanceChange?.(opt); closeDist() }}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '12px 4px', borderBottom: '1px solid #f0e8de',

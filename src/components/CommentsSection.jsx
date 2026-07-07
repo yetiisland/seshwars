@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { getProfiles } from '../utils/profileCache'
 
@@ -39,8 +40,15 @@ export default function CommentsSection({ spotId, user, onGoProfile }) {
   const [myProfile, setMyProfile] = useState(null)
   const [text, setText] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [deleteConfirmId, setDeleteConfirmId] = useState(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteModalClosing, setDeleteModalClosing] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const channelRef = useRef(null)
+
+  const closeDeleteModal = () => {
+    setDeleteModalClosing(true)
+    setTimeout(() => { setDeleteModalClosing(false); setShowDeleteModal(false); setPendingDeleteId(null) }, 180)
+  }
 
   const fetchComments = useCallback(async () => {
     const { data, error } = await supabase
@@ -113,14 +121,11 @@ export default function CommentsSection({ spotId, user, onGoProfile }) {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (deleteConfirmId !== id) {
-      setDeleteConfirmId(id)
-      return
-    }
-    await supabase.from('spot_comments').delete().eq('id', id)
-    setComments(prev => prev.filter(c => c.id !== id))
-    setDeleteConfirmId(null)
+  const handleDelete = async () => {
+    if (!pendingDeleteId) return
+    await supabase.from('spot_comments').delete().eq('id', pendingDeleteId)
+    setComments(prev => prev.filter(c => c.id !== pendingDeleteId))
+    closeDeleteModal()
   }
 
   return (
@@ -171,14 +176,11 @@ export default function CommentsSection({ spotId, user, onGoProfile }) {
       )}
 
       {/* Comment list */}
-      {comments.length === 0 ? (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>No comments yet. Be the first!</div>
-      ) : (
+      {comments.length === 0 ? null : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 14 }}>
           {comments.map(comment => {
             const profile = profiles[comment.user_id]
             const isOwn = user?.id === comment.user_id
-            const confirming = deleteConfirmId === comment.id
             return (
               <div key={comment.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <Avatar profile={profile} size={28} />
@@ -191,27 +193,15 @@ export default function CommentsSection({ spotId, user, onGoProfile }) {
                       {relativeTime(comment.created_at)}
                     </span>
                     {isOwn && (
-                      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {confirming && (
-                          <span
-                            onClick={() => setDeleteConfirmId(null)}
-                            style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', padding: '6px 8px' }}
-                          >
-                            Cancel
-                          </span>
-                        )}
+                      <div style={{ marginLeft: 'auto' }}>
                         <div
-                          onClick={() => handleDelete(comment.id)}
-                          style={{ minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 6, background: confirming ? 'rgba(192,69,58,0.1)' : 'transparent' }}
+                          onClick={() => { setPendingDeleteId(comment.id); setShowDeleteModal(true) }}
+                          style={{ minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 6 }}
                         >
-                          {confirming ? (
-                            <span style={{ fontSize: 10, color: '#c0453a', fontWeight: 700, padding: '0 4px' }}>Delete</span>
-                          ) : (
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                              <line x1="2" y1="2" x2="12" y2="12" stroke="var(--text-muted)" strokeWidth="1.8" strokeLinecap="round" />
-                              <line x1="12" y1="2" x2="2" y2="12" stroke="var(--text-muted)" strokeWidth="1.8" strokeLinecap="round" />
-                            </svg>
-                          )}
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <line x1="2" y1="2" x2="12" y2="12" stroke="var(--text-muted)" strokeWidth="1.8" strokeLinecap="round" />
+                            <line x1="12" y1="2" x2="2" y2="12" stroke="var(--text-muted)" strokeWidth="1.8" strokeLinecap="round" />
+                          </svg>
                         </div>
                       </div>
                     )}
@@ -222,6 +212,21 @@ export default function CommentsSection({ spotId, user, onGoProfile }) {
             )
           })}
         </div>
+      )}
+
+      {(showDeleteModal || deleteModalClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeDeleteModal}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Comment</div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Delete this comment? This cannot be undone.</div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={handleDelete} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Delete</button>
+              <button onClick={closeDeleteModal} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -1,20 +1,23 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { ShareIcon, BookmarkIcon, PencilIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import ClipsSection from '../components/ClipsSection'
+import ReviewsSection from '../components/ReviewsSection'
 import ReportSection from '../components/ReportSection'
 import CommentsSection from '../components/CommentsSection'
 import { slugify } from '../utils/slugify'
 import { compressImage } from '../utils/compressImage'
 import { checkImageModeration } from '../utils/moderation'
+import TermsOfService from './TermsOfService'
+import { isAdminUser } from '../lib/admin'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const TYPES = ['Street', 'DIY', 'Skatepark', 'Skate Shop']
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
-const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar']
+const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar', 'Bump']
 const BUST_OPTIONS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
@@ -49,7 +52,7 @@ function bustChipActiveStyle(rating) {
   return {}
 }
 
-export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile }) {
+const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile }, ref) {
   // ── Photo / hero state ────────────────────────────────────────
   const [photoIndex, setPhotoIndex] = useState(0)
   const [dragX, setDragX] = useState(0)
@@ -83,14 +86,15 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
   const resetLbZoom = () => { setLbScale(1); setLbPanX(0); setLbPanY(0) }
 
   // ── Publisher avatar ──────────────────────────────────────────
+  // Always start empty and fill from profiles table so we show the CURRENT username/avatar,
+  // not whatever snapshot was stored in added_by at creation time.
   const [publisherAvatar, setPublisherAvatar] = useState(null)
-  const [publisherInitial, setPublisherInitial] = useState(spot.added_by?.[0]?.toUpperCase() || '?')
-  const [publisherUsername, setPublisherUsername] = useState(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(spot.added_by) ? '' : (spot.added_by || '')
-  )
+  const [publisherInitial, setPublisherInitial] = useState('')
+  const [publisherUsername, setPublisherUsername] = useState('')
 
   // ── Edit state ────────────────────────────────────────────────
   const [showMapsModal, setShowMapsModal] = useState(false)
+  const [showTos, setShowTos] = useState(false)
   const [showMapFullscreen, setShowMapFullscreen] = useState(false)
   const [showEditAuth, setShowEditAuth] = useState(false)
   const [editPassword, setEditPassword] = useState('')
@@ -112,20 +116,20 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [liveReport, setLiveReport] = useState(null)
+  const [fsMapSatellite, setFsMapSatellite] = useState(false)
+  const [avgRating, setAvgRating] = useState(spot.avg_rating ?? null)
+  const [reviewCount, setReviewCount] = useState(spot.rating_count ?? 0)
+  const handleStatsChange = (avg, count) => { setAvgRating(avg); setReviewCount(count) }
   const [modStatus, setModStatus] = useState(spot.moderation_status || 'approved')
   const scrollAreaRef = useRef()
-  const directionsRef = useRef()
-  const [directionsInView, setDirectionsInView] = useState(true)
 
   const photos = spot.photos || []
-  const isAdmin = !!user && (
-    user.email?.includes('taylorselgas') ||
-    user.user_metadata?.username === 'taylorselgas'
-  )
+  const isAdmin = isAdminUser(user)
   const isOwner = !!user && (
     user.id === spot.added_by ||
     user.email?.split('@')[0] === spot.added_by
   )
+  const hasCoords = spot.latitude && spot.longitude
 
   // ── Data fetching ─────────────────────────────────────────────
   useEffect(() => {
@@ -138,24 +142,25 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
         ? supabase.from('profiles').select('avatar_url, first_name, username').eq('id', spot.added_by).maybeSingle()
         : supabase.from('profiles').select('avatar_url, first_name, username').eq('username', spot.added_by).maybeSingle()
       query.then(({ data }) => {
-        if (data?.avatar_url) setPublisherAvatar(data.avatar_url)
-        if (data?.first_name) setPublisherInitial(data.first_name[0].toUpperCase())
-        if (data?.username) setPublisherUsername(data.username)
-        else if (data?.first_name) setPublisherUsername(data.first_name)
+        if (data) {
+          if (data.avatar_url) setPublisherAvatar(data.avatar_url)
+          if (data.first_name) setPublisherInitial(data.first_name[0].toUpperCase())
+          if (data.username) setPublisherUsername(data.username)
+          else if (data.first_name) setPublisherUsername(data.first_name)
+        } else if (isOwner && user?.id) {
+          // Legacy spot: added_by stored old username that no longer matches — fall back to current user profile
+          supabase.from('profiles').select('avatar_url, first_name, username').eq('id', user.id).maybeSingle()
+            .then(({ data: d }) => {
+              if (d?.avatar_url) setPublisherAvatar(d.avatar_url)
+              if (d?.first_name) setPublisherInitial(d.first_name[0].toUpperCase())
+              if (d?.username) setPublisherUsername(d.username)
+              else if (d?.first_name) setPublisherUsername(d.first_name)
+            })
+        }
       })
     }
   }, [spot.id, user?.id])
 
-  // ── Sticky directions button observer ────────────────────────
-  useEffect(() => {
-    if (!directionsRef.current || !scrollAreaRef.current) return
-    const observer = new IntersectionObserver(
-      ([entry]) => setDirectionsInView(entry.isIntersecting),
-      { root: scrollAreaRef.current, threshold: 0.5 }
-    )
-    observer.observe(directionsRef.current)
-    return () => observer.disconnect()
-  }, [spot.id])
 
   // ── Edit geocode ──────────────────────────────────────────────
   useEffect(() => {
@@ -362,6 +367,8 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
     else { setDeleteError(''); setShowEditAuth(true) }
   }
 
+  useImperativeHandle(ref, () => ({ handleEditClick }))
+
   const selectEditGeoResult = (feature) => {
     const [lng, lat] = feature.geometry.coordinates
     setEditForm(p => ({ ...p, address: feature.place_name, latitude: lat, longitude: lng }))
@@ -376,7 +383,7 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
     setEditUploading(true)
     const urls = []
     for (const file of files) {
-      const compressed = await compressImage(file)
+      const compressed = await compressImage(file, 1400)
       const path = `spots/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
       const { error } = await supabase.storage.from('spot-photos').upload(path, compressed, { contentType: 'image/jpeg' })
       if (!error) {
@@ -434,15 +441,8 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
     }))
   }
 
-  const handleReported = async () => {
-    const { data } = await supabase
-      .from('spot_reports')
-      .select('report_type, custom_text')
-      .eq('spot_id', spot.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (data) setLiveReport({ most_recent_report: data.report_type, most_recent_report_custom: data.custom_text })
+  const handleReported = (reportType, customText) => {
+    setLiveReport({ most_recent_report: reportType, most_recent_report_custom: customText || null })
     if (scrollAreaRef.current) scrollAreaRef.current.scrollTop = 0
   }
 
@@ -496,8 +496,6 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
     if (navigator.share) await navigator.share({ title: spot.title, text, url: shareUrl })
     else navigator.clipboard?.writeText(shareUrl)
   }
-
-  const hasCoords = spot.latitude && spot.longitude
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative' }}>
@@ -589,37 +587,58 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
         {/* ── Content ───────────────────────────────────────── */}
         <div style={{ padding: '16px 14px 0', background: '#FDF8F0' }}>
 
-          {/* Title + action buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', flex: 1, paddingRight: 8, lineHeight: 1.3 }}>{spot.title}</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div className="star-btn" onClick={handleEditClick} title="Edit"><PencilIcon /></div>
-              <div className="star-btn" onClick={handleShare} title="Share"><ShareIcon /></div>
+          {/* Title row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', flex: 1, lineHeight: 1.3, paddingRight: 8 }}>{spot.title}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              {avgRating != null && reviewCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#3D4454" />
+                  </svg>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#3D4454' }}>{avgRating.toFixed(1)}</span>
+                </div>
+              )}
+              {avgRating != null && reviewCount > 0 && spot.distance != null && (
+                <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
+              )}
+              {spot.distance != null && <span className="dist-text">{spot.distance} mi</span>}
+              <div
+                onClick={handleShare}
+                style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 2 }}
+              >
+                <ShareIcon color="#d4785a" />
+              </div>
             </div>
           </div>
 
-          {/* Meta row: distance + publisher avatar + username */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            {spot.distance != null && <span className="dist-text">{spot.distance} mi away</span>}
-            {spot.distance != null && (publisherAvatar || publisherUsername) && <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text-dim)' }} />}
-            {(publisherAvatar || publisherUsername) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
-                  {publisherAvatar ? (
-                    <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ fontSize: 10, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial}</span>
-                  )}
-                </div>
-                {publisherUsername && <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700 }}>@{publisherUsername}</span>}
-              </div>
-            )}
-          </div>
+          {/* Feature chips — above publisher */}
+          {(spot.features || []).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', marginBottom: 8 }}>
+              {(spot.features || []).map(f => <span key={f} className="tag">{f}</span>)}
+            </div>
+          )}
 
-          {/* Feature tags */}
-          <div className="tags-wrap" style={{ marginBottom: 14 }}>
-            {(spot.features || []).map(f => <span key={f} className="tag">{f}</span>)}
-          </div>
+          {/* Publisher row */}
+          {(publisherAvatar || publisherUsername || spot.added_by === null) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700 }}>Added by:</span>
+              {spot.added_by === null ? (
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700 }}>Anonymous</span>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
+                    {publisherAvatar ? (
+                      <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: 9, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial}</span>
+                    )}
+                  </div>
+                  {publisherUsername && <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700 }}>@{publisherUsername}</span>}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Moderation banners */}
           {modStatus === 'pending' && isAdmin && (
@@ -676,13 +695,14 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
             {hasCoords ? (
               <>
                 <Map
-                  longitude={spot.longitude} latitude={spot.latitude} zoom={15}
-                  mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+                  initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: 15 }}
+                  mapStyle="mapbox://styles/mapbox/streets-v12"
                   mapboxAccessToken={MAPBOX_TOKEN}
                   style={{ width: '100%', height: '100%' }}
                   attributionControl={false}
+                  scrollZoom={true}
+                  touchZoomRotate={true}
                 >
-                  <NavigationControl position="bottom-right" showCompass={false} />
                   <Marker longitude={spot.longitude} latitude={spot.latitude} anchor="bottom">
                     <svg width="20" height="24" viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.35))' }}>
                       <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
@@ -707,39 +727,60 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
           </div>
           {spot.address && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>{spot.address}</div>}
 
-          <div ref={directionsRef} onClick={() => setShowMapsModal(true)} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginBottom: 16 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 1, textTransform: 'uppercase' }}>Get Directions</span>
-          </div>
+          {hasCoords && (
+            <div style={{ marginBottom: 16 }}>
+              <div
+                onClick={() => setShowMapsModal(true)}
+                style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 1, textTransform: 'uppercase' }}>Get Directions</span>
+              </div>
+            </div>
+          )}
           <ReportSection spotId={spot.id} spot={spot} user={user} onGoProfile={onGoProfile} onReported={handleReported} />
+          {/* Report Skateable Again — visible when there's an active caution report */}
+          {(() => {
+            const activeReport = liveReport?.most_recent_report ?? spot.most_recent_report
+            if (!activeReport || activeReport === 'Skateable Again') return null
+            return (
+              <div
+                onClick={async () => {
+                  if (!user) { onGoProfile?.(); return }
+                  const { data: { user: cu } } = await supabase.auth.getUser()
+                  if (!cu) return
+                  await supabase.from('spot_reports').insert({ spot_id: spot.id, user_id: cu.id, report_type: 'Skateable Again', custom_text: null })
+                  handleReported('Skateable Again', null)
+                }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1.5px solid #4a7a3a', borderRadius: 6, padding: 13, cursor: 'pointer', marginBottom: 20, background: 'transparent' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 7L6 11L12 3" stroke="#4a7a3a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#4a7a3a', letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
+                  Report Skateable Again
+                </span>
+              </div>
+            )
+          })()}
           <ClipsSection spotId={spot.id} user={user} onGoProfile={onGoProfile} isAdmin={isAdmin} />
+          <ReviewsSection spotId={spot.id} user={user} onStatsChange={handleStatsChange} />
           <CommentsSection spotId={spot.id} user={user} onGoProfile={onGoProfile} />
           <div style={{ height: BOTTOM_PAD }} />
         </div>
       </div>
 
-      {/* ── Sticky Get Directions ────────────────────────────── */}
-      {hasCoords && !directionsInView && !showMapsModal && !showMapFullscreen && createPortal(
-        <div
-          onClick={() => setShowMapsModal(true)}
-          style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 68px)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 430, padding: '0 16px', zIndex: 200, cursor: 'pointer' }}
-        >
-          <div style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.22)' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 1, textTransform: 'uppercase' }}>Get Directions</span>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* ── Fullscreen map ───────────────────────────────── */}
       {showMapFullscreen && hasCoords && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: '#000' }}>
           <Map
-            longitude={spot.longitude} latitude={spot.latitude} zoom={15}
-            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+            initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: 15 }}
+            mapStyle={fsMapSatellite ? 'mapbox://styles/mapbox/satellite-streets-v12' : 'mapbox://styles/mapbox/streets-v12'}
             mapboxAccessToken={MAPBOX_TOKEN}
             style={{ width: '100%', height: '100%' }}
+            scrollZoom={true}
+            touchZoomRotate={true}
           >
-            <NavigationControl position="bottom-right" showCompass={false} />
             <Marker longitude={spot.longitude} latitude={spot.latitude} anchor="bottom">
               <svg width="24" height="29" viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.5))' }}>
                 <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
@@ -747,6 +788,21 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
               </svg>
             </Marker>
           </Map>
+          {/* Satellite/street eye toggle — bottom-right */}
+          <div
+            onClick={() => setFsMapSatellite(s => !s)}
+            style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)', right: 10, width: 38, height: 38, borderRadius: 6, background: fsMapSatellite ? '#FDF8F0' : '#d4785a', border: fsMapSatellite ? '2px solid #d4785a' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+          >
+            <svg width="24" height="24" viewBox="0 0 20 20" fill="none">
+              <path d="M1 10C1 10 4 4 10 4C16 4 19 10 19 10C19 10 16 16 10 16C4 16 1 10 1 10Z"
+                stroke={fsMapSatellite ? '#d4785a' : '#fff'} strokeWidth="1.5" strokeLinejoin="round"
+                fill={fsMapSatellite ? 'rgba(212,120,90,0.12)' : 'rgba(255,255,255,0.18)'} />
+              <circle cx="10" cy="10" r="3"
+                stroke={fsMapSatellite ? '#d4785a' : '#fff'} strokeWidth="1.5"
+                fill={fsMapSatellite ? '#d4785a' : '#fff'} />
+            </svg>
+          </div>
+          {/* X close button */}
           <div
             onClick={() => setShowMapFullscreen(false)}
             style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
@@ -784,7 +840,10 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
                 <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>maps.apple.com</div>
               </div>
             </div>
-            <div className="modal-cancel" onClick={() => setShowMapsModal(false)}>Cancel</div>
+            <div style={{ margin: '12px 16px 20px', padding: '10px 12px', background: '#F5F0EA', border: '1px solid #E8DDD0', borderRadius: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Respect The Spot</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>Help us keep spots clean, don't intentionally damage property and respectfully leave if requested by owner, security, or officer. Sesh Wars is not responsible for any illegal activities.{' '}<span onClick={() => { setShowMapsModal(false); setShowTos(true) }} style={{ color: '#d4785a', cursor: 'pointer', textDecoration: 'underline' }}>Terms of Service</span></div>
+            </div>
           </div>
         </div>
       )}
@@ -798,7 +857,7 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
             <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <input className="form-input" type="password" placeholder="Enter password to edit" value={editPassword}
                 onChange={e => { setEditPassword(e.target.value); setAuthError('') }}
-                onKeyDown={e => e.key === 'Enter' && handleEditAuth()} autoFocus />
+                onKeyDown={e => e.key === 'Enter' && handleEditAuth()} autoFocus autoComplete="off" />
               {authError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700 }}>{authError}</div>}
               <button className="btn-salmon" onClick={handleEditAuth}>Unlock</button>
             </div>
@@ -808,20 +867,25 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
       )}
 
       {/* ── Edit form overlay ─────────────────────────────── */}
-      {showEditForm && editForm && (
-        <div style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'calc(env(safe-area-inset-top) + 10px) 16px 12px', background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0 }}>
+      {showEditForm && editForm && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
             <div style={{ width: 28 }} />
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 1.5, textTransform: 'uppercase' }}>Edit Spot</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Edit Spot</div>
             <div onClick={() => setShowEditForm(false)} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /><line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </div>
           </div>
+
           <div className="scroll-area" style={{ padding: '16px 14px' }}>
+            {/* Spot Name */}
             <div style={{ marginBottom: 14 }}>
               <div className="section-label">Spot Name</div>
-              <input className="form-input" value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} />
+              <input className="form-input" placeholder="e.g. Civic Center Ledges" value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} />
             </div>
+
+            {/* Type */}
             <div style={{ marginBottom: 14 }}>
               <div className="section-label">Type</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -830,34 +894,47 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom: 14 }}>
-              <div className="section-label">Features</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {FEATURES.map(f => (
-                  <div key={f} className={`chip ${editForm.features.includes(f) ? 'active' : ''}`} onClick={() => toggleEditFeature(f)}>{f}</div>
-                ))}
+
+            {/* Features — conditional */}
+            {(editForm.type === 'Street' || editForm.type === 'DIY' || editForm.type === 'Skatepark') && (
+              <div style={{ marginBottom: 14 }}>
+                <div className="section-label">Features</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {FEATURES.map(f => (
+                    <div key={f} className={`chip ${editForm.features.includes(f) ? 'active' : ''}`} onClick={() => toggleEditFeature(f)}>{f}</div>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <div className="section-label">Bust Rating</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {BUST_OPTIONS.map(b => {
-                  const isActive = editForm.bust_rating === b
-                  return (
-                    <div key={b}
-                      className={`chip ${isActive ? 'active' : ''}`}
-                      style={isActive ? bustChipActiveStyle(b) : undefined}
-                      onClick={() => setEditForm(p => ({ ...p, bust_rating: p.bust_rating === b ? '' : b }))}
-                    >{b}</div>
-                  )
-                })}
+            )}
+
+            {/* Bust Rating — conditional */}
+            {(editForm.type === 'Street' || editForm.type === 'DIY') && (
+              <div style={{ marginBottom: 14 }}>
+                <div className="section-label">Bust Rating</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {BUST_OPTIONS.map(b => {
+                    const isActive = editForm.bust_rating === b
+                    return (
+                      <div key={b}
+                        className={`chip ${isActive ? 'active' : ''}`}
+                        style={isActive ? bustChipActiveStyle(b) : undefined}
+                        onClick={() => setEditForm(p => ({ ...p, bust_rating: p.bust_rating === b ? '' : b }))}
+                      >{b}</div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Description */}
             <div style={{ marginBottom: 14 }}>
               <div className="section-label">Description</div>
-              <textarea className="form-input" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} />
+              <textarea className="form-input" placeholder="What makes this spot sick? Security? Best time to skate?" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} />
             </div>
+
             <div className="divider" />
+
+            {/* Photos */}
             <div style={{ marginBottom: 14 }}>
               <div className="section-label">Photos</div>
               <DraggablePhotos
@@ -868,7 +945,10 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
               />
               <input ref={editFileRef} type="file" accept="image/*" multiple hidden onChange={handleEditPhotos} />
             </div>
+
             <div className="divider" />
+
+            {/* Location */}
             <div style={{ marginBottom: 14 }}>
               <div className="section-label">Location</div>
               <div style={{ position: 'relative', marginBottom: 8 }}>
@@ -891,7 +971,7 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
                   </div>
                 )}
               </div>
-              <div style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid #EAD8C8', height: 200 }}>
+              <div style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid #EAD8C8', height: 280 }}>
                 <Map
                   {...editMapCenter}
                   onMove={e => setEditMapCenter(e.viewState)}
@@ -917,7 +997,10 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
                 : <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 5 }}>Tap the map or search to pin a location</div>
               }
             </div>
+
             <div className="divider" />
+
+            {/* Visibility */}
             <div style={{ marginBottom: 14 }}>
               <div className="section-label">Visibility</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -927,53 +1010,80 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
                     <div
                       key={opt.value}
                       onClick={() => setEditForm(p => ({ ...p, visibility: opt.value }))}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 6, cursor: 'pointer', background: isActive ? '#3D4454' : '#F5F0EA', border: `1px solid ${isActive ? '#3D4454' : '#E0D5C8'}` }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '9px 12px', borderRadius: 6, cursor: 'pointer',
+                        background: isActive ? 'rgba(212,120,90,0.06)' : '#F5F0EA',
+                        border: `1.5px solid ${isActive ? '#d4785a' : '#E0D5C8'}`,
+                      }}
                     >
-                      <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${isActive ? '#fff' : '#b0a090'}`, background: isActive ? '#fff' : 'transparent', flexShrink: 0 }} />
+                      <div style={{
+                        width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                        border: `2px solid ${isActive ? '#d4785a' : '#b0a090'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'transparent',
+                      }}>
+                        {isActive && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#d4785a' }} />}
+                      </div>
                       <div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#fff' : '#2a1e14' }}>{opt.label}</div>
-                        <div style={{ fontSize: 10, color: isActive ? 'rgba(255,255,255,0.65)' : '#9a8878', marginTop: 1 }}>{opt.desc}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#d4785a' : '#2a1e14' }}>{opt.label}</div>
+                        <div style={{ fontSize: 10, color: '#9a8878', marginTop: 1 }}>{opt.desc}</div>
                       </div>
                     </div>
                   )
                 })}
               </div>
             </div>
+
             {editError && <div style={{ fontSize: 11, color: '#e07070', marginBottom: 10, fontWeight: 700 }}>{editError}</div>}
+
+            {/* Respect The Spot note */}
+            <div style={{ background: '#F5F0EA', border: '1px solid #E8DDD0', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+                Respect The Spot
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                Help us keep spots clean, don't intentionally damage property and respectfully leave if requested by owner, security, or officer.
+              </div>
+            </div>
+
             <button className="btn-salmon" onClick={handleEditSave} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save Changes'}</button>
-            <div style={{ marginTop: 10 }}>
+
+            <div style={{ marginTop: 10, marginBottom: 4 }}>
               <button onClick={() => setShowDeleteConfirm(true)} style={{ width: '100%', padding: 11, borderRadius: 6, background: 'transparent', border: '1px solid rgba(212,120,90,0.45)', color: '#d4785a', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
                 Delete Spot
               </button>
             </div>
+
             <div style={{ height: BOTTOM_PAD }} />
           </div>
-        </div>
-      )}
 
-      {/* ── Delete confirm modal ──────────────────────────── */}
-      {showDeleteConfirm && (
-        <div className="modal-overlay" onClick={() => { if (!deleting) { setShowDeleteConfirm(false); setDeleteError('') } }}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-            <div className="modal-handle" />
-            <div className="modal-title">Delete Spot</div>
-            <div style={{ padding: '0 20px 8px', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
-              Are you sure you want to delete this spot? This cannot be undone.
-            </div>
-            {deleteError && (
-              <div style={{ padding: '0 20px 8px', fontSize: 11, color: '#e07070', textAlign: 'center', fontWeight: 700 }}>
-                {deleteError}
+          {/* Delete confirm modal — inside portal so it's above edit form */}
+          {showDeleteConfirm && (
+            <div className="modal-overlay" onClick={() => { if (!deleting) { setShowDeleteConfirm(false); setDeleteError('') } }}>
+              <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+                <div className="modal-handle" />
+                <div className="modal-title">Delete Spot</div>
+                <div style={{ padding: '0 20px 8px', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
+                  Are you sure you want to delete this spot? This cannot be undone.
+                </div>
+                {deleteError && (
+                  <div style={{ padding: '0 20px 8px', fontSize: 11, color: '#e07070', textAlign: 'center', fontWeight: 700 }}>
+                    {deleteError}
+                  </div>
+                )}
+                <div style={{ padding: '8px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <button onClick={handleDeleteSpot} disabled={deleting}
+                    style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: deleting ? 0.7 : 1 }}>
+                    {deleting ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+                <div className="modal-cancel" onClick={() => { if (!deleting) { setShowDeleteConfirm(false); setDeleteError('') } }}>Cancel</div>
               </div>
-            )}
-            <div style={{ padding: '8px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button onClick={handleDeleteSpot} disabled={deleting}
-                style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: deleting ? 0.7 : 1 }}>
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
             </div>
-            <div className="modal-cancel" onClick={() => { if (!deleting) { setShowDeleteConfirm(false); setDeleteError('') } }}>Cancel</div>
-          </div>
-        </div>
+          )}
+        </div>,
+        document.body
       )}
 
       {/* ── Lightbox with pinch zoom ──────────────────────── */}
@@ -1031,11 +1141,14 @@ export default function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuc
           )}
 
           <div style={{ position: 'absolute', bottom: 22, fontSize: 10, color: 'rgba(255,255,255,0.28)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
-            {lbScale > 1 ? 'Double-tap to reset · Pinch to zoom' : 'Swipe down to close'}
+            {lbScale > 1 ? 'Double-tap to reset · Pinch to zoom' : 'Swipe to view photos'}
           </div>
         </div>,
         document.body
       )}
+      {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
     </div>
   )
-}
+})
+
+export default SpotDetail
