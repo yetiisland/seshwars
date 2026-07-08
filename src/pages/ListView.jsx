@@ -55,12 +55,15 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
     if (filters.includes('All') || filters.length === 0) return true
     const _TYPES = new Set(['Street', 'DIY', 'Skatepark', 'Skate Shop'])
     const _BUSTS = new Set(['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only'])
+    const _LIGHTING = new Set(['Lights', 'No Lights'])
     const selTypes = filters.filter(f => _TYPES.has(f))
     const selBusts = filters.filter(f => _BUSTS.has(f))
-    const selFeats = filters.filter(f => !_TYPES.has(f) && !_BUSTS.has(f) && f !== 'All')
+    const selLighting = filters.filter(f => _LIGHTING.has(f))
+    const selFeats = filters.filter(f => !_TYPES.has(f) && !_BUSTS.has(f) && !_LIGHTING.has(f) && f !== 'All')
     if (selTypes.length > 0 && !selTypes.some(t => normalizeType(s.type) === normalizeType(t))) return false
     if (selFeats.length > 0 && !selFeats.some(f => (s.features || []).map(x => x.toLowerCase()).includes(f.toLowerCase()))) return false
     if (selBusts.length > 0 && !selBusts.includes(s.bust_rating)) return false
+    if (selLighting.length > 0 && !selLighting.includes(s.lighting)) return false
     return true
   })
 

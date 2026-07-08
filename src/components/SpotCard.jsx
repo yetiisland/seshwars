@@ -118,7 +118,7 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
         <div className="spot-footer">
           {isShop
             ? <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.75)', letterSpacing: 0.3, flex: 1 }}>Support Your Local Skate Shop</span>
-            : <TagsRow features={spot.features || []} />
+            : <TagsRow features={[...(spot.features || []), ...(spot.lighting ? [spot.lighting] : [])]} />
           }
           <div className="arrow-btn" style={{ flexShrink: 0, marginLeft: 'auto' }}><ArrowIcon /></div>
         </div>

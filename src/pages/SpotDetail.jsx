@@ -658,9 +658,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           </div>
 
           {/* Feature chips — above publisher */}
-          {(spot.features || []).length > 0 && (
+          {((spot.features || []).length > 0 || spot.lighting) && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', marginBottom: 8 }}>
-              {(spot.features || []).map(f => <span key={f} className="tag">{f}</span>)}
+              {[...(spot.features || []), ...(spot.lighting ? [spot.lighting] : [])].map(f => <span key={f} className="tag">{f}</span>)}
             </div>
           )}
 
