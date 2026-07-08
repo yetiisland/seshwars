@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import SpotCard from '../components/SpotCard'
 import MapView from './MapView'
 import AuthScreen from './AuthScreen'
+import TabBar from '../components/TabBar'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -110,6 +111,11 @@ export default function SharedListPage() {
 
   const handleSpotClick = (spot) => navigate(`/spots/${spot.slug || spot.id}`)
 
+  const handleTabChange = (tabId) => {
+    sessionStorage.setItem('activeTab', tabId)
+    navigate('/')
+  }
+
   if (loading) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FDF8F0', fontFamily: 'Barlow, sans-serif', fontSize: 12, color: '#9a8878', fontWeight: 700 }}>
@@ -184,24 +190,25 @@ export default function SharedListPage() {
         </div>
       )}
 
-      {/* LIST/MAP toggle pill */}
+      {/* LIST/MAP toggle pill — above TabBar */}
       {createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 16px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 70px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
           <div onClick={() => setViewMode('list')} style={{ padding: '6px 18px', borderRadius: 50, background: viewMode === 'list' ? '#fff' : 'transparent', color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
           <div onClick={() => setViewMode('map')} style={{ padding: '6px 18px', borderRadius: 50, background: viewMode === 'map' ? '#fff' : 'transparent', color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
         </div>,
         document.body
       )}
 
-      {/* Toast */}
+      {/* Toast — above toggle pill */}
       {toast && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 80px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 134px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {toast}
         </div>,
         document.body
       )}
 
       {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
+      <TabBar active="" onChange={handleTabChange} user={user} />
     </div>
   )
 }
