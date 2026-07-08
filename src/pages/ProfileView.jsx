@@ -363,7 +363,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 </svg>
                 <div>
                   <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{hiddenSpots.length}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Hidden</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Spots Hidden</div>
                 </div>
               </div>
               <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
