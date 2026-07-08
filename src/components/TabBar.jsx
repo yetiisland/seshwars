@@ -4,14 +4,14 @@ import { MapFoldedIcon, BookmarkIcon } from './Icons'
 export default function TabBar({ active, onChange, user, profileAvatar, profileInitials }) {
   const [avatarError, setAvatarError] = useState(false)
   const tabs = [
-    { id: 'spots', label: 'Spots', Icon: MapFoldedIcon },
+    { id: 'spots', label: 'Map', Icon: MapFoldedIcon },
     { id: 'saved', label: 'Saved', Icon: BookmarkIcon },
     { id: 'profile', label: 'Profile', Icon: null },
   ]
 
   return (
     <div className="tab-bar">
-      {tabs.map(({ id, Icon }) => (
+      {tabs.map(({ id, label, Icon }) => (
         <div
           key={id}
           className="tab-item"
@@ -37,6 +37,9 @@ export default function TabBar({ active, onChange, user, profileAvatar, profileI
           ) : (
             <Icon color={active === id ? '#ffffff' : 'rgba(255,255,255,0.55)'} size={36} filled={active === id} />
           )}
+          <span className="tab-label" style={{ opacity: active === id ? 1 : 0.55 }}>
+            {label}
+          </span>
         </div>
       ))}
     </div>
