@@ -37,6 +37,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [hiddenSpotIds, setHiddenSpotIds] = useState(new Set())
   const [showHiddenSpots, setShowHiddenSpots] = useState(false)
+  const [unhideTarget, setUnhideTarget] = useState(null)
+  const [showUnhideConfirm, setShowUnhideConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
@@ -63,6 +65,19 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   }, [user?.id])
 
   useEffect(() => { loadHiddenSpots() }, [loadHiddenSpots])
+
+  const confirmUnhide = async () => {
+    if (!unhideTarget) return
+    const { error } = await supabase.from('hidden_spots').delete().eq('user_id', user.id).eq('spot_id', unhideTarget.id)
+    if (error) {
+      console.error('unhide failed:', error)
+      alert('Could not unhide this spot: ' + error.message)
+      return
+    }
+    setShowUnhideConfirm(false)
+    setUnhideTarget(null)
+    loadHiddenSpots()
+  }
 
   useEffect(() => {
     if (!showMySpots) { mySpotsScrollRestoredRef.current = false; return }
@@ -535,14 +550,40 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   saved={false}
                   onSavePress={() => {}}
                   onClick={onSpotClick}
-                  onUnhidePress={async (s) => {
-                    await supabase.from('hidden_spots').delete().eq('user_id', user.id).eq('spot_id', s.id)
-                    loadHiddenSpots()
-                  }}
+                  onUnhidePress={(s) => { setUnhideTarget(s); setShowUnhideConfirm(true) }}
                 />
               ))
             )}
             <div style={{ height: BOTTOM_PAD }} />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showUnhideConfirm && createPortal(
+        <div className="modal-overlay" onClick={() => { setShowUnhideConfirm(false); setUnhideTarget(null) }}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Unhide This Spot?
+            </div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              This spot will show back up in your feed and search results.
+            </div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={confirmUnhide}
+                style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+              >
+                Unhide Spot
+              </button>
+              <button
+                onClick={() => { setShowUnhideConfirm(false); setUnhideTarget(null) }}
+                style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>,
         document.body

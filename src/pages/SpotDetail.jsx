@@ -116,6 +116,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [deleting, setDeleting] = useState(false)
   const [showHideModal, setShowHideModal] = useState(false)
   const [hideModalClosing, setHideModalClosing] = useState(false)
+  const [showUnhideModal, setShowUnhideModal] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [liveReport, setLiveReport] = useState(null)
   const [fsMapSatellite, setFsMapSatellite] = useState(false)
@@ -565,7 +566,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             {user && (
               isHidden ? (
                 <div
-                  onClick={e => { e.stopPropagation(); onUnhidePress?.() }}
+                  onClick={e => { e.stopPropagation(); setShowUnhideModal(true) }}
                   onTouchStart={e => e.stopPropagation()}
                   style={{ width: 34, height: 34, borderRadius: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                 >
@@ -1191,6 +1192,37 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         document.body
       )}
       {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
+      {showUnhideModal && createPortal(
+        <div className="modal-overlay" onClick={() => setShowUnhideModal(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Unhide This Spot?
+            </div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              This spot will show back up in your feed and search results.
+            </div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={async () => {
+                  setShowUnhideModal(false)
+                  await onUnhidePress?.()
+                }}
+                style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+              >
+                Unhide Spot
+              </button>
+              <button
+                onClick={() => setShowUnhideModal(false)}
+                style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
       {(showHideModal || hideModalClosing) && createPortal(
         <div className="modal-overlay" onClick={closeHideModal}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
