@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { loadProfile, useProfileStore } from '../lib/profileStore'
 import { isAdminUser } from '../lib/admin'
-import { useSavedSpots } from '../hooks/useSpots'
+import { useSavedSpots, useHiddenSpots } from '../hooks/useSpots'
 import TabBar from '../components/TabBar'
 import SpotDetail from './SpotDetail'
 import SaveToListModal from '../components/SaveToListModal'
@@ -28,6 +28,13 @@ export default function SpotPage() {
   const rawTab = location.state?.prevTab || sessionStorage.getItem('activeTab') || 'spots'
   const prevTab = (rawTab === 'list' || rawTab === 'map') ? 'spots' : rawTab
   const { saved, refetchSaved } = useSavedSpots(user?.id)
+  const { hiddenIds, refetchHidden } = useHiddenSpots(user?.id)
+
+  const handleUnhide = async () => {
+    if (!user?.id || !spot) return
+    await supabase.from('hidden_spots').delete().eq('user_id', user.id).eq('spot_id', spot.id)
+    refetchHidden()
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -166,6 +173,8 @@ export default function SpotPage() {
           onEditSuccess={handleBack}
           user={user}
           onGoProfile={goToProfile}
+          isHidden={hiddenIds.has(spot.id)}
+          onUnhidePress={handleUnhide}
         />
       </div>
 

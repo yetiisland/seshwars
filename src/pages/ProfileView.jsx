@@ -529,21 +529,17 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               <div style={{ padding: '40px 24px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No hidden spots.</div>
             ) : (
               hiddenSpots.map(spot => (
-                <div key={spot.id} style={{ position: 'relative' }}>
-                  <SpotCard spot={spot} saved={false} onSavePress={() => {}} onClick={onSpotClick} />
-                  <div style={{ position: 'absolute', bottom: 14, right: 14, zIndex: 10 }}>
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        await supabase.from('hidden_spots').delete().eq('user_id', user.id).eq('spot_id', spot.id)
-                        loadHiddenSpots()
-                      }}
-                      style={{ padding: '6px 14px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
-                    >
-                      Unhide
-                    </button>
-                  </div>
-                </div>
+                <SpotCard
+                  key={spot.id}
+                  spot={spot}
+                  saved={false}
+                  onSavePress={() => {}}
+                  onClick={onSpotClick}
+                  onUnhidePress={async (s) => {
+                    await supabase.from('hidden_spots').delete().eq('user_id', user.id).eq('spot_id', s.id)
+                    loadHiddenSpots()
+                  }}
+                />
               ))
             )}
             <div style={{ height: BOTTOM_PAD }} />

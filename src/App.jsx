@@ -335,9 +335,9 @@ export default function App() {
   }, [spots, userLocation, searchLocation])
 
   const visibleSpots = useMemo(() => {
-    if (isAdmin) return spotsWithDistance
     return spotsWithDistance.filter(s => {
       if (hiddenIds.has(s.id)) return false
+      if (isAdmin) return true
       const status = s.moderation_status
       const passesModeration = !status || status === 'approved' ||
         (status === 'pending' && user?.id && s.added_by === user.id)
