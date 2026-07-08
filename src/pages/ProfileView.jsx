@@ -334,6 +334,24 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           {/* Stats */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
             <div
+              onClick={() => { sessionStorage.setItem('mySpots:open', '1'); setShowMySpots(true) }}
+              style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <svg width="18" height="22" viewBox="0 0 20 24" fill="none">
+                  <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
+                  <circle cx="10" cy="10" r="4" fill="#fff" />
+                </svg>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{mySpots.length}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Spots Added</div>
+                </div>
+              </div>
+              <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div
               onClick={() => setShowHiddenSpots(true)}
               style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             >
@@ -352,24 +370,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-            <div
-              onClick={() => { sessionStorage.setItem('mySpots:open', '1'); setShowMySpots(true) }}
-              style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <svg width="18" height="22" viewBox="0 0 20 24" fill="none">
-                  <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
-                  <circle cx="10" cy="10" r="4" fill="#fff" />
-                </svg>
-                <div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{mySpots.length}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Spots Added</div>
-                </div>
-              </div>
-              <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
-                <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
           </div>
 
           <div className="divider" />
@@ -378,7 +378,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           <div style={{ marginBottom: 16 }}>
             <button
               onClick={() => setShowFeedbackSheet(true)}
-              style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+              style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
             >
               Send Feedback
             </button>
