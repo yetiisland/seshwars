@@ -374,7 +374,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
 
         {/* Eye/satellite toggle — bottom-right (within container on desktop) */}
         {showFilterChips && (
-          <div style={{ position: 'absolute', bottom: isDesktop ? 30 : 10, left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', bottom: isDesktop ? 'calc(30px + 46px)' : 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
             <div style={{ maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto', display: 'flex', justifyContent: 'flex-end', paddingRight: 10, pointerEvents: 'auto' }}>
               <div
                 onClick={() => setSatellite(s => !s)}
@@ -390,13 +390,12 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
                   pointerEvents: 'auto',
                 }}
               >
-                <svg width="24" height="24" viewBox="0 0 20 20" fill="none">
-                  <path d="M1 10C1 10 4 4 10 4C16 4 19 10 19 10C19 10 16 16 10 16C4 16 1 10 1 10Z"
-                    stroke={satellite ? '#d4785a' : '#fff'} strokeWidth="1.5" strokeLinejoin="round"
-                    fill={satellite ? 'rgba(212,120,90,0.12)' : 'rgba(255,255,255,0.18)'} />
-                  <circle cx="10" cy="10" r="3"
-                    stroke={satellite ? '#d4785a' : '#fff'} strokeWidth="1.5"
-                    fill={satellite ? '#d4785a' : '#fff'} />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 4L20 9L12 14L4 9L12 4Z"
+                    stroke={satellite ? '#d4785a' : '#fff'} strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M4 13L12 18L20 13"
+                    stroke={satellite ? '#d4785a' : '#fff'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="19" cy="5" r="2" fill={satellite ? '#d4785a' : '#fff'} />
                 </svg>
               </div>
             </div>
