@@ -165,14 +165,24 @@ export default function FiltersModal({ active, onChange, compact = false, distan
               )}
 
               {showSkateparkExtras && (
-                <div>
-                  <div className="section-label" style={{ marginBottom: 8 }}>Features</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {SKATEPARK_FEATURES.map(f => (
-                      <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
-                    ))}
+                <>
+                  <div>
+                    <div className="section-label" style={{ marginBottom: 8 }}>Features</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {SKATEPARK_FEATURES.map(f => (
+                        <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                  <div>
+                    <div className="section-label" style={{ marginBottom: 8 }}>Lights</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {LIGHTING_OPTIONS.map(f => (
+                        <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
