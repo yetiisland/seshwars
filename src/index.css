@@ -180,7 +180,7 @@ body {
 .tab-bar {
   display: flex;
   background: var(--salmon);
-  padding-bottom: max(env(safe-area-inset-bottom), 24px);
+  padding-bottom: max(env(safe-area-inset-bottom), 16px);
   position: absolute;
   bottom: 0;
   left: 0;
@@ -316,6 +316,7 @@ body {
   letter-spacing: 1px;
   text-transform: uppercase;
   font-weight: 700;
+  margin-top: 4px;
 }
 
 /* Type/feature badge */
