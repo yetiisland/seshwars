@@ -729,7 +729,7 @@ export default function App() {
 
       {/* Spots view toggle pill — above tab bar, only when on spots tab */}
       {effectiveTab === 'spots' && !showAdd && (
-        <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 70px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 1001, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 1001, pointerEvents: 'none' }}>
           <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
             <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
             <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>

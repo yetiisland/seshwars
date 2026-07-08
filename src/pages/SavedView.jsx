@@ -170,7 +170,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
       )}
       {/* Fixed bottom toggle */}
       {createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 70px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
           <div onClick={() => setViewMode('list')} style={{ padding: '6px 18px', borderRadius: 50, background: viewMode === 'list' ? '#fff' : 'transparent', color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
           <div onClick={() => setViewMode('map')} style={{ padding: '6px 18px', borderRadius: 50, background: viewMode === 'map' ? '#fff' : 'transparent', color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
         </div>,
