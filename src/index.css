@@ -180,7 +180,7 @@ body {
 .tab-bar {
   display: flex;
   background: var(--salmon);
-  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  padding-bottom: max(env(safe-area-inset-bottom), 24px);
   position: absolute;
   bottom: 0;
   left: 0;
@@ -453,7 +453,7 @@ textarea.form-input {
   border-radius: 12px 12px 0 0;
   width: 100%;
   border-top: 1px solid #EAD8C8;
-  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  padding-bottom: max(env(safe-area-inset-bottom), 24px);
   animation: slideInUp 0.25s ease-out;
 }
 
