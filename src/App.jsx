@@ -450,7 +450,12 @@ export default function App() {
 
   const confirmHide = async () => {
     if (!hideTarget || !user) return
-    await supabase.from('hidden_spots').insert({ user_id: user.id, spot_id: hideTarget.id }).catch(() => {})
+    const { error } = await supabase.from('hidden_spots').insert({ user_id: user.id, spot_id: hideTarget.id })
+    if (error) {
+      console.error('hide spot failed:', error)
+      alert('Could not hide this spot: ' + error.message)
+      return
+    }
     refetchHidden()
     closeHideConfirm()
   }
