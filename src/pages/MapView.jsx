@@ -374,7 +374,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
 
         {/* Eye/satellite toggle — bottom-right (within container on desktop) */}
         {showFilterChips && (
-          <div style={{ position: 'absolute', bottom: 30, left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
+          <div style={{ position: 'fixed', bottom: isDesktop ? 100 : 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
             <div style={{ maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto', display: 'flex', justifyContent: 'flex-end', paddingRight: 10, pointerEvents: 'auto' }}>
               <div
                 onClick={() => setSatellite(s => !s)}
