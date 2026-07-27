@@ -277,6 +277,26 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   </span>
                 )}
               </div>
+              {editDraft && (
+                <div
+                  onClick={() => avatarRef.current?.click()}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.42)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" />
+                    <path d="M14.5 5.5l4 4" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </div>
+              )}
               {storeProfile.avatar_url && (
                 <div onClick={handleRemoveAvatar} style={{ position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: '50%', background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><line x1="1" y1="1" x2="7" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /><line x1="7" y1="1" x2="1" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /></svg>

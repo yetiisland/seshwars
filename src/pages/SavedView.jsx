@@ -61,32 +61,69 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
   const handleShare = async () => {
     if (sharing) return
     setSharing(true)
-    let token = shareToken
-    if (!token) {
-      token = generateShareToken()
-      if (isFavorites) {
-        const { data } = await supabase
-          .from('spot_lists')
-          .insert({ user_id: userId, name: 'Saved Spots', is_favorites: true, share_token: token })
-          .select('id')
-          .single()
-        onTokenGenerated?.(token, data?.id)
-      } else {
-        await supabase.from('spot_lists').update({ share_token: token }).eq('id', listId)
-        onTokenGenerated?.(token)
+    try {
+      let token = shareToken
+      if (!token) {
+        token = generateShareToken()
+        if (isFavorites) {
+          const { data, error } = await supabase
+            .from('spot_lists')
+            .insert({ user_id: userId, name: 'Saved Spots', is_favorites: true, share_token: token })
+            .select('id')
+            .single()
+          if (error) {
+            console.error('[share] failed to create share token:', error)
+            alert('Could not create a share link: ' + error.message)
+            return
+          }
+          onTokenGenerated?.(token, data?.id)
+        } else {
+          const { error } = await supabase
+            .from('spot_lists')
+            .update({ share_token: token })
+            .eq('id', listId)
+          if (error) {
+            console.error('[share] failed to save share token:', error)
+            alert('Could not create a share link: ' + error.message)
+            return
+          }
+          onTokenGenerated?.(token)
+        }
       }
+
+      const url = `${window.location.origin}/#/list/${token}`
+
+      // Try the native share sheet first, but fall back to clipboard if it
+      // isn't available or throws (common inside the Capacitor WebView).
+      let shared = false
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, url })
+          shared = true
+        } catch (err) {
+          // User cancelling the share sheet is normal — don't fall through to a toast.
+          if (err && err.name === 'AbortError') {
+            shared = true
+          } else {
+            console.warn('[share] navigator.share failed, falling back to clipboard:', err)
+          }
+        }
+      }
+
+      if (!shared) {
+        try {
+          await navigator.clipboard.writeText(url)
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2500)
+        } catch (err) {
+          console.error('[share] clipboard failed:', err)
+          // Last resort so the user still gets the link.
+          window.prompt('Copy this share link:', url)
+        }
+      }
+    } finally {
+      setSharing(false)
     }
-    const url = `${window.location.origin}/#/list/${token}`
-    if (navigator.share) {
-      try { await navigator.share({ title, url }) } catch {}
-    } else {
-      try {
-        await navigator.clipboard.writeText(url)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2500)
-      } catch {}
-    }
-    setSharing(false)
   }
 
   return (
