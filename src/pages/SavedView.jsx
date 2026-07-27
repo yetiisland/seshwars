@@ -6,6 +6,9 @@ import Navbar from '../components/Navbar'
 import { ArrowIcon, ShareIcon } from '../components/Icons'
 import MapView from './MapView'
 
+// Set to true to re-enable list sharing.
+const LIST_SHARING_ENABLED = false
+
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
 // Module-level state: survives App remount so back-nav restores the open collection
@@ -144,7 +147,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
         <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
           {title}
         </div>
-        {(isList || isFavorites) ? (
+        {(isList || (isFavorites && LIST_SHARING_ENABLED)) ? (
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             {isList && (
               <div
@@ -156,12 +159,14 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
                 </svg>
               </div>
             )}
-            <div
-              onClick={handleShare}
-              style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: sharing ? 0.6 : 1 }}
-            >
-              <ShareIcon color="#d4785a" />
-            </div>
+            {LIST_SHARING_ENABLED && (
+              <div
+                onClick={handleShare}
+                style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: sharing ? 0.6 : 1 }}
+              >
+                <ShareIcon color="#d4785a" />
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ width: 36 }} />
