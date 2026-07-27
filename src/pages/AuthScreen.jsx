@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { siteOrigin } from '../lib/siteUrl'
 import TermsOfService from './TermsOfService'
 import PrivacyPolicy from './PrivacyPolicy'
 import { setProfileDirect } from '../lib/profileStore'
@@ -105,7 +106,7 @@ export default function AuthScreen({ onClose }) {
     setError('')
     setLoading(true)
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/#/reset-password`,
+      redirectTo: `${siteOrigin()}/#/reset-password`,
     })
     setLoading(false)
     if (err) { setError(err.message); return }

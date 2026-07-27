@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 're
 import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
+import { siteOrigin } from '../lib/siteUrl'
 import { ShareIcon, BookmarkIcon, PencilIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import ClipsSection from '../components/ClipsSection'
@@ -57,6 +58,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [photoIndex, setPhotoIndex] = useState(0)
   const [dragX, setDragX] = useState(0)
   const [transitioning, setTransitioning] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
   const touchStartX = useRef(null)
   const touchStartY = useRef(null)
   const dragging = useRef(false)
@@ -494,10 +496,34 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   }
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/api/spot/${spot.slug || spot.id}`
+    const shareUrl = `${siteOrigin()}/api/spot/${spot.slug || spot.id}`
     const text = `Check out this spot: ${spot.title}`
-    if (navigator.share) await navigator.share({ title: spot.title, text, url: shareUrl })
-    else navigator.clipboard?.writeText(shareUrl)
+
+    let shared = false
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: spot.title, text, url: shareUrl })
+        shared = true
+      } catch (err) {
+        // Cancelling the share sheet is normal — don't fall through to a toast.
+        if (err && err.name === 'AbortError') {
+          shared = true
+        } else {
+          console.warn('[share] navigator.share failed, falling back to clipboard:', err)
+        }
+      }
+    }
+
+    if (!shared) {
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        setShareCopied(true)
+        setTimeout(() => setShareCopied(false), 2500)
+      } catch (err) {
+        console.error('[share] clipboard failed:', err)
+        window.prompt('Copy this link:', shareUrl)
+      }
+    }
   }
 
   const closeHideModal = () => {
@@ -1242,6 +1268,12 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </button>
             </div>
           </div>
+        </div>,
+        document.body
+      )}
+      {shareCopied && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          Link Copied!
         </div>,
         document.body
       )}

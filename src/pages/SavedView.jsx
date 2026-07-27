@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { siteOrigin } from '../lib/siteUrl'
 import SpotCard from '../components/SpotCard'
 import Navbar from '../components/Navbar'
 import { ArrowIcon, ShareIcon } from '../components/Icons'
@@ -94,7 +95,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
         }
       }
 
-      const url = `${window.location.origin}/#/list/${token}`
+      const url = `${siteOrigin()}/#/list/${token}`
 
       // Try the native share sheet first, but fall back to clipboard if it
       // isn't available or throws (common inside the Capacitor WebView).
