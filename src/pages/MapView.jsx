@@ -151,7 +151,7 @@ function CautionChip({ report, reportCustom, small = false }) {
   )
 }
 
-export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, searchLocation, highlightedSpotId, onSearch, fitOnMount = false, onHidePress }) {
+export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, searchLocation, highlightedSpotId, onSearch, fitOnMount = false, onHidePress, isActive = true }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
   const [viewState, setViewState] = useState(_savedViewState ?? FALLBACK)
@@ -177,6 +177,14 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
       setViewState(v => ({ ...v, longitude: userLocation.longitude, latitude: userLocation.latitude }))
     }
   }, [userLocation])
+
+  // When the map becomes visible after display:none, the canvas has 0x0 dimensions.
+  // resize() tells Mapbox to re-measure the container and repaint correctly.
+  useEffect(() => {
+    if (!isActive) return
+    const t = setTimeout(() => { mapRef.current?.getMap()?.resize() }, 0)
+    return () => clearTimeout(t)
+  }, [isActive])
 
   useEffect(() => {
     if (searchLocation) {

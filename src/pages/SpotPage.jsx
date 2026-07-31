@@ -191,6 +191,7 @@ export default function SpotPage() {
           user={user}
           onGoProfile={goToProfile}
           isHidden={hiddenIds.has(spot.id)}
+          onHidePress={() => { if (!user) { setShowAuth(true); return } }}
           onUnhidePress={handleUnhide}
           sheetPad={sheetPad}
         />

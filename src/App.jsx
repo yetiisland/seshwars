@@ -272,6 +272,8 @@ export default function App() {
   const navigate = useNavigate()
   const [tab, setTab] = useState(() => normalizeTab(sessionStorage.getItem('activeTab') || 'spots'))
   const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')
+  // Flip true on first map visit and never back — prevents Mapbox loading for list-only users
+  const [mapEverOpened, setMapEverOpened] = useState(() => sessionStorage.getItem('spotsView') === 'map')
   const [user, setUser] = useState(_cachedUser)
   const [authLoaded, setAuthLoaded] = useState(_authReady)
   const profile = useProfileStore()
@@ -484,6 +486,7 @@ export default function App() {
   const handleSpotsViewChange = (v) => {
     setSpotsView(v)
     sessionStorage.setItem('spotsView', v)
+    if (v === 'map') setMapEverOpened(true)
   }
 
   const goToProfile = () => {
@@ -497,6 +500,7 @@ export default function App() {
   if (!authLoaded) return <div className="loading" />
 
   const effectiveTab = user ? tab : (tab === 'saved' || tab === 'profile' ? 'spots' : tab)
+  const isMapActive = effectiveTab === 'spots' && spotsView === 'map'
 
   const hideConfirmModal = (showHideConfirm || hideConfirmClosing) ? createPortal(
     <div className="modal-overlay" onClick={closeHideConfirm}>
@@ -546,7 +550,7 @@ export default function App() {
           </div>
 
           {/* Content area — map is full-width exception; everything else constrained to 1200px */}
-          <div className={`desktop-content${effectiveTab === 'spots' && spotsView === 'map' ? '' : ' desktop-content-constrained'}`}>
+          <div className={`desktop-content${isMapActive ? '' : ' desktop-content-constrained'}`}>
             {effectiveTab === 'spots' && spotsView === 'list' && (
               <ListView
                 spots={filteredByDistance}
@@ -566,22 +570,25 @@ export default function App() {
                 onHidePress={handleHidePress}
               />
             )}
-            {effectiveTab === 'spots' && spotsView === 'map' && (
-              <MapView
-                spots={filteredByDistance}
-                saved={saved}
-                onSavePress={handleSavePress}
-                onSpotClick={handleSpotClick}
-                onAddSpot={openAdd}
-                userLocation={userLocation}
-                searchLocation={searchLocation}
-                showNav={false}
-                filters={filters}
-                onFiltersChange={setFilters}
-                distance={distanceRadius}
-                onDistanceChange={setDistanceRadius}
-                onHidePress={handleHidePress}
-              />
+            {mapEverOpened && (
+              <div style={{ display: isMapActive ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
+                <MapView
+                  isActive={isMapActive}
+                  spots={filteredByDistance}
+                  saved={saved}
+                  onSavePress={handleSavePress}
+                  onSpotClick={handleSpotClick}
+                  onAddSpot={openAdd}
+                  userLocation={userLocation}
+                  searchLocation={searchLocation}
+                  showNav={false}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  distance={distanceRadius}
+                  onDistanceChange={setDistanceRadius}
+                  onHidePress={handleHidePress}
+                />
+              </div>
             )}
             {effectiveTab === 'saved' && (
               <SavedView
@@ -662,23 +669,6 @@ export default function App() {
                   onHidePress={handleHidePress}
                 />
               )}
-              {effectiveTab === 'spots' && spotsView === 'map' && (
-                <MapView
-                  spots={filteredByDistance}
-                  saved={saved}
-                  onSavePress={handleSavePress}
-                  onSpotClick={handleSpotClick}
-                  onAddSpot={openAdd}
-                  userLocation={userLocation}
-                  searchLocation={searchLocation}
-                  onSearch={openSearch}
-                  filters={filters}
-                  onFiltersChange={setFilters}
-                  distance={distanceRadius}
-                  onDistanceChange={setDistanceRadius}
-                  onHidePress={handleHidePress}
-                />
-              )}
               {effectiveTab === 'saved' && (
                 <SavedView
                   spots={visibleSpots}
@@ -702,6 +692,34 @@ export default function App() {
                 />
               )}
             </>
+          )}
+
+          {/* MapView keep-alive — outside !showAdd so AddSpot never unmounts it */}
+          {mapEverOpened && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              display: isMapActive && !showAdd ? 'flex' : 'none',
+              flexDirection: 'column',
+              zIndex: 2,
+            }}>
+              <MapView
+                isActive={isMapActive && !showAdd}
+                spots={filteredByDistance}
+                saved={saved}
+                onSavePress={handleSavePress}
+                onSpotClick={handleSpotClick}
+                onAddSpot={openAdd}
+                userLocation={userLocation}
+                searchLocation={searchLocation}
+                onSearch={openSearch}
+                filters={filters}
+                onFiltersChange={setFilters}
+                distance={distanceRadius}
+                onDistanceChange={setDistanceRadius}
+                onHidePress={handleHidePress}
+              />
+            </div>
           )}
 
           {/* Spots view toggle pill — above tab bar, only when on spots tab */}
