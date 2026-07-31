@@ -45,7 +45,7 @@ function bustBadgeStyle(rating) {
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
 }
 
-const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, isHidden, onUnhidePress }, ref) {
+const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, isHidden, onUnhidePress, sheetPad = 0 }, ref) {
   // ── Photo / hero state ────────────────────────────────────────
   const [photoIndex, setPhotoIndex] = useState(0)
   const [dragX, setDragX] = useState(0)
@@ -830,7 +830,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           <ClipsSection spotId={spot.id} user={user} onGoProfile={onGoProfile} isAdmin={isAdmin} />
           <ReviewsSection spotId={spot.id} user={user} onStatsChange={handleStatsChange} />
           <CommentsSection spotId={spot.id} user={user} onGoProfile={onGoProfile} />
-          <div style={{ height: BOTTOM_PAD }} />
+          <div style={{ height: sheetPad > 0 ? `calc(${BOTTOM_PAD} + ${sheetPad}px)` : BOTTOM_PAD }} />
         </div>
       </div>
 
@@ -1069,7 +1069,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </button>
             </div>
 
-            <div style={{ height: BOTTOM_PAD }} />
+            <div style={{ height: sheetPad > 0 ? `calc(${BOTTOM_PAD} + ${sheetPad}px)` : BOTTOM_PAD }} />
           </div>
 
           {/* Delete confirm modal — inside portal so it's above edit form */}

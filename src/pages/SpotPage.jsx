@@ -22,6 +22,7 @@ export default function SpotPage() {
   const [authLoaded, setAuthLoaded] = useState(!!location.state?.spot)
   const [saveModalSpot, setSaveModalSpot] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
+  const [sheetPad, setSheetPad] = useState(0)
   const profile = useProfileStore()
   const profileAvatar = profile?.avatar_url || null
   const profileInitials = profile?.initials || ''
@@ -191,10 +192,11 @@ export default function SpotPage() {
           onGoProfile={goToProfile}
           isHidden={hiddenIds.has(spot.id)}
           onUnhidePress={handleUnhide}
+          sheetPad={sheetPad}
         />
       </div>
 
-      <OpenInAppSheet spot={spot} />
+      <OpenInAppSheet spot={spot} onHeight={setSheetPad} />
       <TabBar active={prevTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} />
 
       {saveModalSpot && (

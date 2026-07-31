@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
@@ -16,29 +16,42 @@ function extractSlug(url) {
 
 export default function DeepLinkHandler() {
   const navigate = useNavigate()
+  // Stable ref so the listener callback always calls the latest navigate without
+  // being listed as a dependency (which would cause the effect to re-run on every
+  // navigation, re-calling getLaunchUrl() and forcing the user back to the spot).
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
     let handle
+    let cancelled = false
 
     ;(async () => {
-      // Cold start — app opened via a link
+      // Cold start — app opened via a link.
+      // getLaunchUrl() returns the same URL for the life of the session on iOS,
+      // so we guard with `cancelled` and only act on it once.
       const launch = await CapApp.getLaunchUrl()
-      if (launch?.url) {
+      if (!cancelled && launch?.url) {
         const slug = extractSlug(launch.url)
-        if (slug) navigate(`/spots/${slug}`, { replace: true })
+        if (slug) navigateRef.current(`/spots/${slug}`, { replace: true })
       }
 
-      // Warm resume — link tapped while app is running
+      // Warm resume — link tapped while app is already running.
       handle = await CapApp.addListener('appUrlOpen', ({ url }) => {
         const slug = extractSlug(url)
-        if (slug) navigate(`/spots/${slug}`)
+        if (slug) navigateRef.current(`/spots/${slug}`)
       })
     })()
 
-    return () => { handle?.remove() }
-  }, [navigate])
+    // Empty dep array — runs once on mount. cancelled flag stops getLaunchUrl()
+    // from acting if the component somehow unmounts before the async resolves.
+    return () => {
+      cancelled = true
+      handle?.remove()
+    }
+  }, []) // intentionally empty — navigate is accessed via ref
 
   return null
 }
