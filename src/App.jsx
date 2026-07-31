@@ -518,237 +518,235 @@ export default function App() {
     document.body
   ) : null
 
-  // Desktop layout
-  if (isDesktop) {
-    return (
-      <>
-        {/* Fixed top nav */}
-        <div className="desktop-top-nav">
-          <div className="desktop-nav-inner">
-            <div className="desktop-nav-left">
-              <Logo />
-            </div>
-            <div className="desktop-nav-center">
-              <DesktopSearchBar spots={spots} searchLocation={searchLocation} onSelect={handleSelectLocation} onClear={handleClearSearch} />
-            </div>
-            <div className="desktop-nav-right">
-              <button className="btn-drop-spot" onClick={openAdd}>
-                <PlusIcon color="#fff" />
-                <span>DROP A SPOT</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Content area — map is full-width exception; everything else constrained to 1200px */}
-        <div className={`desktop-content${effectiveTab === 'spots' && spotsView === 'map' ? '' : ' desktop-content-constrained'}`}>
-          {effectiveTab === 'spots' && spotsView === 'list' && (
-            <ListView
-              spots={filteredByDistance}
-              loading={loading}
-              saved={saved}
-              onSavePress={handleSavePress}
-              onSpotClick={handleSpotClick}
-              onAddSpot={openAdd}
-              onSearch={openSearch}
-              searchLocation={searchLocation}
-              onClearSearch={handleClearSearch}
-              showNav={false}
-              filters={filters}
-              onFiltersChange={setFilters}
-              distance={distanceRadius}
-              onDistanceChange={setDistanceRadius}
-              onHidePress={handleHidePress}
-            />
-          )}
-          {effectiveTab === 'spots' && spotsView === 'map' && (
-            <MapView
-              spots={filteredByDistance}
-              saved={saved}
-              onSavePress={handleSavePress}
-              onSpotClick={handleSpotClick}
-              onAddSpot={openAdd}
-              userLocation={userLocation}
-              searchLocation={searchLocation}
-              showNav={false}
-              filters={filters}
-              onFiltersChange={setFilters}
-              distance={distanceRadius}
-              onDistanceChange={setDistanceRadius}
-              onHidePress={handleHidePress}
-            />
-          )}
-          {effectiveTab === 'saved' && (
-            <SavedView
-              spots={visibleSpots}
-              saved={saved}
-              onSavePress={handleSavePress}
-              onSpotClick={handleSpotClick}
-              onAddSpot={openAdd}
-              onSearch={openSearch}
-              showNav={false}
-              user={user}
-            />
-          )}
-          {effectiveTab === 'profile' && (
-            <ProfileView
-              user={user}
-              spots={spots}
-              onAddSpot={openAdd}
-              onSearch={openSearch}
-              showNav={false}
-              saved={saved}
-              onSavePress={handleSavePress}
-              onSpotClick={handleSpotClick}
-            />
-          )}
-        </div>
-
-        {/* Spots view toggle pill for desktop */}
-        {effectiveTab === 'spots' && (
-          <div style={{ position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
-            <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
-              <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-              <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
-            </div>
-          </div>
-        )}
-
-        {/* Floating bottom nav pill */}
-        <div className="desktop-float-nav">
-          {TABS.map(({ id, Icon }) => (
-            <div
-              key={id}
-              className={`tab-item ${effectiveTab === id ? 'active' : ''}`}
-              onClick={() => handleTabChange(id)}
-              style={{ flex: 1 }}
-            >
-              {id === 'profile' ? (
-                <div style={{ width: 33, height: 33, borderRadius: '50%', background: profileAvatar ? 'transparent' : '#d4785a', border: tab === 'profile' ? '2.5px solid #fff' : '2.5px solid rgba(255,255,255,0.3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {profileAvatar ? <img src={profileAvatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{profileInitials}</span>}
-                </div>
-              ) : (
-                <Icon color="#ffffff" size={36} filled={tab === id} />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Add spot overlay */}
-        {showAdd && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }} onClick={() => setShowAdd(false)}>
-            <div style={{ background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', position: 'relative' }} onClick={e => e.stopPropagation()}>
-              <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} onGoProfile={goToProfile} />
-            </div>
-          </div>
-        )}
-
-        {saveModalSpot && (
-          <SaveToListModal
-            spot={saveModalSpot}
-            user={user}
-            onClose={() => { setSaveModalSpot(null); refetchSaved() }}
-          />
-        )}
-
-        {hideConfirmModal}
-
-        {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
-
-      </>
-    )
-  }
-
-  // Mobile layout — TabBar is position:absolute; AddSpot overlays content area
+  // Single return — AddSpot is in a portal outside the isDesktop branch so its
+  // React instance (and all form state) survives when the viewport crosses 769 px.
   return (
     <>
-      <SafeAreaTop />
-      {showAdd ? (
-        <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} onGoProfile={goToProfile} />
+      {isDesktop ? (
+        <>
+          {/* Fixed top nav */}
+          <div className="desktop-top-nav">
+            <div className="desktop-nav-inner">
+              <div className="desktop-nav-left">
+                <Logo />
+              </div>
+              <div className="desktop-nav-center">
+                <DesktopSearchBar spots={spots} searchLocation={searchLocation} onSelect={handleSelectLocation} onClear={handleClearSearch} />
+              </div>
+              <div className="desktop-nav-right">
+                <button className="btn-drop-spot" onClick={openAdd}>
+                  <PlusIcon color="#fff" />
+                  <span>DROP A SPOT</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Content area — map is full-width exception; everything else constrained to 1200px */}
+          <div className={`desktop-content${effectiveTab === 'spots' && spotsView === 'map' ? '' : ' desktop-content-constrained'}`}>
+            {effectiveTab === 'spots' && spotsView === 'list' && (
+              <ListView
+                spots={filteredByDistance}
+                loading={loading}
+                saved={saved}
+                onSavePress={handleSavePress}
+                onSpotClick={handleSpotClick}
+                onAddSpot={openAdd}
+                onSearch={openSearch}
+                searchLocation={searchLocation}
+                onClearSearch={handleClearSearch}
+                showNav={false}
+                filters={filters}
+                onFiltersChange={setFilters}
+                distance={distanceRadius}
+                onDistanceChange={setDistanceRadius}
+                onHidePress={handleHidePress}
+              />
+            )}
+            {effectiveTab === 'spots' && spotsView === 'map' && (
+              <MapView
+                spots={filteredByDistance}
+                saved={saved}
+                onSavePress={handleSavePress}
+                onSpotClick={handleSpotClick}
+                onAddSpot={openAdd}
+                userLocation={userLocation}
+                searchLocation={searchLocation}
+                showNav={false}
+                filters={filters}
+                onFiltersChange={setFilters}
+                distance={distanceRadius}
+                onDistanceChange={setDistanceRadius}
+                onHidePress={handleHidePress}
+              />
+            )}
+            {effectiveTab === 'saved' && (
+              <SavedView
+                spots={visibleSpots}
+                saved={saved}
+                onSavePress={handleSavePress}
+                onSpotClick={handleSpotClick}
+                onAddSpot={openAdd}
+                onSearch={openSearch}
+                showNav={false}
+                user={user}
+              />
+            )}
+            {effectiveTab === 'profile' && (
+              <ProfileView
+                user={user}
+                spots={spots}
+                onAddSpot={openAdd}
+                onSearch={openSearch}
+                showNav={false}
+                saved={saved}
+                onSavePress={handleSavePress}
+                onSpotClick={handleSpotClick}
+              />
+            )}
+          </div>
+
+          {/* Spots view toggle pill for desktop */}
+          {effectiveTab === 'spots' && (
+            <div style={{ position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
+              <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
+                <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+              </div>
+            </div>
+          )}
+
+          {/* Floating bottom nav pill */}
+          <div className="desktop-float-nav">
+            {TABS.map(({ id, Icon }) => (
+              <div
+                key={id}
+                className={`tab-item ${effectiveTab === id ? 'active' : ''}`}
+                onClick={() => handleTabChange(id)}
+                style={{ flex: 1 }}
+              >
+                {id === 'profile' ? (
+                  <div style={{ width: 33, height: 33, borderRadius: '50%', background: profileAvatar ? 'transparent' : '#d4785a', border: tab === 'profile' ? '2.5px solid #fff' : '2.5px solid rgba(255,255,255,0.3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {profileAvatar ? <img src={profileAvatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{profileInitials}</span>}
+                  </div>
+                ) : (
+                  <Icon color="#ffffff" size={36} filled={tab === id} />
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       ) : (
         <>
-          {effectiveTab === 'spots' && spotsView === 'list' && (
-            <ListView
-              spots={filteredByDistance}
-              loading={loading}
-              saved={saved}
-              onSavePress={handleSavePress}
-              onSpotClick={handleSpotClick}
-              onAddSpot={openAdd}
-              onSearch={openSearch}
-              searchLocation={searchLocation}
-              onClearSearch={handleClearSearch}
-              filters={filters}
-              onFiltersChange={setFilters}
-              distance={distanceRadius}
-              onDistanceChange={setDistanceRadius}
-              onHidePress={handleHidePress}
-            />
+          <SafeAreaTop />
+          {!showAdd && (
+            <>
+              {effectiveTab === 'spots' && spotsView === 'list' && (
+                <ListView
+                  spots={filteredByDistance}
+                  loading={loading}
+                  saved={saved}
+                  onSavePress={handleSavePress}
+                  onSpotClick={handleSpotClick}
+                  onAddSpot={openAdd}
+                  onSearch={openSearch}
+                  searchLocation={searchLocation}
+                  onClearSearch={handleClearSearch}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  distance={distanceRadius}
+                  onDistanceChange={setDistanceRadius}
+                  onHidePress={handleHidePress}
+                />
+              )}
+              {effectiveTab === 'spots' && spotsView === 'map' && (
+                <MapView
+                  spots={filteredByDistance}
+                  saved={saved}
+                  onSavePress={handleSavePress}
+                  onSpotClick={handleSpotClick}
+                  onAddSpot={openAdd}
+                  userLocation={userLocation}
+                  searchLocation={searchLocation}
+                  onSearch={openSearch}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  distance={distanceRadius}
+                  onDistanceChange={setDistanceRadius}
+                  onHidePress={handleHidePress}
+                />
+              )}
+              {effectiveTab === 'saved' && (
+                <SavedView
+                  spots={visibleSpots}
+                  saved={saved}
+                  onSavePress={handleSavePress}
+                  onSpotClick={handleSpotClick}
+                  onAddSpot={openAdd}
+                  onSearch={openSearch}
+                  user={user}
+                />
+              )}
+              {effectiveTab === 'profile' && (
+                <ProfileView
+                  user={user}
+                  spots={spots}
+                  onAddSpot={openAdd}
+                  onSearch={openSearch}
+                  saved={saved}
+                  onSavePress={handleSavePress}
+                  onSpotClick={handleSpotClick}
+                />
+              )}
+            </>
           )}
-          {effectiveTab === 'spots' && spotsView === 'map' && (
-            <MapView
-              spots={filteredByDistance}
-              saved={saved}
-              onSavePress={handleSavePress}
-              onSpotClick={handleSpotClick}
-              onAddSpot={openAdd}
-              userLocation={userLocation}
-              searchLocation={searchLocation}
-              onSearch={openSearch}
-              filters={filters}
-              onFiltersChange={setFilters}
-              distance={distanceRadius}
-              onDistanceChange={setDistanceRadius}
-              onHidePress={handleHidePress}
-            />
+
+          {/* Spots view toggle pill — above tab bar, only when on spots tab */}
+          {effectiveTab === 'spots' && !showAdd && (
+            <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 1001, pointerEvents: 'none' }}>
+              <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
+                <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+              </div>
+            </div>
           )}
-          {effectiveTab === 'saved' && (
-            <SavedView
-              spots={visibleSpots}
-              saved={saved}
-              onSavePress={handleSavePress}
-              onSpotClick={handleSpotClick}
-              onAddSpot={openAdd}
-              onSearch={openSearch}
-              user={user}
-            />
+
+          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} />}
+
+          {toast && (
+            <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, right: 16, zIndex: 2001, background: '#2a1e14', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, textAlign: 'center', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', letterSpacing: 0.3 }}>
+              {toast}
+            </div>
           )}
-          {effectiveTab === 'profile' && (
-            <ProfileView
-              user={user}
-              spots={spots}
-              onAddSpot={openAdd}
-              onSearch={openSearch}
-              saved={saved}
-              onSavePress={handleSavePress}
-              onSpotClick={handleSpotClick}
-            />
-          )}
+
+          {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
+          {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
         </>
       )}
 
-      {/* Spots view toggle pill — above tab bar, only when on spots tab */}
-      {effectiveTab === 'spots' && !showAdd && (
-        <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 1001, pointerEvents: 'none' }}>
-          <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
-            <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-            <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+      {/* AddSpot — single portal instance outside the isDesktop branch; React identity
+          is preserved when the viewport crosses the mobile/desktop threshold */}
+      {showAdd && createPortal(
+        <div
+          style={isDesktop
+            ? { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }
+            : { position: 'fixed', inset: 0, zIndex: 2000 }
+          }
+          onClick={isDesktop ? () => setShowAdd(false) : undefined}
+        >
+          <div
+            style={isDesktop
+              ? { background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', position: 'relative' }
+              : { height: '100%', background: '#FDF8F0' }
+            }
+            onClick={isDesktop ? e => e.stopPropagation() : undefined}
+          >
+            <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} onGoProfile={goToProfile} />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} />}
-
-      {toast && (
-        <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, right: 16, zIndex: 2001, background: '#2a1e14', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, textAlign: 'center', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', letterSpacing: 0.3 }}>
-          {toast}
-        </div>
-      )}
-
-      {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
-      {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
-      {hideConfirmModal}
-      {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
       {saveModalSpot && (
         <SaveToListModal
           spot={saveModalSpot}
@@ -757,6 +755,9 @@ export default function App() {
         />
       )}
 
+      {hideConfirmModal}
+
+      {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
     </>
   )
 }

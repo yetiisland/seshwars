@@ -11,6 +11,8 @@ import { checkPhotosSafe } from '../utils/moderation'
 import TermsOfService from './TermsOfService'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
+const DRAFT_KEY = 'seshwars_spot_draft'
+
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
   { value: 'unlisted', label: 'Unlisted', desc: 'Only people with the link can see it' },
@@ -56,11 +58,31 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
   const [mapCenter, setMapCenter] = useState({ longitude: -104.9903, latitude: 39.7392, zoom: 13 })
   const fileRef = useRef()
+  const draftTimer = useRef(null)
+  const draftRestoredRef = useRef(false)
 
-  // Auto-locate on mount
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const { form: f, photos: p, geoQuery: gq, mapCenter: mc } = JSON.parse(raw)
+        if (f) {
+          setForm(prev => ({ ...prev, ...f }))
+          if (f.latitude) draftRestoredRef.current = true
+        }
+        if (p?.length) setPhotos(p)
+        if (gq) { skipGeoRef.current = true; setGeoQuery(gq) }
+        if (mc) setMapCenter(mc)
+      }
+    } catch {}
+  }, [])
+
+  // Auto-locate on mount — skipped if draft already has coordinates
   useEffect(() => {
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(async (pos) => {
+      if (draftRestoredRef.current) return
       const { latitude: lat, longitude: lng } = pos.coords
       setForm(p => ({ ...p, latitude: lat, longitude: lng }))
       setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
@@ -92,6 +114,22 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     }, 300)
     return () => clearTimeout(geocodeTimer.current)
   }, [geoQuery])
+
+  // Persist draft to sessionStorage, debounced 300 ms; photos are already-uploaded URLs so safe to store
+  useEffect(() => {
+    clearTimeout(draftTimer.current)
+    draftTimer.current = setTimeout(() => {
+      try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ form, photos, geoQuery, mapCenter }))
+      } catch {}
+    }, 300)
+    return () => clearTimeout(draftTimer.current)
+  }, [form, photos, geoQuery, mapCenter])
+
+  const handleClose = () => {
+    sessionStorage.removeItem(DRAFT_KEY)
+    onClose()
+  }
 
   const selectGeoResult = (feature) => {
     const [lng, lat] = feature.geometry.coordinates
@@ -161,6 +199,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     })
     setUploading(false)
     if (error) { setError(error.message); return }
+    sessionStorage.removeItem(DRAFT_KEY)
     if (moderation_status === 'pending') {
       setSpotPending(true)
     } else {
@@ -174,7 +213,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
           <div style={{ width: 28 }} />
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Add a Spot</div>
-          <div onClick={onClose} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <div onClick={handleClose} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <CloseIcon />
           </div>
         </div>
@@ -188,7 +227,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             You need an account to add spots to the map. It only takes a minute.
           </div>
-          <button className="btn-salmon" onClick={() => { onClose(); onGoProfile?.() }} style={{ marginTop: 8 }}>
+          <button className="btn-salmon" onClick={() => { handleClose(); onGoProfile?.() }} style={{ marginTop: 8 }}>
             Go to Profile to Sign In
           </button>
         </div>
@@ -236,7 +275,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
         <div style={{ width: 28 }} />
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Add a Spot</div>
-        <div onClick={onClose} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+        <div onClick={handleClose} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           <CloseIcon />
         </div>
       </div>
