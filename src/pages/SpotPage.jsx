@@ -1,5 +1,6 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
 import { loadProfile, useProfileStore } from '../lib/profileStore'
 import { isAdminUser } from '../lib/admin'
@@ -8,6 +9,7 @@ import TabBar from '../components/TabBar'
 import SpotDetail from './SpotDetail'
 import SaveToListModal from '../components/SaveToListModal'
 import AuthScreen from './AuthScreen'
+import OpenInAppSheet from '../components/OpenInAppSheet'
 
 export default function SpotPage() {
   const { slug } = useParams()
@@ -61,6 +63,20 @@ export default function SpotPage() {
     }
     fetchSpot()
   }, [slug, location.state?.spot])
+
+  useEffect(() => {
+    if (!spot || Capacitor.isNativePlatform()) return
+    const canonicalSlug = spot.slug || slug
+    const appArgument = `https://seshwars.com/spot/${canonicalSlug}`
+    let meta = document.querySelector('meta[name="apple-itunes-app"]')
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.name = 'apple-itunes-app'
+      document.head.appendChild(meta)
+    }
+    meta.content = `app-id=6779744364, app-argument=${appArgument}`
+    return () => { meta?.remove() }
+  }, [spot, slug])
 
   const handleBack = () => {
     if (window.history.length > 1) navigate(-1)
@@ -178,6 +194,7 @@ export default function SpotPage() {
         />
       </div>
 
+      <OpenInAppSheet spot={spot} />
       <TabBar active={prevTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} />
 
       {saveModalSpot && (

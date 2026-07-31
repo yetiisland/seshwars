@@ -21,11 +21,12 @@ export default async function handler(req, res) {
   const host = req.headers['host'] || 'seshwars.com'
   const origin = `${proto}://${host}`
 
+  const canonicalSlug = spot?.slug || slug
   const title = spot ? `${spot.title} — Seshwars` : 'Seshwars'
   const description = spot?.description || 'Discover and share skate spots near you.'
   const image = spot?.photos?.[0] || `${origin}/sw-webclip.png`
-  const shareUrl = `${origin}/api/spot/${slug}`
-  const appUrl = `${origin}/#/spots/${spot?.slug || slug}`
+  const canonicalUrl = `https://seshwars.com/spot/${canonicalSlug}`
+  const appUrl = `/spots/${canonicalSlug}`
 
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -40,11 +41,13 @@ export default async function handler(req, res) {
   <meta property="og:title" content="${esc(spot?.title || 'Seshwars')}" />
   <meta property="og:description" content="${esc(description)}" />
   <meta property="og:image" content="${esc(image)}" />
-  <meta property="og:url" content="${esc(shareUrl)}" />
+  <meta property="og:url" content="${esc(canonicalUrl)}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${esc(spot?.title || 'Seshwars')}" />
   <meta name="twitter:description" content="${esc(description)}" />
   <meta name="twitter:image" content="${esc(image)}" />
+  <meta name="apple-itunes-app" content="app-id=6779744364, app-argument=${esc(canonicalUrl)}" />
+  <link rel="canonical" href="${esc(canonicalUrl)}" />
   <meta http-equiv="refresh" content="0;url=${esc(appUrl)}" />
   <script>window.location.replace(${JSON.stringify(appUrl)})</script>
 </head>

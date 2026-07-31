@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["H8352UJXWA.com.seshwars.app"],
+        "components": [
+          { "/": "/spot/*" },
+          { "/": "/spots/*" },
+          { "/": "/map*" }
+        ]
+      }
+    ]
+  }
+}
