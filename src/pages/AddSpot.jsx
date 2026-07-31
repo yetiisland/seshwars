@@ -5,27 +5,18 @@ import { supabase } from '../lib/supabase'
 import { CloseIcon } from '../components/Icons'
 import { slugify } from '../utils/slugify'
 import DraggablePhotos from '../components/DraggablePhotos'
+import SpotFormFields from '../components/SpotFormFields'
 import { compressImage } from '../utils/compressImage'
 import { checkPhotosSafe } from '../utils/moderation'
 import TermsOfService from './TermsOfService'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
-const TYPES = ['Street', 'DIY', 'Skatepark', 'Skate Shop']
-const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Rail', 'Bump', 'Hip', 'Ride On Grind', 'Pole Jam', 'Bowl', 'Halfpipe', 'Step Up']
-const BUST_OPTIONS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
-const LIGHTING_OPTIONS = ['Lights', 'No Lights']
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
   { value: 'unlisted', label: 'Unlisted', desc: 'Only people with the link can see it' },
   { value: 'private', label: 'Private', desc: 'Only you can see it' },
 ]
 
-function bustChipActiveStyle(rating) {
-  if (rating === 'No Bust') return { background: '#4a7a3a', borderColor: '#3d6830', color: '#ffffff' }
-  if (rating === 'Bust') return { background: '#c0453a', borderColor: '#a83830', color: '#ffffff' }
-  if (rating === 'Medium Bust' || rating === 'Weekends Only' || rating === 'Weekdays Only') return { background: '#c8a020', borderColor: '#b08818', color: '#ffffff' }
-  return {}
-}
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
 async function reverseGeocode(lng, lat) {
@@ -109,13 +100,6 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     skipGeoRef.current = true
     setGeoQuery(feature.place_name)
     setShowDropdown(false)
-  }
-
-  const toggleFeature = (f) => {
-    setForm(prev => ({
-      ...prev,
-      features: prev.features.includes(f) ? prev.features.filter(x => x !== f) : [...prev.features, f]
-    }))
   }
 
   const handlePhotos = async (e) => {
@@ -259,67 +243,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
       <div className="scroll-area" style={{ padding: '16px 14px' }}>
 
-        <div style={{ marginBottom: 14 }}>
-          <div className="section-label">Spot Name</div>
-          <input className="form-input" placeholder="e.g. Civic Center Ledges" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
-        </div>
-
-        <div style={{ marginBottom: 14 }}>
-          <div className="section-label">Type</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {TYPES.map(t => (
-              <div key={t} className={`chip ${form.type === t ? 'active' : ''}`} onClick={() => setForm(p => ({ ...p, type: t }))}>{t}</div>
-            ))}
-          </div>
-        </div>
-
-        {(form.type === 'Street' || form.type === 'DIY' || form.type === 'Skatepark') && (
-          <div style={{ marginBottom: 14 }}>
-            <div className="section-label">Features</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {FEATURES.map(f => (
-                <div key={f} className={`chip ${form.features.includes(f) ? 'active' : ''}`} onClick={() => toggleFeature(f)}>{f}</div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {(form.type === 'Street' || form.type === 'DIY' || form.type === 'Skatepark') && (
-          <div style={{ marginBottom: 14 }}>
-            <div className="section-label">Lights</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {LIGHTING_OPTIONS.map(l => (
-                <div key={l}
-                  className={`chip ${form.lighting === l ? 'active' : ''}`}
-                  onClick={() => setForm(p => ({ ...p, lighting: p.lighting === l ? '' : l }))}
-                >{l}</div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {(form.type === 'Street' || form.type === 'DIY') && (
-          <div style={{ marginBottom: 14 }}>
-            <div className="section-label">Bust Rating</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {BUST_OPTIONS.map(b => {
-                const isActive = form.bust_rating === b
-                return (
-                  <div key={b}
-                    className={`chip ${isActive ? 'active' : ''}`}
-                    style={isActive ? bustChipActiveStyle(b) : undefined}
-                    onClick={() => setForm(p => ({ ...p, bust_rating: p.bust_rating === b ? '' : b }))}
-                  >{b}</div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginBottom: 14 }}>
-          <div className="section-label">Description</div>
-          <textarea className="form-input" placeholder="What makes this spot sick? Security? Best time to skate?" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
-        </div>
+        <SpotFormFields form={form} setForm={setForm} />
 
         <div className="divider" />
 

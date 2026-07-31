@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
 import { ShareIcon, BookmarkIcon, PencilIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
+import SpotFormFields from '../components/SpotFormFields'
 import ClipsSection from '../components/ClipsSection'
 import ReviewsSection from '../components/ReviewsSection'
 import ReportSection from '../components/ReportSection'
@@ -14,12 +15,10 @@ import { compressImage } from '../utils/compressImage'
 import { checkImageModeration } from '../utils/moderation'
 import TermsOfService from './TermsOfService'
 import { isAdminUser } from '../lib/admin'
+import { SPOT_FIELDS } from '../lib/spotFields'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
-const TYPES = ['Street', 'DIY', 'Skatepark', 'Skate Shop']
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
-const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Flat Bar', 'Bump']
-const BUST_OPTIONS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
   { value: 'unlisted', label: 'Unlisted', desc: 'Only people with the link can see it' },
@@ -44,13 +43,6 @@ function bustBadgeStyle(rating) {
   if (rating === 'Bust') return { background: '#c0453a', color: '#ffffff', border: '1px solid #a83830' }
   if (rating === 'Medium Bust' || rating === 'Weekends Only' || rating === 'Weekdays Only') return { background: '#c8a020', color: '#ffffff', border: '1px solid #b08818' }
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
-}
-
-function bustChipActiveStyle(rating) {
-  if (rating === 'No Bust') return { background: '#4a7a3a', borderColor: '#3d6830', color: '#ffffff' }
-  if (rating === 'Bust') return { background: '#c0453a', borderColor: '#a83830', color: '#ffffff' }
-  if (rating === 'Medium Bust' || rating === 'Weekends Only' || rating === 'Weekdays Only') return { background: '#c8a020', borderColor: '#b08818', color: '#ffffff' }
-  return {}
 }
 
 const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, isHidden, onUnhidePress }, ref) {
@@ -340,6 +332,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       type: spot.type || '',
       features: [...(spot.features || [])],
       bust_rating: spot.bust_rating || '',
+      lighting: spot.lighting || '',
       description: spot.description || '',
       address: spot.address || '',
       latitude: spot.latitude,
@@ -407,26 +400,34 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     setEditError('')
     const originalPhotos = spot.photos || []
     const newPhotos = editPhotos.filter(url => !originalPhotos.includes(url))
+    const photosChanged = editPhotos.length !== originalPhotos.length ||
+      editPhotos.some((url, i) => url !== originalPhotos[i])
     let newModerationStatus = spot.moderation_status || 'approved'
     if (newPhotos.length > 0) {
       const results = await Promise.all(newPhotos.map(url => checkImageModeration(url)))
       const allSafe = results.every(r => r.safe)
       if (!allSafe) newModerationStatus = 'pending'
     }
+    const currentType = editForm.type
     const payload = {
       title: editForm.title,
       slug: spot.slug || slugify(editForm.title, Math.random().toString(36).slice(2, 6)),
-      type: editForm.type,
-      features: editForm.features,
-      bust_rating: editForm.bust_rating || null,
+      type: currentType,
       description: editForm.description,
       address: editForm.address,
       latitude: editForm.latitude ? parseFloat(editForm.latitude) : null,
       longitude: editForm.longitude ? parseFloat(editForm.longitude) : null,
       photos: editPhotos,
-      moderation_status: newModerationStatus,
       visibility: editForm.visibility || 'public',
     }
+    SPOT_FIELDS.filter(f => f.showForTypes !== null).forEach(field => {
+      if (field.showForTypes.includes(currentType)) {
+        payload[field.key] = field.type === 'multi'
+          ? (editForm[field.key] || [])
+          : (editForm[field.key] || null)
+      }
+    })
+    if (photosChanged) payload.moderation_status = newModerationStatus
     const { data, error } = await supabase.from('spots').update(payload).eq('id', spot.id).select()
     setEditSaving(false)
     if (error) { setEditError(error.message); return }
@@ -434,16 +435,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       setEditError('Update failed — you may not have permission to edit this spot.')
       return
     }
-    setModStatus(newModerationStatus)
+    if (photosChanged) setModStatus(newModerationStatus)
     setShowEditForm(false)
     onEditSuccess?.()
-  }
-
-  const toggleEditFeature = (f) => {
-    setEditForm(p => ({
-      ...p,
-      features: p.features.includes(f) ? p.features.filter(x => x !== f) : [...p.features, f],
-    }))
   }
 
   const handleReported = (reportType, customText) => {
@@ -950,58 +944,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           </div>
 
           <div className="scroll-area" style={{ padding: '16px 14px' }}>
-            {/* Spot Name */}
-            <div style={{ marginBottom: 14 }}>
-              <div className="section-label">Spot Name</div>
-              <input className="form-input" placeholder="e.g. Civic Center Ledges" value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} />
-            </div>
-
-            {/* Type */}
-            <div style={{ marginBottom: 14 }}>
-              <div className="section-label">Type</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {TYPES.map(t => (
-                  <div key={t} className={`chip ${editForm.type === t ? 'active' : ''}`} onClick={() => setEditForm(p => ({ ...p, type: t }))}>{t}</div>
-                ))}
-              </div>
-            </div>
-
-            {/* Features — conditional */}
-            {(editForm.type === 'Street' || editForm.type === 'DIY' || editForm.type === 'Skatepark') && (
-              <div style={{ marginBottom: 14 }}>
-                <div className="section-label">Features</div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {FEATURES.map(f => (
-                    <div key={f} className={`chip ${editForm.features.includes(f) ? 'active' : ''}`} onClick={() => toggleEditFeature(f)}>{f}</div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Bust Rating — conditional */}
-            {(editForm.type === 'Street' || editForm.type === 'DIY') && (
-              <div style={{ marginBottom: 14 }}>
-                <div className="section-label">Bust Rating</div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {BUST_OPTIONS.map(b => {
-                    const isActive = editForm.bust_rating === b
-                    return (
-                      <div key={b}
-                        className={`chip ${isActive ? 'active' : ''}`}
-                        style={isActive ? bustChipActiveStyle(b) : undefined}
-                        onClick={() => setEditForm(p => ({ ...p, bust_rating: p.bust_rating === b ? '' : b }))}
-                      >{b}</div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Description */}
-            <div style={{ marginBottom: 14 }}>
-              <div className="section-label">Description</div>
-              <textarea className="form-input" placeholder="What makes this spot sick? Security? Best time to skate?" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} />
-            </div>
+            <SpotFormFields form={editForm} setForm={setEditForm} />
 
             <div className="divider" />
 

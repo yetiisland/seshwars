@@ -1,19 +1,11 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { SPOT_FIELDS, bustChipActiveStyle } from '../lib/spotFields'
 
-const TYPES = ['All', 'Street', 'DIY', 'Skatepark', 'Skate Shop']
-const FEATURES = ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Rail', 'Bump', 'Hip', 'Ride On Grind', 'Pole Jam', 'Bowl', 'Halfpipe', 'Step Up']
-const LIGHTING_OPTIONS = ['Lights', 'No Lights']
-const SKATEPARK_FEATURES = FEATURES
-const BUST_RATINGS = ['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only']
+const typeField = SPOT_FIELDS.find(f => f.key === 'type')
+const TYPE_OPTIONS = ['All', ...typeField.options]
+const filterableFields = SPOT_FIELDS.filter(f => f.filterable && f.key !== 'type')
 const DISTANCE_OPTIONS = [null, 5, 10, 25, 50, 100]
-
-function bustActiveStyle(f) {
-  if (f === 'No Bust') return { background: '#4a7a3a', borderColor: '#3d6830', color: '#ffffff' }
-  if (f === 'Medium Bust' || f === 'Weekends Only' || f === 'Weekdays Only') return { background: '#c8a020', borderColor: '#b08818', color: '#ffffff' }
-  if (f === 'Bust') return { background: '#c0453a', borderColor: '#a83830', color: '#ffffff' }
-  return {}
-}
 
 export default function FiltersModal({ active, onChange, compact = false, distance, onDistanceChange }) {
   const [open, setOpen] = useState(false)
@@ -43,9 +35,8 @@ export default function FiltersModal({ active, onChange, compact = false, distan
   const clearAll = () => onChange(['All'])
   const isActive = (f) => activeArr.includes(f)
 
-  const selectedTypes = activeArr.filter(f => TYPES.includes(f) && f !== 'All')
-  const showStreetDiyExtras = selectedTypes.some(t => t === 'Street' || t === 'DIY')
-  const showSkateparkExtras = selectedTypes.includes('Skatepark') && !showStreetDiyExtras
+  const selectedTypes = activeArr.filter(f => typeField.options.includes(f))
+  const isFieldVisible = (field) => field.showForTypes.some(t => selectedTypes.includes(t))
 
   const chipColor = (active) => active ? '#fff' : '#d4785a'
 
@@ -124,66 +115,33 @@ export default function FiltersModal({ active, onChange, compact = false, distan
               <div>
                 <div className="section-label" style={{ marginBottom: 8 }}>Type</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {TYPES.map(f => (
+                  {TYPE_OPTIONS.map(f => (
                     <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
                   ))}
                 </div>
               </div>
 
-              {showStreetDiyExtras && (
-                <>
-                  <div>
-                    <div className="section-label" style={{ marginBottom: 8 }}>Features</div>
+              {filterableFields.map(field => {
+                if (!isFieldVisible(field)) return null
+                return (
+                  <div key={field.key}>
+                    <div className="section-label" style={{ marginBottom: 8 }}>{field.label}</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {FEATURES.map(f => (
-                        <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
-                      ))}
+                      {field.options.map(f => {
+                        const active = isActive(f)
+                        return (
+                          <div
+                            key={f}
+                            className={`chip ${active ? 'active' : ''}`}
+                            style={field.key === 'bust_rating' && active ? bustChipActiveStyle(f) : undefined}
+                            onClick={() => toggle(f)}
+                          >{f}</div>
+                        )
+                      })}
                     </div>
                   </div>
-                  <div>
-                    <div className="section-label" style={{ marginBottom: 8 }}>Lights</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {LIGHTING_OPTIONS.map(f => (
-                        <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="section-label" style={{ marginBottom: 8 }}>Bust Rating</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {BUST_RATINGS.map(f => (
-                        <div
-                          key={f}
-                          className={`chip ${isActive(f) ? 'active' : ''}`}
-                          style={isActive(f) ? bustActiveStyle(f) : undefined}
-                          onClick={() => toggle(f)}
-                        >{f}</div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {showSkateparkExtras && (
-                <>
-                  <div>
-                    <div className="section-label" style={{ marginBottom: 8 }}>Features</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {SKATEPARK_FEATURES.map(f => (
-                        <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="section-label" style={{ marginBottom: 8 }}>Lights</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {LIGHTING_OPTIONS.map(f => (
-                        <div key={f} className={`chip ${isActive(f) ? 'active' : ''}`} onClick={() => toggle(f)}>{f}</div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+                )
+              })}
             </div>
 
             <div style={{ padding: '0 16px 28px' }}>
