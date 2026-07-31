@@ -8,6 +8,9 @@ import TagsRow from '../components/TagsRow'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const FALLBACK = { longitude: -104.9903, latitude: 39.7392, zoom: 13 }
+
+// Module-level — persists map center/zoom across unmount/remount (back navigation)
+let _savedViewState = null
 const STYLE_CUSTOM = 'mapbox://styles/mapbox/streets-v12'
 const STYLE_LIGHT = 'mapbox://styles/mapbox/streets-v12'
 const STYLE_SAT = 'mapbox://styles/mapbox/satellite-streets-v12'
@@ -151,14 +154,15 @@ function CautionChip({ report, reportCustom, small = false }) {
 export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, searchLocation, highlightedSpotId, onSearch, fitOnMount = false, onHidePress }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
-  const [viewState, setViewState] = useState(FALLBACK)
+  const [viewState, setViewState] = useState(_savedViewState ?? FALLBACK)
   const [satellite, setSatellite] = useState(false)
   const [baseStyle, setBaseStyle] = useState(STYLE_CUSTOM)
   const [unclusteredIds, setUnclusteredIds] = useState(() => new Set())
   const [mapReady, setMapReady] = useState(false)
   const [fitDone, setFitDone] = useState(false)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
-  const initializedRef = useRef(false)
+  // Skip auto-centering on userLocation if we already have a saved position
+  const initializedRef = useRef(!!_savedViewState)
   const mapRef = useRef()
 
   useEffect(() => {
@@ -315,7 +319,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
         <Map
           ref={mapRef}
           {...viewState}
-          onMove={e => setViewState(e.viewState)}
+          onMove={e => { _savedViewState = e.viewState; setViewState(e.viewState) }}
           onClick={handleMapClick}
           onIdle={updateUnclusteredIds}
           onLoad={updateUnclusteredIds}

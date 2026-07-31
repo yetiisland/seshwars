@@ -11,8 +11,12 @@ import SupportPage from './SupportPage'
 import ImageCropModal from '../components/ImageCropModal'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
+const STALE_MS = 30_000
 
 let _mySpotsScrollTop = 0
+let _cachedHiddenIds = null
+let _hiddenIdsUserId = null
+let _hiddenIdsLastFetched = 0
 
 export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick }) {
   const [email, setEmail] = useState('')
@@ -35,7 +39,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showPrivacy, setShowPrivacy] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [hiddenSpotIds, setHiddenSpotIds] = useState(new Set())
+  const [hiddenSpotIds, setHiddenSpotIds] = useState(() =>
+    _hiddenIdsUserId === user?.id && _cachedHiddenIds ? _cachedHiddenIds : new Set()
+  )
   const [showHiddenSpots, setShowHiddenSpots] = useState(false)
   const [unhideTarget, setUnhideTarget] = useState(null)
   const [showUnhideConfirm, setShowUnhideConfirm] = useState(false)
@@ -58,10 +64,17 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const mySpots = spots.filter(s => s.added_by === identifier || s.added_by === user?.id)
   const hiddenSpots = spots.filter(s => hiddenSpotIds.has(s.id))
 
-  const loadHiddenSpots = useCallback(async () => {
+  const loadHiddenSpots = useCallback(async ({ force = false } = {}) => {
     if (!user?.id) return
+    if (!force && _hiddenIdsUserId === user.id && _cachedHiddenIds && Date.now() - _hiddenIdsLastFetched < STALE_MS) return
+    _hiddenIdsLastFetched = Date.now()
+    _hiddenIdsUserId = user.id
     const { data } = await supabase.from('hidden_spots').select('spot_id').eq('user_id', user.id)
-    if (data) setHiddenSpotIds(new Set(data.map(d => d.spot_id)))
+    if (data) {
+      const s = new Set(data.map(d => d.spot_id))
+      _cachedHiddenIds = s
+      setHiddenSpotIds(s)
+    }
   }, [user?.id])
 
   useEffect(() => { loadHiddenSpots() }, [loadHiddenSpots])
@@ -76,7 +89,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     }
     setShowUnhideConfirm(false)
     setUnhideTarget(null)
-    loadHiddenSpots()
+    loadHiddenSpots({ force: true })
   }
 
   useEffect(() => {

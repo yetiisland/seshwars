@@ -3,6 +3,13 @@ import TagsRow from './TagsRow'
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
+function truncateDesc(text, limit = 130) {
+  if (!text || text.length <= limit) return text ?? ''
+  const cut = text.slice(0, limit)
+  const lastSpace = cut.lastIndexOf(' ')
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + '...'
+}
+
 function bustStyle(rating) {
   if (!rating) return null
   if (rating === 'No Bust') return { background: '#4a7a3a', color: '#ffffff', border: '1px solid #3d6830', borderRadius: 6 }
@@ -114,7 +121,7 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
             {spot.distance != null && <div className="dist-text">{spot.distance} mi</div>}
           </div>
         </div>
-        <div className="spot-desc" style={isShop ? { color: 'rgba(255,255,255,0.85)' } : undefined}>{spot.description}</div>
+        <div className="spot-desc" style={isShop ? { color: 'rgba(255,255,255,0.85)' } : undefined}>{truncateDesc(spot.description)}</div>
         <div className="spot-footer">
           {isShop
             ? <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.75)', letterSpacing: 0.3, flex: 1 }}>Support Your Local Skate Shop</span>
