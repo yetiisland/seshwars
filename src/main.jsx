@@ -9,6 +9,7 @@ import SharedListPage from './pages/SharedListPage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx'
 import SupportPage from './pages/SupportPage.jsx'
+import DeleteAccountPage from './pages/DeleteAccountPage.jsx'
 import DeepLinkHandler from './components/DeepLinkHandler.jsx'
 
 // Upgrade previously-shared hash links (/#/spots/foo → /spots/foo) on web
@@ -31,6 +32,7 @@ createRoot(document.getElementById('root')).render(
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/privacy" element={<PrivacyPolicy onClose={() => window.history.back()} />} />
         <Route path="/support" element={<SupportPage onClose={() => window.history.back()} />} />
+        <Route path="/delete-account" element={<DeleteAccountPage />} />
         <Route path="*" element={<App />} />
       </Routes>
     </Router>

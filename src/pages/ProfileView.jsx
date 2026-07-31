@@ -8,6 +8,7 @@ import SpotCard from '../components/SpotCard'
 import TermsOfService from './TermsOfService'
 import PrivacyPolicy from './PrivacyPolicy'
 import SupportPage from './SupportPage'
+import DeleteAccountPage from './DeleteAccountPage'
 import ImageCropModal from '../components/ImageCropModal'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
@@ -39,6 +40,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showPrivacy, setShowPrivacy] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDeleteAccountPage, setShowDeleteAccountPage] = useState(false)
   const [hiddenSpotIds, setHiddenSpotIds] = useState(() =>
     _hiddenIdsUserId === user?.id && _cachedHiddenIds ? _cachedHiddenIds : new Set()
   )
@@ -500,11 +502,18 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           >
             Delete Account
           </div>
+          <div
+            onClick={() => setShowDeleteAccountPage(true)}
+            style={{ padding: '2px 0 8px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Account Deletion Info
+          </div>
           <div style={{ height: BOTTOM_PAD }} />
           {cropFile && <ImageCropModal imageFile={cropFile} onConfirm={handleCropConfirm} onCancel={() => setCropFile(null)} />}
           {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
           {showPrivacy && createPortal(<PrivacyPolicy onClose={() => setShowPrivacy(false)} />, document.body)}
           {showSupport && createPortal(<SupportPage onClose={() => setShowSupport(false)} />, document.body)}
+          {showDeleteAccountPage && createPortal(<DeleteAccountPage onClose={() => setShowDeleteAccountPage(false)} />, document.body)}
           {showDeleteConfirm && createPortal(
             <div
               className="modal-overlay"

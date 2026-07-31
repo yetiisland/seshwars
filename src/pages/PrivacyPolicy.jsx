@@ -79,6 +79,7 @@ export default function PrivacyPolicy({ onClose }) {
               n: '4',
               title: 'ACCOUNT DELETION',
               body: 'You can delete your account at any time using the Delete Account option on your profile page. Deleting your account removes your personal data from our systems. Spots you added may remain visible attributed to "Anonymous."',
+              link: { text: 'Full account deletion instructions →', href: '/delete-account' },
             },
             {
               n: '5',
@@ -111,6 +112,14 @@ export default function PrivacyPolicy({ onClose }) {
                     <li key={i} style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 4 }}>{b}</li>
                   ))}
                 </ul>
+              )}
+              {section.link && (
+                <a
+                  href={section.link.href}
+                  style={{ display: 'inline-block', marginTop: 6, fontSize: 12, fontWeight: 700, color: '#d4785a', textDecoration: 'underline' }}
+                >
+                  {section.link.text}
+                </a>
               )}
             </div>
           ))}
