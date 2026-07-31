@@ -3,21 +3,30 @@ import { createPortal } from 'react-dom'
 import { Capacitor } from '@capacitor/core'
 
 const APP_STORE_URL = 'https://apps.apple.com/app/id6779744364'
+const ANDROID_STORE_URL = null
 const SCHEME_PREFIX = 'seshwars://spot/'
 
 const prefersReducedMotion =
   typeof window !== 'undefined' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+function detectOS() {
+  const ua = navigator.userAgent
+  if (/ipad|iphone|ipod/i.test(ua)) return 'ios'
+  if (/android/i.test(ua)) return 'android'
+  return 'unknown'
+}
+
 function canShow() {
   if (Capacitor.isNativePlatform()) return false
   if (typeof window === 'undefined') return false
+  // Only show on direct arrival — if App.jsx has mounted, user arrived via in-app navigation
+  if (sessionStorage.getItem('seshwars:appMounted')) return false
   return window.matchMedia('(max-width: 767px) and (pointer: coarse)').matches
 }
 
 export default function OpenInAppSheet({ spot, onHeight }) {
   const [visible, setVisible] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
   const timerRef = useRef(null)
   const containerRef = useRef(null)
   const onHeightRef = useRef(onHeight)
@@ -25,24 +34,19 @@ export default function OpenInAppSheet({ spot, onHeight }) {
 
   useEffect(() => {
     if (!canShow() || !spot) return
-    const dismissed = sessionStorage.getItem('openInAppDismissed')
-    if (dismissed) {
-      setCollapsed(true)
-    }
+    if (sessionStorage.getItem('openInAppDismissed')) return
     setVisible(true)
   }, [spot])
 
-  // Report height to parent so it can pad the scroll content
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current || !visible) return
     const ro = new ResizeObserver(entries => {
       onHeightRef.current?.(entries[0].borderBoxSize?.[0]?.blockSize ?? entries[0].contentRect.height)
     })
     ro.observe(containerRef.current)
     return () => ro.disconnect()
-  }, [visible]) // re-bind when visibility changes so ref is populated
+  }, [visible])
 
-  // Clear reported height when sheet hides
   useEffect(() => {
     if (!visible) onHeightRef.current?.(0)
   }, [visible])
@@ -51,6 +55,7 @@ export default function OpenInAppSheet({ spot, onHeight }) {
 
   const slug = spot.slug || spot.id
   const appUrl = `${SCHEME_PREFIX}${slug}`
+  const os = detectOS()
 
   function openInApp() {
     const hiddenAtClick = document.hidden
@@ -71,92 +76,83 @@ export default function OpenInAppSheet({ spot, onHeight }) {
     }, 1200)
   }
 
+  function openAndroid() {
+    if (ANDROID_STORE_URL) window.open(ANDROID_STORE_URL, '_blank')
+  }
+
   function dismiss() {
     sessionStorage.setItem('openInAppDismissed', '1')
-    setCollapsed(true)
+    setVisible(false)
   }
 
-  const safeBottom = 'max(env(safe-area-inset-bottom, 0px), 12px)'
+  const safeBottom = 'max(env(safe-area-inset-bottom, 0px), 16px)'
 
-  const containerStyle = {
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1100,
-    background: '#FDF8F0',
-    borderTop: '1.5px solid #EAD8C8',
-    borderRadius: '16px 16px 0 0',
-    boxShadow: '0 -4px 24px rgba(42,30,20,0.10)',
-    animation: prefersReducedMotion ? 'none' : 'slideInUp 0.25s ease-out',
-  }
-
-  const logo = (
-    <img
-      src="/sw-webclip.png"
-      alt="Sesh Wars"
-      style={{ width: 40, height: 40, borderRadius: 9, flexShrink: 0 }}
-    />
-  )
-
-  if (collapsed) {
-    return createPortal(
-      <div ref={containerRef} style={{ ...containerStyle, padding: `10px 14px`, paddingBottom: `calc(${safeBottom} + 10px)`, display: 'flex', alignItems: 'center', gap: 10 }}>
-        {logo}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 12, fontWeight: 700, color: '#2a1e14', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {spot.title}
-          </div>
-          <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 10, fontWeight: 600, color: '#9a8878' }}>
-            View in Sesh Wars app
-          </div>
-        </div>
-        <button
-          onClick={openInApp}
-          style={{ background: '#d4785a', color: '#FDF8F0', border: 'none', borderRadius: 8, padding: '7px 16px', fontFamily: 'Barlow, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-        >
-          Open
-        </button>
-      </div>,
-      document.body
-    )
-  }
+  const showIos = os === 'ios' || os === 'unknown'
+  const showAndroid = (os === 'android' || os === 'unknown') && ANDROID_STORE_URL
 
   return createPortal(
-    <div ref={containerRef} style={{ ...containerStyle, padding: '18px 16px 14px', paddingBottom: `calc(${safeBottom} + 14px)`, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        {logo}
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 14, fontWeight: 700, color: '#2a1e14', lineHeight: 1.3 }}>
-            Open In The App
-          </div>
-          <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 11, fontWeight: 600, color: '#9a8878', marginTop: 2 }}>
-            Get the full experience with the Sesh Wars App.
-          </div>
-        </div>
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end' }}
+      onClick={dismiss}
+    >
+      <div
+        ref={containerRef}
+        style={{
+          position: 'relative',
+          width: 'calc(100% - 16px)',
+          margin: '0 8px',
+          background: '#FDF8F0',
+          borderRadius: '26px 26px 0 0',
+          boxShadow: '0 -4px 24px rgba(42,30,20,0.15)',
+          animation: prefersReducedMotion ? 'none' : 'slideInUp 0.25s ease-out',
+          padding: '24px 20px',
+          paddingBottom: `calc(${safeBottom} + 24px)`,
+          boxSizing: 'border-box',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
         <button
           onClick={dismiss}
           aria-label="Dismiss"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9a8878', flexShrink: 0 }}
+          style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(0,0,0,0.08)', border: 'none', cursor: 'pointer', width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9a8878', padding: 0 }}
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 2L12 12M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+            <path d="M2 2L12 12M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
         </button>
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={openInApp}
-          style={{ flex: 1, background: '#d4785a', color: '#FDF8F0', border: 'none', borderRadius: 10, padding: '10px 0', fontFamily: 'Barlow, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-        >
-          Open App
-        </button>
-        <button
-          onClick={dismiss}
-          style={{ flex: 1, background: 'transparent', color: '#9a8878', border: '1.5px solid #EAD8C8', borderRadius: 10, padding: '10px 0', fontFamily: 'Barlow, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-        >
-          Continue in Browser
-        </button>
+
+        <img
+          src="/sw-webclip.png"
+          alt="Sesh Wars"
+          style={{ width: 80, height: 80, borderRadius: 18, marginBottom: 16, display: 'block' }}
+        />
+
+        <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 22, fontWeight: 900, color: '#2a1e14', lineHeight: 1.15, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+          Open In The App
+        </div>
+
+        <div style={{ fontFamily: 'Barlow, sans-serif', fontSize: 13, fontWeight: 600, color: '#9a8878', marginBottom: 22, lineHeight: 1.5 }}>
+          Get the full experience with the Sesh Wars App.
+        </div>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          {showIos && (
+            <button
+              onClick={openInApp}
+              style={{ flex: 1, background: '#d4785a', color: '#FDF8F0', border: 'none', borderRadius: 10, padding: '13px 0', fontFamily: 'Barlow, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase' }}
+            >
+              App Store
+            </button>
+          )}
+          {showAndroid && (
+            <button
+              onClick={openAndroid}
+              style={{ flex: 1, background: '#3D4454', color: '#FDF8F0', border: 'none', borderRadius: 10, padding: '13px 0', fontFamily: 'Barlow, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase' }}
+            >
+              Google Play
+            </button>
+          )}
+        </div>
       </div>
     </div>,
     document.body

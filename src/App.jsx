@@ -266,6 +266,9 @@ function matchesFilters(s, filters) {
 }
 
 export default function App() {
+  // Mark that the user arrived via in-app navigation so OpenInAppSheet skips itself
+  sessionStorage.setItem('seshwars:appMounted', '1')
+
   const navigate = useNavigate()
   const [tab, setTab] = useState(() => normalizeTab(sessionStorage.getItem('activeTab') || 'spots'))
   const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')

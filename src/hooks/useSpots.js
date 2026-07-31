@@ -2,17 +2,27 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 const LS_SAVED_KEY = 'seshwars_saved_spots'
+const STALE_MS = 30_000
 
 // Module-level cache so spots survive App unmount/remount (e.g. navigating back from SpotPage)
 let _cachedSpots = []
 let _spotsReady = false
+let _lastFetched = 0
+let _lastFingerprint = ''
+
+function spotsFingerprint(arr) {
+  return arr.map(s => `${s.id}:${s.updated_at}:${s.report_count}`).join('|')
+}
 
 export function useSpots() {
   const [spots, setSpots] = useState(_cachedSpots)
   const [loading, setLoading] = useState(!_spotsReady)
 
-  const fetchSpots = useCallback(async () => {
+  const fetchSpots = useCallback(async ({ force = false } = {}) => {
+    // Skip if cache is fresh and not forced (prevents re-render on back navigation)
+    if (!force && _spotsReady && Date.now() - _lastFetched < STALE_MS) return
     if (!_spotsReady) setLoading(true)
+    _lastFetched = Date.now()
     const [spotsRes, reviewsRes, reportsRes] = await Promise.all([
       supabase.from('spots').select('*').order('created_at', { ascending: false }),
       supabase.from('spot_reviews').select('spot_id, rating'),
@@ -42,16 +52,22 @@ export function useSpots() {
           most_recent_report_custom: rep?.most_recent_custom || null,
         }
       })
-      _cachedSpots = merged
-      _spotsReady = true
-      setSpots(merged)
+      const fp = spotsFingerprint(merged)
+      if (fp !== _lastFingerprint) {
+        _lastFingerprint = fp
+        _cachedSpots = merged
+        _spotsReady = true
+        setSpots(merged)
+      } else {
+        _spotsReady = true
+      }
     }
     setLoading(false)
   }, [])
 
   useEffect(() => { fetchSpots() }, [fetchSpots])
 
-  return { spots, loading, refetch: fetchSpots }
+  return { spots, loading, refetch: () => fetchSpots({ force: true }) }
 }
 
 export function useSavedSpots(userId) {
