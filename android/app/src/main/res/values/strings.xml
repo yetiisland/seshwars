@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sesh Wars</string>
+    <string name="title_activity_main">Sesh Wars</string>
+    <string name="package_name">com.seshwars.app</string>
+    <string name="custom_url_scheme">com.seshwars.app</string>
+</resources>
