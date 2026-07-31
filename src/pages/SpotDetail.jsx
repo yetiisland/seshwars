@@ -381,7 +381,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     setEditUploading(true)
     const urls = []
     for (const file of files) {
-      const compressed = await compressImage(file, 1400)
+      const compressed = await compressImage(file, 1200)
       const path = `spots/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
       const { error } = await supabase.storage.from('spot-photos').upload(path, compressed, { contentType: 'image/jpeg' })
       if (!error) {
@@ -555,7 +555,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 transition: transitioning ? 'transform 0.28s cubic-bezier(0.25,0.1,0.25,1)' : 'none',
                 willChange: 'transform',
               }}>
-                <img src={photo} alt={spot.title} style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
+                <img src={photo} alt={spot.title} width="800" height="600" loading="eager" fetchpriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
               </div>
             ))
           ) : (
@@ -1130,6 +1130,10 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <img
                   src={photo}
                   alt={spot.title}
+                  width="1200"
+                  height="900"
+                  loading="lazy"
+                  decoding="async"
                   style={{
                     maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
                     userSelect: 'none', pointerEvents: 'none', display: 'block',

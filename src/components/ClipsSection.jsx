@@ -287,7 +287,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
                     onClick={() => { const i = clips.indexOf(clip); setActiveClip(clip); setActiveIndex(i); setVideoError(false) }}
                     style={{ width: 140, height: 100, borderRadius: 8, overflow: 'hidden', background: (!thumb && extractInstagramId(clip.url)) ? 'linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%)' : '#2a352a', position: 'relative', cursor: 'pointer' }}
                   >
-                    {thumb && <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+                    {thumb && <img src={thumb} alt="" width="140" height="100" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
                     {!thumb && extractInstagramId(clip.url) && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                         <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
@@ -495,7 +495,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
             {(() => {
               if (isImageUrl(activeClip.url)) {
                 return (
-                  <img src={activeClip.url} alt="" style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, display: 'block', objectFit: 'contain' }} />
+                  <img src={activeClip.url} alt="" width="1200" height="900" loading="lazy" decoding="async" style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, display: 'block', objectFit: 'contain' }} />
                 )
               }
               const embedUrl = getEmbedUrl(activeClip)

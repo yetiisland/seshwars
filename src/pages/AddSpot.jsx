@@ -151,7 +151,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     for (let i = 0; i < files.length; i++) {
       setPhotoUploadProgress({ current: i + 1, total: files.length })
       const file = files[i]
-      const compressed = await compressImage(file, 1400)
+      const compressed = await compressImage(file, 1200)
       const path = `spots/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
       const { error } = await supabase.storage.from('spot-photos').upload(path, compressed, { contentType: 'image/jpeg' })
       if (error) {

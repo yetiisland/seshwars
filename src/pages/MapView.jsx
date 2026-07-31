@@ -423,7 +423,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
               >
                 <div className="spot-card-img">
                   {selected.photos?.[0] ? (
-                    <img src={selected.photos[0]} alt={selected.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={selected.photos[0]} alt={selected.title} width="800" height="450" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', background: '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="40" height="24" viewBox="0 0 40 24" fill="none">
