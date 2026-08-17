@@ -290,6 +290,7 @@ export default function App() {
 
   const [filters, setFilters] = useState(['All'])
   const [distanceRadius, setDistanceRadius] = useState(null)
+  const [sortBy, setSortBy] = useState(null)
   const { spots, loading, refetch } = useSpots()
   const { saved, refetchSaved } = useSavedSpots(user?.id)
   const { hiddenIds, refetchHidden } = useHiddenSpots(user?.id)
@@ -357,6 +358,37 @@ export default function App() {
     if (!distanceRadius || (!userLocation && !searchLocation)) return visibleSpots
     return visibleSpots.filter(s => s.distance != null && s.distance <= distanceRadius)
   }, [visibleSpots, distanceRadius, userLocation, searchLocation])
+
+  const hasLocation = !!(userLocation || searchLocation)
+
+  // "Closest" depends on location; if it becomes unavailable (permission
+  // revoked, etc.) fall back to the default order instead of sorting on stale/missing distances
+  useEffect(() => {
+    if (sortBy === 'closest' && !hasLocation) setSortBy(null)
+  }, [sortBy, hasLocation])
+
+  const sortedSpots = useMemo(() => {
+    if (sortBy === 'closest' && hasLocation) {
+      return [...filteredByDistance].sort((a, b) => {
+        if (a.distance == null && b.distance == null) return 0
+        if (a.distance == null) return 1
+        if (b.distance == null) return -1
+        return a.distance - b.distance
+      })
+    }
+    if (sortBy === 'recent') {
+      return [...filteredByDistance].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    }
+    if (sortBy === 'rating') {
+      return [...filteredByDistance].sort((a, b) => {
+        if (a.avg_rating == null && b.avg_rating == null) return 0
+        if (a.avg_rating == null) return 1
+        if (b.avg_rating == null) return -1
+        return b.avg_rating - a.avg_rating
+      })
+    }
+    return filteredByDistance
+  }, [filteredByDistance, sortBy, hasLocation])
 
   useEffect(() => {
     let mounted = true
@@ -553,7 +585,7 @@ export default function App() {
           <div className={`desktop-content${isMapActive ? '' : ' desktop-content-constrained'}`}>
             {effectiveTab === 'spots' && spotsView === 'list' && (
               <ListView
-                spots={filteredByDistance}
+                spots={sortedSpots}
                 loading={loading}
                 saved={saved}
                 onSavePress={handleSavePress}
@@ -567,6 +599,9 @@ export default function App() {
                 onFiltersChange={setFilters}
                 distance={distanceRadius}
                 onDistanceChange={setDistanceRadius}
+                sortBy={sortBy}
+                onSortChange={setSortBy}
+                hasLocation={hasLocation}
                 onHidePress={handleHidePress}
               />
             )}
@@ -574,7 +609,7 @@ export default function App() {
               <div style={{ display: isMapActive ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
                 <MapView
                   isActive={isMapActive}
-                  spots={filteredByDistance}
+                  spots={sortedSpots}
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}
@@ -586,6 +621,9 @@ export default function App() {
                   onFiltersChange={setFilters}
                   distance={distanceRadius}
                   onDistanceChange={setDistanceRadius}
+                  sortBy={sortBy}
+                  onSortChange={setSortBy}
+                  hasLocation={hasLocation}
                   onHidePress={handleHidePress}
                 />
               </div>
@@ -653,7 +691,7 @@ export default function App() {
             <>
               {effectiveTab === 'spots' && spotsView === 'list' && (
                 <ListView
-                  spots={filteredByDistance}
+                  spots={sortedSpots}
                   loading={loading}
                   saved={saved}
                   onSavePress={handleSavePress}
@@ -666,6 +704,9 @@ export default function App() {
                   onFiltersChange={setFilters}
                   distance={distanceRadius}
                   onDistanceChange={setDistanceRadius}
+                  sortBy={sortBy}
+                  onSortChange={setSortBy}
+                  hasLocation={hasLocation}
                   onHidePress={handleHidePress}
                 />
               )}
@@ -705,7 +746,7 @@ export default function App() {
             }}>
               <MapView
                 isActive={isMapActive && !showAdd}
-                spots={filteredByDistance}
+                spots={sortedSpots}
                 saved={saved}
                 onSavePress={handleSavePress}
                 onSpotClick={handleSpotClick}
@@ -717,6 +758,9 @@ export default function App() {
                 onFiltersChange={setFilters}
                 distance={distanceRadius}
                 onDistanceChange={setDistanceRadius}
+                sortBy={sortBy}
+                onSortChange={setSortBy}
+                hasLocation={hasLocation}
                 onHidePress={handleHidePress}
               />
             </div>

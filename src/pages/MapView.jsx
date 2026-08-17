@@ -151,7 +151,7 @@ function CautionChip({ report, reportCustom, small = false }) {
   )
 }
 
-export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, searchLocation, highlightedSpotId, onSearch, fitOnMount = false, onHidePress, isActive = true }) {
+export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, sortBy, onSortChange, hasLocation, searchLocation, highlightedSpotId, onSearch, fitOnMount = false, onHidePress, isActive = true }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
   const [viewState, setViewState] = useState(_savedViewState ?? FALLBACK)
@@ -376,10 +376,10 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
             {isDesktop ? (
               <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-                <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} />
+                <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} sortBy={sortBy} onSortChange={onSortChange} hasLocation={hasLocation} />
               </div>
             ) : (
-              <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} />
+              <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} sortBy={sortBy} onSortChange={onSortChange} hasLocation={hasLocation} />
             )}
           </div>
         )}

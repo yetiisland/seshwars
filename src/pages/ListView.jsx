@@ -33,7 +33,7 @@ function LocationChip({ location, onClear }) {
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
-export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress }) {
+export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, sortBy, onSortChange, hasLocation, onHidePress }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const filters = propFilters ?? localFilters
   const handleFiltersChange = onFiltersChange ?? setLocalFilters
@@ -71,7 +71,7 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
     <>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
       {searchLocation && <LocationChip location={searchLocation} onClear={onClearSearch} />}
-      <FiltersModal active={filters} onChange={handleFiltersChange} distance={distance} onDistanceChange={onDistanceChange} />
+      <FiltersModal active={filters} onChange={handleFiltersChange} distance={distance} onDistanceChange={onDistanceChange} sortBy={sortBy} onSortChange={onSortChange} hasLocation={hasLocation} />
       <div className="scroll-area" ref={scrollRef}>
         <div style={{ padding: '0 0 2px', fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', paddingLeft: 16, marginBottom: 8 }}>
           {loading ? 'Loading...' : `${filtered.length} spot${filtered.length !== 1 ? 's' : ''}`}
