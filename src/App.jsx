@@ -750,15 +750,15 @@ export default function App() {
       {showAdd && createPortal(
         <div
           style={isDesktop
-            ? { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }
+            ? { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }
             : { position: 'fixed', inset: 0, zIndex: 2000 }
           }
           onClick={isDesktop ? () => setShowAdd(false) : undefined}
         >
           <div
             style={isDesktop
-              ? { background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', position: 'relative' }
-              : { height: '100%', background: '#FDF8F0' }
+              ? { background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: 'calc(100dvh - 48px)', display: 'flex', flexDirection: 'column', position: 'relative' }
+              : { height: '100%', background: '#FDF8F0', display: 'flex', flexDirection: 'column' }
             }
             onClick={isDesktop ? e => e.stopPropagation() : undefined}
           >

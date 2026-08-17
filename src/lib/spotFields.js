@@ -22,7 +22,7 @@ export const SPOT_FIELDS = [
     key: 'features',
     label: 'Features',
     type: 'multi',
-    options: ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Rail', 'Bump', 'Hip', 'Ride On Grind', 'Pole Jam', 'Bowl', 'Halfpipe', 'Step Up'],
+    options: ['Stairs', 'Hubba', 'Ledges', 'Banks', 'Gap', 'Manual Pad', 'Curb', 'Wall Ride', 'Hand Rail', 'Rail', 'Bump', 'Hip', 'Ride On Grind', 'Pole Jam', 'Bowl', 'Halfpipe', 'Step Up', 'Barrier'],
     showForTypes: ['Street', 'DIY', 'Skatepark'],
     filterable: true,
     clearable: false,

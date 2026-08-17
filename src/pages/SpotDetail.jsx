@@ -987,6 +987,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <Map
                   {...editMapCenter}
                   onMove={e => setEditMapCenter(e.viewState)}
+                  onLoad={e => e.target.scrollZoom.disable()}
                   mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
                   mapboxAccessToken={MAPBOX_TOKEN}
                   style={{ width: '100%', height: '100%' }}

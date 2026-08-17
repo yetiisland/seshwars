@@ -19,8 +19,6 @@ const VISIBILITY_OPTIONS = [
   { value: 'private', label: 'Private', desc: 'Only you can see it' },
 ]
 
-const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
-
 async function reverseGeocode(lng, lat) {
   try {
     const res = await fetch(
@@ -209,7 +207,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
   if (!user) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#FDF8F0' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, background: '#FDF8F0' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
           <div style={{ width: 28 }} />
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Add a Spot</div>
@@ -217,7 +215,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
             <CloseIcon />
           </div>
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: 14, textAlign: 'center' }}>
+        <div className="scroll-area" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: 14, textAlign: 'center' }}>
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
             <circle cx="20" cy="20" r="18" stroke="#d4785a" strokeWidth="2" fill="none" />
             <path d="M20 12C17.2 12 15 14.2 15 17C15 20.5 20 28 20 28C20 28 25 20.5 25 17C25 14.2 22.8 12 20 12Z" fill="#d4785a" />
@@ -238,7 +236,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
   if (spotRejected) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#FDF8F0', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: 16, textAlign: 'center' }}>
+      <div className="scroll-area" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', background: '#FDF8F0', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: 16, textAlign: 'center' }}>
         <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
           <circle cx="22" cy="22" r="20" stroke="#c0453a" strokeWidth="2" fill="rgba(192,69,58,0.08)" />
           <line x1="14" y1="14" x2="30" y2="30" stroke="#c0453a" strokeWidth="2.5" strokeLinecap="round" />
@@ -255,7 +253,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
   if (spotPending) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#FDF8F0', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: 16, textAlign: 'center' }}>
+      <div className="scroll-area" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', background: '#FDF8F0', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: 16, textAlign: 'center' }}>
         <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
           <path d="M22 10L40 38H4L22 10Z" stroke="#c8a020" strokeWidth="2" strokeLinejoin="round" fill="rgba(200,160,32,0.1)" />
           <line x1="22" y1="18" x2="22" y2="26" stroke="#c8a020" strokeWidth="2" strokeLinecap="round" />
@@ -271,7 +269,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#FDF8F0', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, background: '#FDF8F0', position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
         <div style={{ width: 28 }} />
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Add a Spot</div>
@@ -280,7 +278,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
         </div>
       </div>
 
-      <div className="scroll-area" style={{ padding: '16px 14px' }}>
+      <div className="scroll-area" style={{ flex: '1 1 auto', minHeight: 0, padding: '16px 14px' }}>
 
         <SpotFormFields form={form} setForm={setForm} />
 
@@ -327,6 +325,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
             <Map
               {...mapCenter}
               onMove={e => setMapCenter(e.viewState)}
+              onLoad={e => e.target.scrollZoom.disable()}
               mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
               mapboxAccessToken={MAPBOX_TOKEN}
               style={{ width: '100%', height: '100%' }}
@@ -399,11 +398,12 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
           </div>
         </div>
 
+      </div>
+
+      <div style={{ flex: '0 0 auto', padding: '12px 14px calc(12px + env(safe-area-inset-bottom))', borderTop: '1px solid #E8DDD0', background: '#FDF8F0' }}>
         <button className="btn-salmon" onClick={handleSubmit} disabled={uploading}>
           {uploading ? uploadingText : 'Drop This Spot'}
         </button>
-
-        <div style={{ height: BOTTOM_PAD }} />
       </div>
 
       {/* Photo upload progress overlay */}

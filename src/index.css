@@ -74,6 +74,7 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   flex: 1;
+  min-height: 0;
 }
 
 .scroll-area::-webkit-scrollbar { display: none; }
@@ -181,10 +182,11 @@ body {
   display: flex;
   background: var(--salmon);
   padding-bottom: max(env(safe-area-inset-bottom), 24px);
-  position: absolute;
+  position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
+  width: 100%;
   z-index: 1000;
 }
 
