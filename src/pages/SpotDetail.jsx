@@ -689,11 +689,11 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700 }}>Anonymous</span>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
+                  <div style={{ width: 27, height: 27, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
                     {publisherAvatar ? (
                       <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <span style={{ fontSize: 18, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial}</span>
+                      <span style={{ fontSize: 12, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial}</span>
                     )}
                   </div>
                   {publisherUsername && (
