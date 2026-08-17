@@ -3,19 +3,12 @@ import { createPortal } from 'react-dom'
 import { Capacitor } from '@capacitor/core'
 
 const APP_STORE_URL = 'https://apps.apple.com/app/id6779744364'
-const ANDROID_STORE_URL = null
+const GOOGLE_PLAY_URL = 'https://play.google.com/store/apps/details?id=com.seshwars.app'
 const SCHEME_PREFIX = 'seshwars://spot/'
 
 const prefersReducedMotion =
   typeof window !== 'undefined' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-function detectOS() {
-  const ua = navigator.userAgent
-  if (/ipad|iphone|ipod/i.test(ua)) return 'ios'
-  if (/android/i.test(ua)) return 'android'
-  return 'unknown'
-}
 
 function canShow() {
   if (Capacitor.isNativePlatform()) return false
@@ -55,7 +48,6 @@ export default function OpenInAppSheet({ spot, onHeight }) {
 
   const slug = spot.slug || spot.id
   const appUrl = `${SCHEME_PREFIX}${slug}`
-  const os = detectOS()
 
   function openInApp() {
     const hiddenAtClick = document.hidden
@@ -76,8 +68,8 @@ export default function OpenInAppSheet({ spot, onHeight }) {
     }, 1200)
   }
 
-  function openAndroid() {
-    if (ANDROID_STORE_URL) window.open(ANDROID_STORE_URL, '_blank')
+  function openGooglePlay() {
+    window.open(GOOGLE_PLAY_URL, '_blank')
   }
 
   function dismiss() {
@@ -86,9 +78,6 @@ export default function OpenInAppSheet({ spot, onHeight }) {
   }
 
   const safeBottom = 'max(env(safe-area-inset-bottom, 0px), 16px)'
-
-  const showIos = os === 'ios' || os === 'unknown'
-  const showAndroid = (os === 'android' || os === 'unknown') && ANDROID_STORE_URL
 
   return createPortal(
     <div
@@ -108,6 +97,8 @@ export default function OpenInAppSheet({ spot, onHeight }) {
           padding: '24px 20px',
           paddingBottom: `calc(${safeBottom} + 24px)`,
           boxSizing: 'border-box',
+          maxHeight: 'calc(100dvh - 32px)',
+          overflowY: 'auto',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -136,22 +127,18 @@ export default function OpenInAppSheet({ spot, onHeight }) {
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          {showIos && (
-            <button
-              onClick={openInApp}
-              style={{ flex: 1, background: '#d4785a', color: '#FDF8F0', border: 'none', borderRadius: 10, padding: '13px 0', fontFamily: 'Barlow, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase' }}
-            >
-              App Store
-            </button>
-          )}
-          {showAndroid && (
-            <button
-              onClick={openAndroid}
-              style={{ flex: 1, background: '#3D4454', color: '#FDF8F0', border: 'none', borderRadius: 10, padding: '13px 0', fontFamily: 'Barlow, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase' }}
-            >
-              Google Play
-            </button>
-          )}
+          <button
+            onClick={openInApp}
+            style={{ flex: 1, minWidth: 0, background: '#d4785a', color: '#FDF8F0', border: 'none', borderRadius: 10, padding: '13px 0', fontFamily: 'Barlow, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase', whiteSpace: 'nowrap' }}
+          >
+            App Store
+          </button>
+          <button
+            onClick={openGooglePlay}
+            style={{ flex: 1, minWidth: 0, background: '#d4785a', color: '#FDF8F0', border: 'none', borderRadius: 10, padding: '13px 0', fontFamily: 'Barlow, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase', whiteSpace: 'nowrap' }}
+          >
+            Google Play
+          </button>
         </div>
       </div>
     </div>,
