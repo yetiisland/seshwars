@@ -651,7 +651,7 @@ export default function App() {
 
           {/* Spots view toggle pill for desktop */}
           {effectiveTab === 'spots' && (
-            <div style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
+            <div style={{ position: 'fixed', bottom: 'calc(var(--desktop-nav-clearance) + var(--desktop-peek-card-lift))', left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
               <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
                 <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
                 <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>

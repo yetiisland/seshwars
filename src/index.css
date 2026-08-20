@@ -278,6 +278,22 @@ body {
     --desktop-nav-clearance: calc(var(--desktop-nav-total) + 24px);
   }
 
+  /* The list/map switcher pill and the map's peek card both anchor to
+     --desktop-nav-clearance, so by default the pill sits at the same height
+     as the peek card's bottom edge — fine when no card is showing, but the
+     pill would render on top of the card once one is. MapView measures the
+     peek card's live rendered height with a ResizeObserver and writes it to
+     --desktop-peek-card-height, flipping --desktop-peek-card-open to 1 only
+     while a card is actually mounted. --desktop-peek-card-lift resolves to
+     0px normally, or (card height + 16px) while a card is shown, so the pill
+     sits exactly 16px above the card's top edge without a hardcoded height
+     that would drift if a spot's description/title made the card taller. */
+  :root {
+    --desktop-peek-card-open: 0;
+    --desktop-peek-card-height: 0px;
+    --desktop-peek-card-lift: calc(var(--desktop-peek-card-open) * (var(--desktop-peek-card-height) + 16px));
+  }
+
   /* Floating bottom nav pill */
   .desktop-float-nav {
     display: flex;
