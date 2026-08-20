@@ -50,8 +50,8 @@ serve(async (req) => {
     <div style="background:#c0453a;padding:20px 24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
         <tr>
-          <td style="vertical-align:middle;width:42px;padding-right:10px;">
-            <img src="${LOGO_URL}" width="32" height="32" alt="Sesh Wars" style="display:block;width:32px;height:32px;border-radius:7px;" />
+          <td style="vertical-align:middle;width:42px;padding-right:8px;">
+            <img src="${LOGO_URL}" width="42" height="42" alt="Sesh Wars" style="display:block;width:42px;height:42px;border-radius:9px;" />
           </td>
           <td style="vertical-align:middle;">
             <span style="font-size:18px;font-weight:900;color:#FDF8F0;letter-spacing:0.3px;">Content Reported</span>
@@ -147,15 +147,14 @@ serve(async (req) => {
     <div style="background:#d4785a;padding:20px 24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
         <tr>
-          <td style="vertical-align:middle;width:42px;padding-right:10px;">
-            <img src="${LOGO_URL}" width="32" height="32" alt="Sesh Wars" style="display:block;width:32px;height:32px;border-radius:7px;" />
+          <td style="vertical-align:middle;width:42px;padding-right:8px;">
+            <img src="${LOGO_URL}" width="42" height="42" alt="Sesh Wars" style="display:block;width:42px;height:42px;border-radius:9px;" />
           </td>
           <td style="vertical-align:middle;">
             <span style="font-size:18px;font-weight:900;color:#FDF8F0;letter-spacing:0.3px;">New Spot Added</span>
           </td>
         </tr>
       </table>
-      <div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:8px;font-weight:600;">${isPending ? 'Content flagged for review' : 'New spot notification'}</div>
     </div>
 
     ${isPending ? `
@@ -172,7 +171,7 @@ serve(async (req) => {
     ` : ''}
 
     <div style="padding:24px;">
-      <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:${isPending ? '#c07820' : '#9a8878'};text-transform:uppercase;letter-spacing:1px;">${isPending ? 'Flagged spot — pending your review' : 'A new spot was just dropped on Sesh Wars'}</p>
+      ${isPending ? `<p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#c07820;text-transform:uppercase;letter-spacing:1px;">Flagged spot — pending your review</p>` : ''}
 
       <h1 style="margin:0 0 16px;font-size:26px;font-weight:900;color:#2a1e14;line-height:1.2;">${spot.title}</h1>
 
