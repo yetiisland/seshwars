@@ -386,7 +386,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
 
         {/* Eye/satellite toggle — bottom-right (within container on desktop) */}
         {showSatelliteToggle && (
-          <div style={{ position: 'fixed', bottom: isDesktop ? 100 : 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
+          <div style={{ position: 'fixed', bottom: isDesktop ? 'var(--desktop-nav-clearance)' : 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
             <div style={{ maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto', display: 'flex', justifyContent: 'flex-end', paddingRight: 10, pointerEvents: 'auto' }}>
               <div
                 onClick={() => setSatellite(s => !s)}
@@ -417,7 +417,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
         {/* Peek card — desktop: compact floating, mobile: full-width */}
         {showPeekCard && selected && (
           isDesktop ? (
-            <div style={{ position: 'absolute', bottom: 100, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 12px', zIndex: 1100 }}>
+            <div style={{ position: 'absolute', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 12px', zIndex: 1100 }}>
               <SpotCard
                 spot={selected}
                 saved={saved.has(selected.id)}

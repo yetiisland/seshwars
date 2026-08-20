@@ -261,6 +261,19 @@ body {
     justify-content: flex-end;
   }
 
+  /* Rendered height of .desktop-float-nav below (10px+10px container padding,
+     8px+8px .tab-item padding, 36px icon, 4px label margin-top, ~9.5px label
+     line at 8px/Barlow) — measured from the live DOM, not estimated. Update
+     this if the nav's padding, icon size, or label styling changes.
+     --desktop-nav-clearance is what anything floating above the nav on
+     desktop (satellite toggle, map peek card, list/map switcher pill) should
+     use for its `bottom` offset instead of a hardcoded number, so they can't
+     drift out of sync with the nav again. */
+  :root {
+    --desktop-nav-height: 86px;
+    --desktop-nav-clearance: calc(20px + var(--desktop-nav-height) + 16px);
+  }
+
   /* Floating bottom nav pill */
   .desktop-float-nav {
     display: flex;
