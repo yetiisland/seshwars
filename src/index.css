@@ -262,8 +262,11 @@ body {
   }
 
   /* Rendered height of .desktop-float-nav, measured live via
-     getBoundingClientRect() (not estimated): 85.5px. --desktop-nav-clearance
-     = that height + the nav's own 20px bottom offset + 20px breathing room.
+     getBoundingClientRect() (not estimated): 85.5px. Nav's own bottom
+     offset from the viewport: 20px. Total distance from the viewport
+     bottom to the nav's TOP edge: 85.5 + 20 = 105.5px.
+     --desktop-nav-clearance = that 105.5px + 24px clearance = 129.5px,
+     placing anything using it exactly 24px above the nav's top edge.
      Anything floating above the nav on desktop (satellite toggle, map peek
      card, list/map switcher pill) should use this for its `bottom` offset
      instead of a hardcoded number, so they can't drift out of sync with the
@@ -271,7 +274,8 @@ body {
      padding, icon size, or label styling changes. */
   :root {
     --desktop-nav-height: 85.5px;
-    --desktop-nav-clearance: calc(20px + var(--desktop-nav-height) + 20px);
+    --desktop-nav-total: calc(var(--desktop-nav-height) + 20px);
+    --desktop-nav-clearance: calc(var(--desktop-nav-total) + 24px);
   }
 
   /* Floating bottom nav pill */

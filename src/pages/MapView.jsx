@@ -417,7 +417,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
         {/* Peek card — desktop: compact floating, mobile: full-width */}
         {showPeekCard && selected && (
           isDesktop ? (
-            <div className="desktop-peek-card" style={{ position: 'absolute', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 12px', zIndex: 1100 }}>
+            <div className="desktop-peek-card" style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 12px', zIndex: 100 }}>
               <SpotCard
                 spot={selected}
                 saved={saved.has(selected.id)}
