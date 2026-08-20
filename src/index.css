@@ -261,17 +261,17 @@ body {
     justify-content: flex-end;
   }
 
-  /* Rendered height of .desktop-float-nav below (10px+10px container padding,
-     8px+8px .tab-item padding, 36px icon, 4px label margin-top, ~9.5px label
-     line at 8px/Barlow) — measured from the live DOM, not estimated. Update
-     this if the nav's padding, icon size, or label styling changes.
-     --desktop-nav-clearance is what anything floating above the nav on
-     desktop (satellite toggle, map peek card, list/map switcher pill) should
-     use for its `bottom` offset instead of a hardcoded number, so they can't
-     drift out of sync with the nav again. */
+  /* Rendered height of .desktop-float-nav, measured live via
+     getBoundingClientRect() (not estimated): 85.5px. --desktop-nav-clearance
+     = that height + the nav's own 20px bottom offset + 20px breathing room.
+     Anything floating above the nav on desktop (satellite toggle, map peek
+     card, list/map switcher pill) should use this for its `bottom` offset
+     instead of a hardcoded number, so they can't drift out of sync with the
+     nav again. Re-measure and update --desktop-nav-height if the nav's
+     padding, icon size, or label styling changes. */
   :root {
-    --desktop-nav-height: 86px;
-    --desktop-nav-clearance: calc(20px + var(--desktop-nav-height) + 16px);
+    --desktop-nav-height: 85.5px;
+    --desktop-nav-clearance: calc(20px + var(--desktop-nav-height) + 20px);
   }
 
   /* Floating bottom nav pill */
@@ -645,6 +645,16 @@ textarea.form-input {
 
   .spots-list-grid .spot-card:hover {
     border-color: #d4785a;
+  }
+
+  /* The desktop map peek card wraps a plain .spot-card, which carries a
+     10px margin-bottom by default. That left a transparent 10px gap below
+     the visible card — inside its own positioned box — where the salmon
+     list/map switcher pill (sharing the same --desktop-nav-clearance
+     bottom offset) was visible peeking out. Zero only the bottom margin;
+     left/right stay untouched so the card's rendered width is unchanged. */
+  .desktop-peek-card .spot-card {
+    margin-bottom: 0;
   }
 }
 
