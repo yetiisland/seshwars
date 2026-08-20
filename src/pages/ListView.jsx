@@ -46,6 +46,24 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
     }
   }, [])
 
+  // Desktop: on wide viewports the list column is centered with empty margin
+  // on either side, and that margin isn't itself scrollable — the wheel does
+  // nothing unless the cursor is directly over the narrow list. Forward wheel
+  // input from anywhere on screen into the list's own scroll position. Native
+  // in-bounds scrolling (over the list itself) is left alone. Wheel events
+  // aren't fired by touch scrolling, and the width check gates out mobile/
+  // Capacitor explicitly, so this can't affect either.
+  useEffect(() => {
+    const handleWheel = (e) => {
+      if (window.innerWidth < 769) return
+      const el = scrollRef.current
+      if (!el || el.contains(e.target)) return
+      el.scrollTop += e.deltaY
+    }
+    window.addEventListener('wheel', handleWheel, { passive: true })
+    return () => window.removeEventListener('wheel', handleWheel)
+  }, [])
+
   const handleSpotClick = (spot) => {
     if (scrollRef.current) _savedScrollTop = scrollRef.current.scrollTop
     onSpotClick(spot)

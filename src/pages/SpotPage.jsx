@@ -80,7 +80,9 @@ export default function SpotPage() {
   }, [spot, slug])
 
   const handleBack = () => {
-    if (window.history.length > 1) navigate(-1)
+    // If the user arrived here without App.jsx ever mounting (e.g. a share
+    // link opened directly), there's no in-app history to go back to.
+    if (sessionStorage.getItem('seshwars:appMounted')) navigate(-1)
     else navigate('/')
   }
 

@@ -5,7 +5,8 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const TO = 'taylor@yetiisland.studio'
-const FROM = 'Seshwars <onboarding@resend.dev>'
+const FROM = 'Sesh Wars <onboarding@resend.dev>'
+const LOGO_URL = 'https://seshwars.com/sw-webclip.png'
 
 async function getUsername(userId: string): Promise<string> {
   if (!userId) return 'Anonymous'
@@ -94,6 +95,8 @@ serve(async (req) => {
     const features = Array.isArray(spot.features) && spot.features.length > 0
       ? spot.features.join(', ')
       : '—'
+    const location = spot.address
+      || (spot.latitude != null && spot.longitude != null ? `${spot.latitude.toFixed(5)}, ${spot.longitude.toFixed(5)}` : '—')
     const isPending = spot.moderation_status === 'pending'
 
     const html = `
@@ -107,9 +110,18 @@ serve(async (req) => {
   <div style="max-width:520px;margin:32px auto;background:#fff;border-radius:12px;border:1px solid #EAD8C8;overflow:hidden;">
 
     <!-- Header -->
-    <div style="background:${isPending ? '#c07820' : '#d4785a'};padding:20px 24px;">
-      <div style="font-size:13px;font-weight:700;color:#fff;letter-spacing:1px;text-transform:uppercase;">Seshwars</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:4px;font-weight:600;">${isPending ? '⚠️ Content flagged for review' : 'New spot notification'}</div>
+    <div style="background:#d4785a;padding:20px 24px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+        <tr>
+          <td style="vertical-align:middle;width:40px;padding-right:10px;">
+            <img src="${LOGO_URL}" width="32" height="32" alt="Sesh Wars" style="display:block;width:32px;height:32px;border-radius:7px;" />
+          </td>
+          <td style="vertical-align:middle;">
+            <span style="font-size:18px;font-weight:900;color:#FDF8F0;letter-spacing:0.3px;">New Spot Added</span>
+          </td>
+        </tr>
+      </table>
+      <div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:8px;font-weight:600;">${isPending ? '⚠️ Content flagged for review' : 'New spot notification'}</div>
     </div>
 
     ${isPending ? `
@@ -140,6 +152,10 @@ serve(async (req) => {
         <tr>
           <td style="padding:8px 0;border-bottom:1px solid #EAD8C8;font-size:11px;font-weight:700;color:#9a8878;text-transform:uppercase;letter-spacing:0.5px;width:110px;">Type</td>
           <td style="padding:8px 0;border-bottom:1px solid #EAD8C8;font-size:12px;font-weight:700;color:#2a1e14;">${spot.type || '—'}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #EAD8C8;font-size:11px;font-weight:700;color:#9a8878;text-transform:uppercase;letter-spacing:0.5px;">Location</td>
+          <td style="padding:8px 0;border-bottom:1px solid #EAD8C8;font-size:12px;font-weight:700;color:#2a1e14;">${location}</td>
         </tr>
         <tr>
           <td style="padding:8px 0;border-bottom:1px solid #EAD8C8;font-size:11px;font-weight:700;color:#9a8878;text-transform:uppercase;letter-spacing:0.5px;">Bust Rating</td>

@@ -9,7 +9,8 @@ import { useSpots, useSavedSpots, useHiddenSpots } from './hooks/useSpots'
 import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
 import TabBar from './components/TabBar'
 import Logo from './components/Logo'
-import { PlusIcon, MapFoldedIcon, BookmarkIcon } from './components/Icons'
+import { PlusIcon } from './components/Icons'
+import { NAV_TABS } from './lib/navTabs'
 import SaveToListModal from './components/SaveToListModal'
 import ListView from './pages/ListView'
 import MapView from './pages/MapView'
@@ -25,12 +26,6 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 let _cachedUser = null
 let _authReady = false
 const SEARCH_RADIUS_MILES = 100 / 1.60934
-
-const TABS = [
-  { id: 'spots', label: 'Spots', Icon: MapFoldedIcon },
-  { id: 'saved', label: 'Saved', Icon: BookmarkIcon },
-  { id: 'profile', label: 'Profile', Icon: null },
-]
 
 function normalizeTab(t) {
   if (t === 'list' || t === 'map') return 'spots'
@@ -666,7 +661,7 @@ export default function App() {
 
           {/* Floating bottom nav pill */}
           <div className="desktop-float-nav">
-            {TABS.map(({ id, Icon }) => (
+            {NAV_TABS.map(({ id, label, Icon }) => (
               <div
                 key={id}
                 className={`tab-item ${effectiveTab === id ? 'active' : ''}`}
@@ -680,6 +675,7 @@ export default function App() {
                 ) : (
                   <Icon color="#ffffff" size={36} filled={tab === id} />
                 )}
+                <span className="tab-label">{label}</span>
               </div>
             ))}
           </div>

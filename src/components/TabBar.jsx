@@ -1,17 +1,12 @@
 import { useState } from 'react'
-import { MapFoldedIcon, BookmarkIcon } from './Icons'
+import { NAV_TABS } from '../lib/navTabs'
 
 export default function TabBar({ active, onChange, user, profileAvatar, profileInitials }) {
   const [avatarError, setAvatarError] = useState(false)
-  const tabs = [
-    { id: 'spots', label: 'Map', Icon: MapFoldedIcon },
-    { id: 'saved', label: 'Saved', Icon: BookmarkIcon },
-    { id: 'profile', label: 'Profile', Icon: null },
-  ]
 
   return (
     <div className="tab-bar">
-      {tabs.map(({ id, label, Icon }) => (
+      {NAV_TABS.map(({ id, label, Icon }) => (
         <div
           key={id}
           className="tab-item"
