@@ -12,6 +12,7 @@ import TermsOfService from './TermsOfService'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const DRAFT_KEY = 'seshwars_spot_draft'
+const MAX_PHOTO_BYTES = 25 * 1024 * 1024
 
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
@@ -145,21 +146,31 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     setUploadingPhotos(true)
     setPhotoUploadProgress({ current: 0, total: files.length })
     const urls = []
-    let hadError = false
+    const errors = []
     for (let i = 0; i < files.length; i++) {
       setPhotoUploadProgress({ current: i + 1, total: files.length })
       const file = files[i]
-      const compressed = await compressImage(file, 1200)
+      if (file.size > MAX_PHOTO_BYTES) {
+        errors.push(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB) — max size is 25MB.`)
+        continue
+      }
+      let compressed
+      try {
+        compressed = await compressImage(file, 1200)
+      } catch (err) {
+        errors.push(err.message || `${file.name} could not be processed.`)
+        continue
+      }
       const path = `spots/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
       const { error } = await supabase.storage.from('spot-photos').upload(path, compressed, { contentType: 'image/jpeg' })
       if (error) {
-        hadError = true
+        errors.push(`${file.name} failed to upload.`)
       } else {
         const { data: { publicUrl } } = supabase.storage.from('spot-photos').getPublicUrl(path)
         urls.push(publicUrl)
       }
     }
-    if (hadError) setPhotoError('Some photos failed to upload.')
+    if (errors.length) setPhotoError(errors.join(' '))
     setPhotos(prev => [...prev, ...urls])
     setUploadingPhotos(false)
     setPhotoUploadProgress({ current: 0, total: 0 })

@@ -13,11 +13,13 @@ import CommentsSection from '../components/CommentsSection'
 import { slugify } from '../utils/slugify'
 import { compressImage } from '../utils/compressImage'
 import { checkImageModeration } from '../utils/moderation'
+import { transformImageUrl } from '../utils/imageUrl'
 import TermsOfService from './TermsOfService'
 import { isAdminUser } from '../lib/admin'
 import { SPOT_FIELDS } from '../lib/spotFields'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
+const MAX_PHOTO_BYTES = 25 * 1024 * 1024
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
@@ -380,15 +382,29 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     if (!files.length) return
     setEditUploading(true)
     const urls = []
+    const errors = []
     for (const file of files) {
-      const compressed = await compressImage(file, 1200)
+      if (file.size > MAX_PHOTO_BYTES) {
+        errors.push(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB) — max size is 25MB.`)
+        continue
+      }
+      let compressed
+      try {
+        compressed = await compressImage(file, 1200)
+      } catch (err) {
+        errors.push(err.message || `${file.name} could not be processed.`)
+        continue
+      }
       const path = `spots/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
       const { error } = await supabase.storage.from('spot-photos').upload(path, compressed, { contentType: 'image/jpeg' })
       if (!error) {
         const { data: { publicUrl } } = supabase.storage.from('spot-photos').getPublicUrl(path)
         urls.push(publicUrl)
+      } else {
+        errors.push(`${file.name} failed to upload.`)
       }
     }
+    if (errors.length) setEditError(errors.join(' '))
     setEditPhotos(p => [...p, ...urls])
     setEditUploading(false)
   }
@@ -555,7 +571,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 transition: transitioning ? 'transform 0.28s cubic-bezier(0.25,0.1,0.25,1)' : 'none',
                 willChange: 'transform',
               }}>
-                <img src={photo} alt={spot.title} width="800" height="600" loading="eager" fetchpriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
+                <img src={transformImageUrl(photo, 1000)} alt={spot.title} width="800" height="600" loading="eager" fetchpriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
               </div>
             ))
           ) : (

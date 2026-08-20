@@ -1,5 +1,6 @@
 import { BookmarkIcon, ArrowIcon } from './Icons'
 import TagsRow from './TagsRow'
+import { transformImageUrl } from '../utils/imageUrl'
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
@@ -43,7 +44,7 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
     >
       <div className="spot-card-img">
         {spot.photos?.[0] ? (
-          <img src={spot.photos[0]} alt={spot.title} width="800" height="450" loading="lazy" decoding="async" />
+          <img src={transformImageUrl(spot.photos[0], 400)} alt={spot.title} width="800" height="450" loading="lazy" decoding="async" />
         ) : (
           <div style={{ width: '100%', height: '100%', background: isShop ? '#2e3344' : '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="60" height="34" viewBox="0 0 60 34" fill="none">

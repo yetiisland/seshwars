@@ -153,7 +153,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const handleCropConfirm = async (croppedFile) => {
     setCropFile(null)
     if (!user?.id) return
-    const compressed = await compressImage(croppedFile, 250, 0.8)
+    let compressed
+    try {
+      compressed = await compressImage(croppedFile, 250, 0.8)
+    } catch {
+      return
+    }
     const newPath = `${user.id}_${Date.now()}.jpg`
     const { error: upErr } = await supabase.storage.from('avatars').upload(newPath, compressed, { contentType: 'image/jpeg' })
     if (upErr) return
