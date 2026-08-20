@@ -187,7 +187,12 @@ export default function SpotPage() {
           saved={saved.has(spot.id)}
           onSavePress={(s) => { if (!user) { setShowAuth(true); return } setSaveModalSpot(s) }}
           onBack={handleBack}
-          onEditSuccess={(updatedSpot) => { if (updatedSpot) setSpot(prev => ({ ...prev, ...updatedSpot })); handleBack() }}
+          onEditSuccess={(updatedSpot) => {
+            // Edit success passes the saved row — merge it and stay on this page.
+            // Reject/delete call with no argument — the spot is gone, navigate away.
+            if (updatedSpot) setSpot(prev => ({ ...prev, ...updatedSpot }))
+            else handleBack()
+          }}
           user={user}
           onGoProfile={goToProfile}
           isHidden={hiddenIds.has(spot.id)}
