@@ -14,6 +14,17 @@ function spotsFingerprint(arr) {
   return arr.map(s => `${s.id}:${s.updated_at}:${s.report_count}`).join('|')
 }
 
+// Patches a single spot into the module-level cache so the next mount of
+// App.jsx (e.g. after navigating back from an edit) reads fresh data
+// immediately, without waiting on the 30s staleness gate in fetchSpots().
+// Preserves computed fields (avg_rating, report_count, ...) that aren't
+// part of the raw `spots` row returned by an update.
+export function mergeSpotIntoCache(updatedSpot) {
+  if (!updatedSpot?.id) return
+  _cachedSpots = _cachedSpots.map(s => (s.id === updatedSpot.id ? { ...s, ...updatedSpot } : s))
+  _lastFingerprint = spotsFingerprint(_cachedSpots)
+}
+
 export function useSpots() {
   const [spots, setSpots] = useState(_cachedSpots)
   const [loading, setLoading] = useState(!_spotsReady)

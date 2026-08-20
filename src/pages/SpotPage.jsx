@@ -187,7 +187,7 @@ export default function SpotPage() {
           saved={saved.has(spot.id)}
           onSavePress={(s) => { if (!user) { setShowAuth(true); return } setSaveModalSpot(s) }}
           onBack={handleBack}
-          onEditSuccess={handleBack}
+          onEditSuccess={(updatedSpot) => { if (updatedSpot) setSpot(prev => ({ ...prev, ...updatedSpot })); handleBack() }}
           user={user}
           onGoProfile={goToProfile}
           isHidden={hiddenIds.has(spot.id)}

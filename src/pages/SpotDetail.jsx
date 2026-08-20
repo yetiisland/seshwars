@@ -17,6 +17,7 @@ import { transformImageUrl } from '../utils/imageUrl'
 import TermsOfService from './TermsOfService'
 import { isAdminUser } from '../lib/admin'
 import { SPOT_FIELDS } from '../lib/spotFields'
+import { mergeSpotIntoCache } from '../hooks/useSpots'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024
@@ -452,8 +453,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       return
     }
     if (photosChanged) setModStatus(newModerationStatus)
+    mergeSpotIntoCache(data[0])
     setShowEditForm(false)
-    onEditSuccess?.()
+    onEditSuccess?.(data[0])
   }
 
   const handleReported = (reportType, customText) => {
