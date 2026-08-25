@@ -314,19 +314,31 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
       const feature = e.features[0]
       if (feature.properties?.cluster_id != null) {
         const map = mapRef.current.getMap()
-        map.getSource('spots').getClusterExpansionZoom(feature.properties.cluster_id)
-          .then(zoom => {
-            map.flyTo({
-              center: [feature.geometry.coordinates[0], feature.geometry.coordinates[1]],
-              zoom: zoom + 0.5,
-              duration: 500,
-              essential: true,
-            })
+        // getClusterExpansionZoom is callback-based, not Promise-based — calling
+        // .then() on it throws (it returns `this`), which silently killed every
+        // cluster click.
+        map.getSource('spots').getClusterExpansionZoom(feature.properties.cluster_id, (err, zoom) => {
+          if (err) return
+          map.easeTo({
+            center: [feature.geometry.coordinates[0], feature.geometry.coordinates[1]],
+            zoom,
+            duration: 500,
           })
+        })
         return
       }
     }
     setSelected(null)
+  }, [])
+
+  const handleClusterMouseEnter = useCallback(() => {
+    const map = mapRef.current?.getMap()
+    if (map) map.getCanvas().style.cursor = 'pointer'
+  }, [])
+
+  const handleClusterMouseLeave = useCallback(() => {
+    const map = mapRef.current?.getMap()
+    if (map) map.getCanvas().style.cursor = ''
   }, [])
 
   const mapStyle = satellite ? STYLE_SAT : baseStyle
@@ -351,6 +363,8 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           {...viewState}
           onMove={e => { _savedViewState = e.viewState; setViewState(e.viewState) }}
           onClick={handleMapClick}
+          onMouseEnter={handleClusterMouseEnter}
+          onMouseLeave={handleClusterMouseLeave}
           onIdle={updateUnclusteredIds}
           onLoad={updateUnclusteredIds}
           mapStyle={mapStyle}
