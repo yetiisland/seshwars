@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app'
 
 const PAGE_SIZE = 20
 
@@ -123,11 +124,9 @@ export function useNotifications(userId) {
     document.addEventListener('visibilitychange', handleVisibility)
     let capSub
     if (Capacitor.isNativePlatform()) {
-      import('@capacitor/app').then(({ App: CapApp }) => {
-        CapApp.addListener('appStateChange', ({ isActive }) => {
-          if (isActive) fetchUnreadCount()
-        }).then(s => { capSub = s })
-      }).catch(() => {})
+      CapApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) fetchUnreadCount()
+      }).then(s => { capSub = s }).catch(() => {})
     }
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility)
