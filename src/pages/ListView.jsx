@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Navbar from '../components/Navbar'
 import FiltersModal from '../components/FiltersModal'
 import SpotCard from '../components/SpotCard'
@@ -33,7 +33,7 @@ function LocationChip({ location, onClear }) {
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
-export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, sortBy, onSortChange, hasLocation, onHidePress }) {
+export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress, sortMode, onSortModeChange }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const filters = propFilters ?? localFilters
   const handleFiltersChange = onFiltersChange ?? setLocalFilters
@@ -69,7 +69,7 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
     onSpotClick(spot)
   }
 
-  const filtered = spots.filter(s => {
+  const filtered = useMemo(() => spots.filter(s => {
     if (filters.includes('All') || filters.length === 0) return true
     const _TYPES = new Set(['Street', 'DIY', 'Skatepark', 'Skate Shop'])
     const _BUSTS = new Set(['No Bust', 'Medium Bust', 'Bust', 'Weekends Only', 'Weekdays Only'])
@@ -83,24 +83,49 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
     if (selBusts.length > 0 && !selBusts.includes(s.bust_rating)) return false
     if (selLighting.length > 0 && !selLighting.includes(s.lighting)) return false
     return true
-  })
+  }), [spots, filters])
+
+  const sorted = useMemo(() => {
+    if (!sortMode) return filtered
+    if (sortMode === 'new') {
+      return [...filtered].sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+        return tb - ta
+      })
+    }
+    if (sortMode === 'rated') {
+      return [...filtered].sort((a, b) => {
+        const aRated = (a.rating_count || 0) > 0
+        const bRated = (b.rating_count || 0) > 0
+        if (aRated && bRated) return (b.avg_rating || 0) - (a.avg_rating || 0)
+        if (aRated) return -1
+        if (bRated) return 1
+        // Both unrated: fall back to distance sort
+        const ad = a.distance ?? Infinity
+        const bd = b.distance ?? Infinity
+        return ad - bd
+      })
+    }
+    return filtered
+  }, [filtered, sortMode])
 
   return (
     <>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
       {searchLocation && <LocationChip location={searchLocation} onClear={onClearSearch} />}
-      <FiltersModal active={filters} onChange={handleFiltersChange} distance={distance} onDistanceChange={onDistanceChange} sortBy={sortBy} onSortChange={onSortChange} hasLocation={hasLocation} />
+      <FiltersModal active={filters} onChange={handleFiltersChange} distance={distance} onDistanceChange={onDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} />
       <div className="scroll-area" ref={scrollRef}>
         <div style={{ padding: '0 0 2px', fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', paddingLeft: 16, marginBottom: 8 }}>
-          {loading ? 'Loading...' : `${filtered.length} spot${filtered.length !== 1 ? 's' : ''}`}
+          {loading ? 'Loading...' : `${sorted.length} spot${sorted.length !== 1 ? 's' : ''}`}
         </div>
         {loading ? (
           <div className="loading">Loading spots...</div>
-        ) : filtered.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <div className="loading">No spots found</div>
         ) : (
           <div className="spots-list-grid">
-            {filtered.map(spot => (
+            {sorted.map(spot => (
               <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} onHidePress={onHidePress} />
             ))}
           </div>

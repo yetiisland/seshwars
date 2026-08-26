@@ -7,6 +7,7 @@ import { isAdminUser } from './lib/admin'
 import AuthScreen from './pages/AuthScreen'
 import { useSpots, useSavedSpots, useHiddenSpots } from './hooks/useSpots'
 import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
+import { useNotifications } from './hooks/useNotifications'
 import TabBar from './components/TabBar'
 import Logo from './components/Logo'
 import { PlusIcon } from './components/Icons'
@@ -25,6 +26,10 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 // when navigating back from a spot page.
 let _cachedUser = null
 let _authReady = false
+// Module-level filter/sort cache — survives App unmount on spot navigation
+let _cachedFilters = ['All']
+let _cachedDistance = null
+let _cachedSortMode = null
 const SEARCH_RADIUS_MILES = 100 / 1.60934
 
 function normalizeTab(t) {
@@ -283,9 +288,9 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
 
-  const [filters, setFilters] = useState(['All'])
-  const [distanceRadius, setDistanceRadius] = useState(null)
-  const [sortBy, setSortBy] = useState(null)
+  const [filters, setFilters] = useState(_cachedFilters)
+  const [distanceRadius, setDistanceRadius] = useState(_cachedDistance)
+  const [sortMode, setSortMode] = useState(_cachedSortMode)
   const { spots, loading, refetch } = useSpots()
   const { saved, refetchSaved } = useSavedSpots(user?.id)
   const { hiddenIds, refetchHidden } = useHiddenSpots(user?.id)
@@ -295,6 +300,7 @@ export default function App() {
   const [saveModalSpot, setSaveModalSpot] = useState(null)
   const userLocation = useGeolocation()
   const isAdmin = isAdminUser(user)
+  const { notifications, unreadCount, loading: notifLoading, hasMore: notifHasMore, fetchNotifications, markRead, markAllRead } = useNotifications(user?.id)
 
   const showToast = (msg) => {
     setToast(msg)
@@ -320,6 +326,10 @@ export default function App() {
       return { ...s, distance: parseFloat(dist.toFixed(1)) }
     })
     if (searchLocation) {
+      if (searchLocation.isRegion) {
+        const lower = searchLocation.name.toLowerCase()
+        return baseSpots.filter(s => s.address && s.address.toLowerCase().includes(lower))
+      }
       return baseSpots
         .filter(s => s.latitude && s.longitude && s.distance <= SEARCH_RADIUS_MILES)
         .sort((a, b) => a.distance - b.distance)
@@ -356,34 +366,6 @@ export default function App() {
 
   const hasLocation = !!(userLocation || searchLocation)
 
-  // "Closest" depends on location; if it becomes unavailable (permission
-  // revoked, etc.) fall back to the default order instead of sorting on stale/missing distances
-  useEffect(() => {
-    if (sortBy === 'closest' && !hasLocation) setSortBy(null)
-  }, [sortBy, hasLocation])
-
-  const sortedSpots = useMemo(() => {
-    if (sortBy === 'closest' && hasLocation) {
-      return [...filteredByDistance].sort((a, b) => {
-        if (a.distance == null && b.distance == null) return 0
-        if (a.distance == null) return 1
-        if (b.distance == null) return -1
-        return a.distance - b.distance
-      })
-    }
-    if (sortBy === 'recent') {
-      return [...filteredByDistance].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    }
-    if (sortBy === 'rating') {
-      return [...filteredByDistance].sort((a, b) => {
-        if (a.avg_rating == null && b.avg_rating == null) return 0
-        if (a.avg_rating == null) return 1
-        if (b.avg_rating == null) return -1
-        return b.avg_rating - a.avg_rating
-      })
-    }
-    return filteredByDistance
-  }, [filteredByDistance, sortBy, hasLocation])
 
   useEffect(() => {
     let mounted = true
@@ -399,6 +381,10 @@ export default function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
+      if (event === 'PASSWORD_RECOVERY') {
+        navigate('/reset-password')
+        return
+      }
       const u = session?.user ?? null
       _cachedUser = u
       _authReady = true
@@ -460,6 +446,10 @@ export default function App() {
     window.addEventListener('seshwars:spots-changed', handler)
     return () => window.removeEventListener('seshwars:spots-changed', handler)
   }, [refetch])
+
+  const handleFiltersChange = (f) => { _cachedFilters = f; setFilters(f) }
+  const handleDistanceChange = (d) => { _cachedDistance = d; setDistanceRadius(d) }
+  const handleSortModeChange = (m) => { _cachedSortMode = m; setSortMode(m) }
 
   const openSearch = () => setShowSearch(s => !s)
   const closeSearch = () => setShowSearch(false)
@@ -580,7 +570,7 @@ export default function App() {
           <div className={`desktop-content${isMapActive ? '' : ' desktop-content-constrained'}`}>
             {effectiveTab === 'spots' && spotsView === 'list' && (
               <ListView
-                spots={sortedSpots}
+                spots={filteredByDistance}
                 loading={loading}
                 saved={saved}
                 onSavePress={handleSavePress}
@@ -591,20 +581,19 @@ export default function App() {
                 onClearSearch={handleClearSearch}
                 showNav={false}
                 filters={filters}
-                onFiltersChange={setFilters}
+                onFiltersChange={handleFiltersChange}
                 distance={distanceRadius}
-                onDistanceChange={setDistanceRadius}
-                sortBy={sortBy}
-                onSortChange={setSortBy}
-                hasLocation={hasLocation}
+                onDistanceChange={handleDistanceChange}
                 onHidePress={handleHidePress}
+                sortMode={sortMode}
+                onSortModeChange={handleSortModeChange}
               />
             )}
             {mapEverOpened && (
               <div style={{ display: isMapActive ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
                 <MapView
                   isActive={isMapActive}
-                  spots={sortedSpots}
+                  spots={filteredByDistance}
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}
@@ -613,12 +602,9 @@ export default function App() {
                   searchLocation={searchLocation}
                   showNav={false}
                   filters={filters}
-                  onFiltersChange={setFilters}
+                  onFiltersChange={handleFiltersChange}
                   distance={distanceRadius}
-                  onDistanceChange={setDistanceRadius}
-                  sortBy={sortBy}
-                  onSortChange={setSortBy}
-                  hasLocation={hasLocation}
+                  onDistanceChange={handleDistanceChange}
                   onHidePress={handleHidePress}
                 />
               </div>
@@ -645,6 +631,13 @@ export default function App() {
                 saved={saved}
                 onSavePress={handleSavePress}
                 onSpotClick={handleSpotClick}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                notifLoading={notifLoading}
+                notifHasMore={notifHasMore}
+                onFetchNotifications={fetchNotifications}
+                onMarkNotificationRead={markRead}
+                onMarkAllNotificationsRead={markAllRead}
               />
             )}
           </div>
@@ -669,8 +662,15 @@ export default function App() {
                 style={{ flex: 1 }}
               >
                 {id === 'profile' ? (
-                  <div style={{ width: 33, height: 33, borderRadius: '50%', background: profileAvatar ? 'transparent' : '#d4785a', border: tab === 'profile' ? '2.5px solid #fff' : '2.5px solid rgba(255,255,255,0.3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {profileAvatar ? <img src={profileAvatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{profileInitials}</span>}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{ width: 33, height: 33, borderRadius: '50%', background: profileAvatar ? 'transparent' : '#d4785a', border: tab === 'profile' ? '2.5px solid #fff' : '2.5px solid rgba(255,255,255,0.3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {profileAvatar ? <img src={profileAvatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{profileInitials}</span>}
+                    </div>
+                    {unreadCount > 0 && (
+                      <div style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: '#d4785a', border: '1.5px solid #3D4454', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                        <span style={{ fontSize: 8, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{unreadCount > 99 ? '99+' : String(unreadCount)}</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <Icon color="#ffffff" size={36} filled={tab === id} />
@@ -687,7 +687,7 @@ export default function App() {
             <>
               {effectiveTab === 'spots' && spotsView === 'list' && (
                 <ListView
-                  spots={sortedSpots}
+                  spots={filteredByDistance}
                   loading={loading}
                   saved={saved}
                   onSavePress={handleSavePress}
@@ -697,13 +697,12 @@ export default function App() {
                   searchLocation={searchLocation}
                   onClearSearch={handleClearSearch}
                   filters={filters}
-                  onFiltersChange={setFilters}
+                  onFiltersChange={handleFiltersChange}
                   distance={distanceRadius}
-                  onDistanceChange={setDistanceRadius}
-                  sortBy={sortBy}
-                  onSortChange={setSortBy}
-                  hasLocation={hasLocation}
+                  onDistanceChange={handleDistanceChange}
                   onHidePress={handleHidePress}
+                  sortMode={sortMode}
+                  onSortModeChange={handleSortModeChange}
                 />
               )}
               {effectiveTab === 'saved' && (
@@ -726,6 +725,13 @@ export default function App() {
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}
+                  notifications={notifications}
+                  unreadCount={unreadCount}
+                  notifLoading={notifLoading}
+                  notifHasMore={notifHasMore}
+                  onFetchNotifications={fetchNotifications}
+                  onMarkNotificationRead={markRead}
+                  onMarkAllNotificationsRead={markAllRead}
                 />
               )}
             </>
@@ -742,7 +748,7 @@ export default function App() {
             }}>
               <MapView
                 isActive={isMapActive && !showAdd}
-                spots={sortedSpots}
+                spots={filteredByDistance}
                 saved={saved}
                 onSavePress={handleSavePress}
                 onSpotClick={handleSpotClick}
@@ -751,12 +757,9 @@ export default function App() {
                 searchLocation={searchLocation}
                 onSearch={openSearch}
                 filters={filters}
-                onFiltersChange={setFilters}
+                onFiltersChange={handleFiltersChange}
                 distance={distanceRadius}
-                onDistanceChange={setDistanceRadius}
-                sortBy={sortBy}
-                onSortChange={setSortBy}
-                hasLocation={hasLocation}
+                onDistanceChange={handleDistanceChange}
                 onHidePress={handleHidePress}
               />
             </div>
@@ -772,7 +775,7 @@ export default function App() {
             </div>
           )}
 
-          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} />}
+          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} />}
 
           {toast && (
             <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, right: 16, zIndex: 2001, background: '#2a1e14', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, textAlign: 'center', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', letterSpacing: 0.3 }}>

@@ -61,6 +61,8 @@ export default function SaveToListModal({ spot, user, onClose }) {
     setLoading(false)
   }
 
+  const notifyListsChanged = () => window.dispatchEvent(new Event('seshwars:lists-changed'))
+
   const toggleFavorites = async () => {
     if (isFav) {
       await supabase.from('saved_spots')
@@ -86,6 +88,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
         .insert({ user_id: user.id, spot_id: spot.id, list_id: listId })
       setListItems(prev => new Set([...prev, listId]))
     }
+    notifyListsChanged()
   }
 
   const createList = async () => {
@@ -100,6 +103,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
         .insert({ user_id: user.id, spot_id: spot.id, list_id: data.id })
       setLists(prev => [...prev, data])
       setListItems(prev => new Set([...prev, data.id]))
+      notifyListsChanged()
     }
     setNewListName('')
     setCreatingList(false)

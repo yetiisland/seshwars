@@ -147,15 +147,20 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           if (data.first_name) setPublisherInitial(data.first_name[0].toUpperCase())
           if (data.username) setPublisherUsername(data.username)
           else if (data.first_name) setPublisherUsername(data.first_name)
-        } else if (isOwner && user?.id) {
-          // Legacy spot: added_by stored old username that no longer matches — fall back to current user profile
-          supabase.from('profiles').select('avatar_url, first_name, username').eq('id', user.id).maybeSingle()
-            .then(({ data: d }) => {
-              if (d?.avatar_url) setPublisherAvatar(d.avatar_url)
-              if (d?.first_name) setPublisherInitial(d.first_name[0].toUpperCase())
-              if (d?.username) setPublisherUsername(d.username)
-              else if (d?.first_name) setPublisherUsername(d.first_name)
-            })
+        } else {
+          // Profile not found. For non-UUID added_by, show the raw value so old spots
+          // always have attribution regardless of auth state.
+          if (!isUUID) setPublisherUsername(spot.added_by)
+          if (isOwner && user?.id) {
+            // Also try current user's profile for the avatar/current username
+            supabase.from('profiles').select('avatar_url, first_name, username').eq('id', user.id).maybeSingle()
+              .then(({ data: d }) => {
+                if (d?.avatar_url) setPublisherAvatar(d.avatar_url)
+                if (d?.first_name) setPublisherInitial(d.first_name[0].toUpperCase())
+                if (d?.username) setPublisherUsername(d.username)
+                else if (d?.first_name) setPublisherUsername(d.first_name)
+              })
+          }
         }
       })
     }
@@ -643,26 +648,39 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               ))}
             </div>
           )}
-          {/* Caution indicator — bottom left */}
-          {liveReport?.most_recent_report
-            ? liveReport.most_recent_report !== 'Skateable Again'
-            : (spot.most_recent_report && spot.most_recent_report !== 'Skateable Again')
-          ? (
-            <div style={{ position: 'absolute', bottom: 14, left: 12, zIndex: 10, background: '#f5c518', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4, maxWidth: 'calc(100% - 24px)' }}>
-              <svg width="9" height="8" viewBox="0 0 18 16" fill="none">
-                <path d="M9 1L17 15H1L9 1Z" stroke="#000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
-                <line x1="9" y1="5.5" x2="9" y2="10" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
-                <circle cx="9" cy="12.5" r="0.9" fill="#000" />
-              </svg>
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {(() => {
-                  const r = liveReport?.most_recent_report ?? spot.most_recent_report
-                  const rc = liveReport?.most_recent_report_custom ?? spot.most_recent_report_custom
-                  return r === 'Other' ? (rc || 'Spot Reported') : r
-                })()}
-              </span>
-            </div>
-          ) : null}
+          {/* Caution + visibility chips — bottom left */}
+          {(() => {
+            const hasReport = liveReport?.most_recent_report
+              ? liveReport.most_recent_report !== 'Skateable Again'
+              : (spot.most_recent_report && spot.most_recent_report !== 'Skateable Again')
+            const hasVisibility = spot.visibility && spot.visibility !== 'public'
+            if (!hasReport && !hasVisibility) return null
+            return (
+              <div style={{ position: 'absolute', bottom: 14, left: 12, zIndex: 10, display: 'flex', gap: 4, alignItems: 'center', maxWidth: 'calc(100% - 24px)' }}>
+                {hasReport && (
+                  <div style={{ background: '#f5c518', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, minWidth: 0 }}>
+                    <svg width="9" height="8" viewBox="0 0 18 16" fill="none" style={{ flexShrink: 0 }}>
+                      <path d="M9 1L17 15H1L9 1Z" stroke="#000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+                      <line x1="9" y1="5.5" x2="9" y2="10" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
+                      <circle cx="9" cy="12.5" r="0.9" fill="#000" />
+                    </svg>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {(() => {
+                        const r = liveReport?.most_recent_report ?? spot.most_recent_report
+                        const rc = liveReport?.most_recent_report_custom ?? spot.most_recent_report_custom
+                        return r === 'Other' ? (rc || 'Spot Reported') : r
+                      })()}
+                    </span>
+                  </div>
+                )}
+                {hasVisibility && (
+                  <div style={{ background: spot.visibility === 'private' ? 'rgba(42,30,20,0.78)' : 'rgba(70,55,35,0.72)', borderRadius: 6, padding: '4px 8px', flexShrink: 0 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility}</span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* ── Content ───────────────────────────────────────── */}

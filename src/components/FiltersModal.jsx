@@ -6,23 +6,14 @@ const typeField = SPOT_FIELDS.find(f => f.key === 'type')
 const TYPE_OPTIONS = ['All', ...typeField.options]
 const filterableFields = SPOT_FIELDS.filter(f => f.filterable && f.key !== 'type')
 const DISTANCE_OPTIONS = [null, 5, 10, 25, 50, 100]
-const SORT_OPTIONS = [
-  { key: 'closest', label: 'Closest' },
-  { key: 'recent', label: 'Recently Added' },
-  { key: 'rating', label: 'Top Rated' },
-]
-
-export default function FiltersModal({ active, onChange, compact = false, distance, onDistanceChange, sortBy, onSortChange, hasLocation }) {
+export default function FiltersModal({ active, onChange, compact = false, distance, onDistanceChange, sortMode, onSortModeChange }) {
   const [open, setOpen] = useState(false)
   const [distanceOpen, setDistanceOpen] = useState(false)
-  const [sortOpen, setSortOpen] = useState(false)
   const [filterClosing, setFilterClosing] = useState(false)
   const [distClosing, setDistClosing] = useState(false)
-  const [sortClosing, setSortClosing] = useState(false)
 
   const closeFilter = () => { setFilterClosing(true); setTimeout(() => { setFilterClosing(false); setOpen(false) }, 180) }
   const closeDist = () => { setDistClosing(true); setTimeout(() => { setDistClosing(false); setDistanceOpen(false) }, 180) }
-  const closeSort = () => { setSortClosing(true); setTimeout(() => { setSortClosing(false); setSortOpen(false) }, 180) }
   const activeArr = Array.isArray(active) ? active : [active]
   const activeFilters = activeArr.filter(f => f !== 'All')
   const hasActive = activeFilters.length > 0
@@ -107,24 +98,36 @@ export default function FiltersModal({ active, onChange, compact = false, distan
           </span>
         </div>
 
-        {/* Sort chip */}
-        <div
-          onClick={() => setSortOpen(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
-            background: sortBy ? '#d4785a' : '#FDF8F0',
-            border: '1.5px solid #d4785a',
-            borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
-          }}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M3 0L3 8M3 0L0.5 2.5M3 0L5.5 2.5" stroke={chipColor(!!sortBy)} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M7 10L7 2M7 10L4.5 7.5M7 10L9.5 7.5" stroke={chipColor(!!sortBy)} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span style={{ fontSize: 10, fontWeight: 700, color: chipColor(!!sortBy), letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
-            {sortBy ? `Sort: ${SORT_OPTIONS.find(o => o.key === sortBy)?.label}` : 'Sort'}
-          </span>
-        </div>
+        {onSortModeChange && (
+          <>
+            <div
+              onClick={() => onSortModeChange(sortMode === 'new' ? null : 'new')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+                background: sortMode === 'new' ? '#d4785a' : '#FDF8F0',
+                border: '1.5px solid #d4785a',
+                borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 700, color: sortMode === 'new' ? '#fff' : '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
+                New Spots
+              </span>
+            </div>
+            <div
+              onClick={() => onSortModeChange(sortMode === 'rated' ? null : 'rated')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+                background: sortMode === 'rated' ? '#d4785a' : '#FDF8F0',
+                border: '1.5px solid #d4785a',
+                borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 700, color: sortMode === 'rated' ? '#fff' : '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
+                Top Rated
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Filters sheet */}
@@ -226,48 +229,6 @@ export default function FiltersModal({ active, onChange, compact = false, distan
         document.body
       )}
 
-      {/* Sort sheet */}
-      {(sortOpen || sortClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeSort}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={sortClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
-            <div className="modal-handle" />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px 12px' }}>
-              <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Sort By</div>
-              {sortBy && (
-                <div onClick={() => { onSortChange?.(null); closeSort() }} style={{ fontSize: 11, color: 'var(--salmon)', fontWeight: 700, cursor: 'pointer' }}>Clear</div>
-              )}
-            </div>
-            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column' }}>
-              {SORT_OPTIONS.map(opt => {
-                const isSelected = sortBy === opt.key
-                const isDisabled = opt.key === 'closest' && !hasLocation
-                return (
-                  <div
-                    key={opt.key}
-                    onClick={() => { if (isDisabled) return; onSortChange?.(opt.key); closeSort() }}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '12px 4px', borderBottom: '1px solid #f0e8de',
-                      cursor: isDisabled ? 'not-allowed' : 'pointer',
-                      opacity: isDisabled ? 0.4 : 1,
-                    }}
-                  >
-                    <span style={{ fontSize: 13, fontWeight: isSelected ? 700 : 600, color: isSelected ? '#d4785a' : 'var(--text-primary)', fontFamily: 'Barlow, sans-serif' }}>
-                      {opt.label}{isDisabled ? ' (location unavailable)' : ''}
-                    </span>
-                    {isSelected && (
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path d="M2 7L6 11L12 3" stroke="#d4785a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </>
   )
 }

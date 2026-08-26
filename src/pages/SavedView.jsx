@@ -16,6 +16,15 @@ const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 let _savedOpenCollection = null
 let _savedCollectionScrollTop = 0
 
+// Module-level list cache: prevents refetch on every tab switch
+let _cachedLists = []
+let _cachedListSpotIds = {}
+let _listsUserId = null
+
+export function invalidateListsCache() {
+  _listsUserId = null
+}
+
 function generateShareToken() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
   const arr = new Uint8Array(12)
@@ -56,6 +65,9 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
     setDeleting(true)
     await supabase.from('saved_spots').delete().eq('list_id', listId)
     await supabase.from('spot_lists').delete().eq('id', listId)
+    _cachedLists = _cachedLists.filter(l => l.id !== listId)
+    const { [listId]: _removed, ...rest } = _cachedListSpotIds
+    _cachedListSpotIds = rest
     setDeleting(false)
     setShowDeleteConfirm(false)
     onListDeleted?.()
@@ -244,8 +256,8 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
 }
 
 export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, showNav = true, user }) {
-  const [lists, setLists] = useState([])
-  const [listSpotIds, setListSpotIds] = useState({})
+  const [lists, setLists] = useState(() => _listsUserId === user?.id ? _cachedLists : [])
+  const [listSpotIds, setListSpotIds] = useState(() => _listsUserId === user?.id ? _cachedListSpotIds : {})
   const [openCollection, setOpenCollection] = useState(_savedOpenCollection)
   const [showCreateList, setShowCreateList] = useState(false)
   const [newListName, setNewListName] = useState('')
@@ -253,26 +265,38 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
 
   useEffect(() => {
     if (!user?.id) return
+    if (_listsUserId === user.id) return
     fetchLists()
   }, [user?.id])
 
+  // Refetch when a list was modified externally (e.g. SaveToListModal)
+  useEffect(() => {
+    const handler = () => fetchLists()
+    window.addEventListener('seshwars:lists-changed', handler)
+    return () => window.removeEventListener('seshwars:lists-changed', handler)
+  }, [user?.id])
+
   const fetchLists = async () => {
+    if (!user?.id) return
     const { data: listsData } = await supabase
       .from('spot_lists').select('*').eq('user_id', user.id).order('created_at')
-    setLists(listsData || [])
+    const map = {}
     if (listsData?.length > 0) {
       const { data: items } = await supabase
         .from('saved_spots')
         .select('list_id, spot_id')
         .eq('user_id', user.id)
         .not('list_id', 'is', null)
-      const map = {}
       for (const item of (items || [])) {
         if (!map[item.list_id]) map[item.list_id] = new Set()
         map[item.list_id].add(item.spot_id)
       }
-      setListSpotIds(map)
     }
+    _cachedLists = listsData || []
+    _cachedListSpotIds = map
+    _listsUserId = user.id
+    setLists(_cachedLists)
+    setListSpotIds(_cachedListSpotIds)
   }
 
   const savedSpots = spots.filter(s => saved.has(s.id))
@@ -286,7 +310,10 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     if (!newListName.trim() || !user?.id) return
     setCreating(true)
     const { data } = await supabase.from('spot_lists').insert({ user_id: user.id, name: newListName.trim() }).select().single()
-    if (data) setLists(prev => [...prev, data])
+    if (data) {
+      _cachedLists = [..._cachedLists, data]
+      setLists(_cachedLists)
+    }
     setNewListName('')
     setShowCreateList(false)
     setCreating(false)

@@ -13,6 +13,11 @@ function countSpotsNear(spots, lat, lng) {
   }).length
 }
 
+function countSpotsInState(spots, stateName) {
+  const lower = stateName.toLowerCase()
+  return spots.filter(s => s.address && s.address.toLowerCase().includes(lower)).length
+}
+
 function getState(context = []) {
   return context.find(c => c.id?.startsWith('region'))?.text || ''
 }
@@ -68,15 +73,21 @@ export default function SearchPage({ spots, onSelect, onClose }) {
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?types=place,region,postcode&country=US&access_token=${MAPBOX_TOKEN}&limit=5`
         )
         const data = await res.json()
-        setSuggestions((data.features || []).map(f => ({
-          id: f.id,
-          name: f.text,
-          placeName: f.place_name,
-          stateName: getState(f.context),
-          longitude: f.geometry.coordinates[0],
-          latitude: f.geometry.coordinates[1],
-          spotCount: countSpotsNear(spots, f.geometry.coordinates[1], f.geometry.coordinates[0]),
-        })))
+        setSuggestions((data.features || []).map(f => {
+          const isRegion = f.id?.startsWith('region.')
+          return {
+            id: f.id,
+            name: f.text,
+            placeName: f.place_name,
+            stateName: getState(f.context),
+            longitude: f.geometry.coordinates[0],
+            latitude: f.geometry.coordinates[1],
+            isRegion,
+            spotCount: isRegion
+              ? countSpotsInState(spots, f.text)
+              : countSpotsNear(spots, f.geometry.coordinates[1], f.geometry.coordinates[0]),
+          }
+        }))
       } catch { setSuggestions([]) }
       setLoading(false)
     }, 300)
@@ -91,6 +102,7 @@ export default function SearchPage({ spots, onSelect, onClose }) {
       longitude: item.longitude,
       latitude: item.latitude,
       spotCount: item.spotCount ?? 0,
+      isRegion: item.isRegion || false,
     }
     try {
       const prev = JSON.parse(localStorage.getItem(LS_RECENT_KEY) || '[]')
@@ -111,16 +123,15 @@ export default function SearchPage({ spots, onSelect, onClose }) {
         padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
         background: '#FDF8F0', flexShrink: 0,
       }}>
-        <div style={{ width: 36 }} />
-        <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-          Search an Area
-        </div>
         <div onClick={onClose} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-            <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
+        <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+          Search Spots
+        </div>
+        <div style={{ width: 36 }} />
       </div>
 
       {/* Search input */}

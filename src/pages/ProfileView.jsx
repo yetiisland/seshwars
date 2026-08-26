@@ -19,7 +19,28 @@ let _cachedHiddenIds = null
 let _hiddenIdsUserId = null
 let _hiddenIdsLastFetched = 0
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick }) {
+function relativeTime(iso) {
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'Just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 7) return `${d}d ago`
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function notifMessage(n) {
+  if (n.type === 'admin_update') return 'Updates have been made to your spot by the Sesh Wars Admin Account'
+  const who = n.actorUsername || 'Someone'
+  if (n.type === 'rating') return `${who} rated your spot`
+  if (n.type === 'comment') return `${who} commented on your spot`
+  if (n.type === 'report') return `${who} reported your spot`
+  return `${who} interacted with your spot`
+}
+
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -29,6 +50,17 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [showMySpots, setShowMySpots] = useState(() => sessionStorage.getItem('mySpots:open') === '1')
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [notifsFetched, setNotifsFetched] = useState(false)
+  // Update password modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [pwModalClosing, setPwModalClosing] = useState(false)
+  const [pwCurrent, setPwCurrent] = useState('')
+  const [pwNew, setPwNew] = useState('')
+  const [pwConfirm, setPwConfirm] = useState('')
+  const [pwError, setPwError] = useState('')
+  const [pwSuccess, setPwSuccess] = useState(false)
+  const [pwLoading, setPwLoading] = useState(false)
   const mySpotsScrollRef = useRef(null)
   const mySpotsScrollRestoredRef = useRef(false)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
@@ -193,6 +225,41 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     setProfileDirect({ ...storeProfile, avatar_url: null }, user)
   }
 
+  const openPasswordModal = () => {
+    setPwCurrent(''); setPwNew(''); setPwConfirm(''); setPwError(''); setPwSuccess(false)
+    setShowPasswordModal(true)
+  }
+  const closePasswordModal = () => {
+    setPwModalClosing(true)
+    setTimeout(() => { setPwModalClosing(false); setShowPasswordModal(false) }, 180)
+  }
+  const handleUpdatePassword = async () => {
+    if (pwNew !== pwConfirm) { setPwError('New passwords do not match.'); return }
+    if (pwNew.length < 6) { setPwError('Password must be at least 6 characters.'); return }
+    setPwError(''); setPwLoading(true)
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email: user.email, password: pwCurrent })
+    if (authErr) { setPwError('Current password is incorrect.'); setPwLoading(false); return }
+    const { error: updateErr } = await supabase.auth.updateUser({ password: pwNew })
+    setPwLoading(false)
+    if (updateErr) { setPwError(updateErr.message); return }
+    setPwSuccess(true)
+    setTimeout(() => closePasswordModal(), 1800)
+  }
+
+  const openNotifications = () => {
+    setShowNotifications(true)
+    if (!notifsFetched) {
+      onFetchNotifications?.(true)
+      setNotifsFetched(true)
+    }
+  }
+
+  const handleNotifTap = async (notif) => {
+    if (!notif.spotSlug && !notif.spot_id) return
+    await onMarkNotificationRead?.(notif.id)
+    if (notif.spotSlug) onSpotClick?.({ slug: notif.spotSlug, id: notif.spot_id })
+  }
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
   }
@@ -329,6 +396,28 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>@{storeProfile.username || identifier}</div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{user.email}</div>
             </div>
+            {/* Bell icon — notifications */}
+            <div
+              onClick={openNotifications}
+              style={{ position: 'relative', width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="#d4785a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M13.73 21a2 2 0 01-3.46 0" stroke="#d4785a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {unreadCount > 0 && (
+                <div style={{
+                  position: 'absolute', top: -6, right: -6,
+                  minWidth: 17, height: 17, borderRadius: 9,
+                  background: '#d4785a', border: '1.5px solid #FDF8F0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+                }}>
+                  <span style={{ fontSize: 9, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Edit button below name */}
@@ -368,6 +457,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 <input className="form-input" placeholder="Username" value={editDraft.username} onChange={e => setEditDraft(p => ({ ...p, username: e.target.value }))} />
               </div>
               <button className="btn-salmon" onClick={handleSaveProfile} disabled={saving}>{saving ? 'Saving...' : 'Save Profile'}</button>
+              <button
+                onClick={openPasswordModal}
+                style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+              >
+                Update Password
+              </button>
             </div>
           )}
 
@@ -690,6 +785,128 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         document.body
       )}
       </div>{/* end content wrapper */}
+
+      {/* Update Password modal */}
+      {(showPasswordModal || pwModalClosing) && createPortal(
+        <div className="modal-overlay" onClick={closePasswordModal}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={pwModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+            <div className="modal-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px 12px' }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Update Password</div>
+              <div onClick={closePasswordModal} style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                  <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+            {pwSuccess ? (
+              <div style={{ padding: '20px 16px 28px', textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#4caf50' }}>Password updated successfully!</div>
+            ) : (
+              <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <div className="section-label" style={{ marginBottom: 4 }}>Current Password</div>
+                  <input className="form-input" type="password" placeholder="Current password" value={pwCurrent} onChange={e => setPwCurrent(e.target.value)} />
+                </div>
+                <div>
+                  <div className="section-label" style={{ marginBottom: 4 }}>New Password</div>
+                  <input className="form-input" type="password" placeholder="New password" value={pwNew} onChange={e => setPwNew(e.target.value)} />
+                </div>
+                <div>
+                  <div className="section-label" style={{ marginBottom: 4 }}>Confirm New Password</div>
+                  <input className="form-input" type="password" placeholder="Confirm new password" value={pwConfirm} onChange={e => setPwConfirm(e.target.value)} />
+                </div>
+                {pwError && (
+                  <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700 }}>{pwError}</div>
+                )}
+                <button
+                  onClick={handleUpdatePassword}
+                  disabled={pwLoading}
+                  style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: pwLoading ? 0.6 : 1 }}
+                >
+                  {pwLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Notifications overlay — full screen */}
+      {showNotifications && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+            background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
+          }}>
+            <div onClick={() => setShowNotifications(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+              Notifications
+            </div>
+            {unreadCount > 0 ? (
+              <div onClick={() => onMarkAllNotificationsRead?.()} style={{ fontSize: 11, fontWeight: 700, color: '#d4785a', cursor: 'pointer', flexShrink: 0 }}>
+                Mark all read
+              </div>
+            ) : (
+              <div style={{ width: 36 }} />
+            )}
+          </div>
+          <div className="scroll-area">
+            {notifLoading && notifications.length === 0 ? (
+              <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>Loading...</div>
+            ) : notifications.length === 0 ? (
+              <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No notifications yet</div>
+            ) : (
+              <>
+                {notifications.map(n => (
+                  <div
+                    key={n.id}
+                    onClick={() => handleNotifTap(n)}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 12,
+                      padding: '14px 16px',
+                      borderBottom: '1px solid #f0e8de',
+                      background: !n.read_at ? 'rgba(212,120,90,0.06)' : 'transparent',
+                      cursor: n.spotSlug || n.spot_id ? 'pointer' : 'default',
+                    }}
+                  >
+                    <div style={{ flexShrink: 0, width: 8, marginTop: 4 }}>
+                      {!n.read_at && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#d4785a' }} />}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: n.read_at ? 600 : 700, color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: 4 }}>
+                        {notifMessage(n)}
+                      </div>
+                      {n.spotTitle && (
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 2 }}>{n.spotTitle}</div>
+                      )}
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                        {relativeTime(n.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {notifHasMore && (
+                  <div
+                    onClick={() => onFetchNotifications?.()}
+                    style={{ padding: 16, textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#d4785a', cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase' }}
+                  >
+                    Load More
+                  </div>
+                )}
+              </>
+            )}
+            <div style={{ height: BOTTOM_PAD }} />
+          </div>
+        </div>,
+        document.body
+      )}
 
     </>
   )
