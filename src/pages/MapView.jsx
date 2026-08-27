@@ -373,7 +373,6 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           interactiveLayerIds={['clusters']}
           onError={() => { if (!satellite) setBaseStyle(STYLE_LIGHT) }}
           minZoom={2}
-          maxBounds={[[-180, -85.05], [180, 85.05]]}
         >
           <Source id="spots" type="geojson" data={geojson} cluster={true} clusterMaxZoom={9} clusterRadius={50}>
             <Layer {...clusterCircleLayer} />
