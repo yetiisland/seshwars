@@ -151,7 +151,7 @@ export default function AuthScreen({ onClose }) {
         }}
         tabIndex={-1}
       >
-        <EyeIcon visible={showPass} />
+        <EyeIcon visible={!showPass} />
       </button>
     </div>
   )
@@ -250,7 +250,7 @@ export default function AuthScreen({ onClose }) {
               />
               <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPass(v => !v)}
                 style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }} tabIndex={-1}>
-                <EyeIcon visible={showPass} />
+                <EyeIcon visible={!showPass} />
               </button>
             </div>
             {error && <div style={{ color: '#d9534f', fontSize: 11, fontWeight: 700, marginTop: 4 }}>{error}</div>}
@@ -322,7 +322,7 @@ export default function AuthScreen({ onClose }) {
               />
               <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPass(v => !v)}
                 style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }} tabIndex={-1}>
-                <EyeIcon visible={showPass} />
+                <EyeIcon visible={!showPass} />
               </button>
             </div>
             {/* Username last — readOnly until tapped so iOS autofill cannot inject an email */}

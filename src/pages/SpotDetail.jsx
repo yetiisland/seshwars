@@ -655,7 +655,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             return (
               <div style={{ position: 'absolute', bottom: 14, left: 12, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', maxWidth: 'calc(100% - 24px)' }}>
                 {hasVisibility && (
-                  <div style={{ background: 'rgba(212,120,90,0.22)', border: '1px solid #d4785a', borderRadius: 6, padding: '4px 10px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ background: '#3D4454', border: '1px solid #2e3344', borderRadius: 6, padding: '4px 10px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
                       <rect x="1" y="4.5" width="6" height="5" rx="1" stroke="#fff" strokeWidth="1.1" />
                       <path d="M2 4.5V3a2 2 0 014 0v1.5" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
@@ -721,13 +721,13 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
           {/* Publisher row */}
           {(publisherAvatar || publisherUsername || spot.added_by === null) && (
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, minWidth: 0, gap: 8 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', flexShrink: 0 }}>Added by</span>
+            <div style={{ display: 'flex', flexDirection: 'column', marginBottom: 12, gap: 4 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Added by</span>
               {spot.added_by === null ? (
                 <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700 }}>Anonymous</span>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
                     {publisherAvatar ? (
                       <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (

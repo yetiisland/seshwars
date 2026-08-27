@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
                   style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
                   tabIndex={-1}
                 >
-                  <EyeIcon visible={showPass} />
+                  <EyeIcon visible={!showPass} />
                 </button>
               </div>
 
@@ -120,7 +120,7 @@ export default function ResetPasswordPage() {
                   style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
                   tabIndex={-1}
                 >
-                  <EyeIcon visible={showConfirm} />
+                  <EyeIcon visible={!showConfirm} />
                 </button>
               </div>
 

@@ -54,6 +54,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifsFetched, setNotifsFetched] = useState(false)
   // Update password modal state
+  const [showEditSheet, setShowEditSheet] = useState(false)
+  const [editSheetClosing, setEditSheetClosing] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [pwModalClosing, setPwModalClosing] = useState(false)
   const [pwCurrent, setPwCurrent] = useState('')
@@ -178,6 +180,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     setProfileDirect({ ...storeProfile, ...editDraft }, user)
     setSaving(false)
     setEditDraft(null)
+    setShowEditSheet(false)
   }
 
   const handleAvatarUpload = (e) => {
@@ -245,6 +248,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       )}
     </svg>
   )
+
+  const openEditSheet = () => {
+    setEditDraft({ username: storeProfile.username, first_name: storeProfile.first_name, last_name: storeProfile.last_name })
+    setShowEditSheet(true)
+  }
+  const closeEditSheet = () => {
+    setEditSheetClosing(true)
+    setTimeout(() => { setEditSheetClosing(false); setShowEditSheet(false); setEditDraft(null) }, 180)
+  }
 
   const openPasswordModal = () => {
     setPwCurrent(''); setPwNew(''); setPwConfirm(''); setPwError(''); setPwSuccess(false)
@@ -350,7 +362,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPassAuth(v => !v)}
                 style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
                 tabIndex={-1}>
-                <EyeIcon visible={showPassAuth} />
+                <EyeIcon visible={!showPassAuth} />
               </button>
             </div>
             {error && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700 }}>{error}</div>}
@@ -456,7 +468,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           {/* Edit button below name */}
           <div style={{ marginBottom: 20 }}>
             <div
-              onClick={() => editDraft ? setEditDraft(null) : setEditDraft({ username: storeProfile.username, first_name: storeProfile.first_name, last_name: storeProfile.last_name })}
+              onClick={openEditSheet}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 border: '1px solid rgba(212,120,90,0.5)', borderRadius: 6,
@@ -467,37 +479,11 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 <path d="M9.5 2L12 4.5L5 11.5H2.5V9L9.5 2Z" stroke="#d4785a" strokeWidth="1.3" strokeLinejoin="round" />
               </svg>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--salmon)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                {editDraft ? 'Cancel' : 'Edit Profile'}
+                Edit Profile
               </span>
             </div>
           </div>
 
-          {/* Edit fields */}
-          {editDraft && (
-            <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div className="section-label" style={{ marginBottom: 4 }}>First Name</div>
-                  <input className="form-input" placeholder="First name" value={editDraft.first_name} onChange={e => setEditDraft(p => ({ ...p, first_name: e.target.value }))} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div className="section-label" style={{ marginBottom: 4 }}>Last Name</div>
-                  <input className="form-input" placeholder="Last name" value={editDraft.last_name} onChange={e => setEditDraft(p => ({ ...p, last_name: e.target.value }))} />
-                </div>
-              </div>
-              <div>
-                <div className="section-label" style={{ marginBottom: 4 }}>Username</div>
-                <input className="form-input" placeholder="Username" value={editDraft.username} onChange={e => setEditDraft(p => ({ ...p, username: e.target.value }))} />
-              </div>
-              <button className="btn-salmon" onClick={handleSaveProfile} disabled={saving}>{saving ? 'Saving...' : 'Save Profile'}</button>
-              <button
-                onClick={openPasswordModal}
-                style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
-              >
-                Update Password
-              </button>
-            </div>
-          )}
 
           {/* Stats */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
@@ -810,6 +796,81 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       )}
       </div>{/* end content wrapper */}
 
+      {/* Edit Profile sheet */}
+      {(showEditSheet || editSheetClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeEditSheet}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto', ...(editSheetClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : {}) }}>
+            <div className="modal-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px 16px' }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Edit Profile</div>
+              <div onClick={closeEditSheet} style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                  <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Avatar */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+                <div style={{ position: 'relative', width: 72, height: 72 }}>
+                  <div
+                    onClick={() => avatarRef.current?.click()}
+                    style={{ width: 72, height: 72, borderRadius: '50%', background: '#ECEDF2', border: '2px solid #C8CAD4', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer' }}
+                  >
+                    {storeProfile.avatar_url ? (
+                      <img src={storeProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: 28, fontWeight: 900, color: '#6a6c7a' }}>{storeProfile.initials}</span>
+                    )}
+                  </div>
+                  <div
+                    onClick={() => avatarRef.current?.click()}
+                    style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.42)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" />
+                      <path d="M14.5 5.5l4 4" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  {storeProfile.avatar_url && (
+                    <div onClick={handleRemoveAvatar} style={{ position: 'absolute', top: 0, right: 0, width: 20, height: 20, borderRadius: '50%', background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                      <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><line x1="1" y1="1" x2="7" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /><line x1="7" y1="1" x2="1" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /></svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {editDraft && (
+                <>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div className="section-label" style={{ marginBottom: 4 }}>First Name</div>
+                      <input className="form-input" placeholder="First name" value={editDraft.first_name} onChange={e => setEditDraft(p => ({ ...p, first_name: e.target.value }))} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div className="section-label" style={{ marginBottom: 4 }}>Last Name</div>
+                      <input className="form-input" placeholder="Last name" value={editDraft.last_name} onChange={e => setEditDraft(p => ({ ...p, last_name: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="section-label" style={{ marginBottom: 4 }}>Username</div>
+                    <input className="form-input" placeholder="Username" value={editDraft.username} onChange={e => setEditDraft(p => ({ ...p, username: e.target.value }))} />
+                  </div>
+                </>
+              )}
+              <button className="btn-salmon" onClick={handleSaveProfile} disabled={saving}>{saving ? 'Saving...' : 'Save Profile'}</button>
+              <button
+                onClick={() => { closeEditSheet(); setTimeout(openPasswordModal, 200) }}
+                style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+              >
+                Update Password
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Update Password modal */}
       {(showPasswordModal || pwModalClosing) && createPortal(
         <div className="modal-overlay" onClick={closePasswordModal}>
@@ -835,7 +896,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                     <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPwCurrent(v => !v)}
                       style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
                       tabIndex={-1}>
-                      <EyeIcon visible={showPwCurrent} />
+                      <EyeIcon visible={!showPwCurrent} />
                     </button>
                   </div>
                 </div>
@@ -846,7 +907,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                     <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPwNew(v => !v)}
                       style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
                       tabIndex={-1}>
-                      <EyeIcon visible={showPwNew} />
+                      <EyeIcon visible={!showPwNew} />
                     </button>
                   </div>
                 </div>
@@ -857,7 +918,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                     <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPwConfirm(v => !v)}
                       style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
                       tabIndex={-1}>
-                      <EyeIcon visible={showPwConfirm} />
+                      <EyeIcon visible={!showPwConfirm} />
                     </button>
                   </div>
                 </div>
@@ -909,19 +970,25 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No notifications yet</div>
             ) : (
               <>
-                {notifications.map(n => (
-                  <div
-                    key={n.id}
-                    style={{
-                      margin: '8px 12px',
-                      borderRadius: 10,
-                      background: !n.read_at ? 'rgba(212,120,90,0.07)' : '#FFFFFF',
-                      border: `1px solid ${!n.read_at ? 'rgba(212,120,90,0.3)' : '#EAD8C8'}`,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: 12, padding: '12px 12px', alignItems: 'flex-start' }}>
-                      {/* Actor avatar */}
+                {notifications.map(n => {
+                  const actionText = n.type === 'admin_update' ? 'Updated Your Spot'
+                    : n.type === 'rating' ? 'Rated Your Spot'
+                    : n.type === 'comment' ? 'Commented On Your Spot'
+                    : n.type === 'report' ? 'Reported Your Spot'
+                    : 'Interacted With Your Spot'
+                  return (
+                    <div
+                      key={n.id}
+                      style={{
+                        margin: '8px 12px',
+                        borderRadius: 10,
+                        background: !n.read_at ? 'rgba(212,120,90,0.07)' : '#FFFFFF',
+                        border: `1px solid ${!n.read_at ? 'rgba(212,120,90,0.3)' : '#EAD8C8'}`,
+                        overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                      }}
+                    >
+                      {/* Avatar */}
                       <div style={{ flexShrink: 0, width: 38, height: 38, borderRadius: '50%', background: '#ECEDF2', border: '1px solid #C8CAD4', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {n.type === 'admin_update' ? (
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -938,39 +1005,29 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                         )}
                       </div>
 
-                      {/* Content */}
+                      {/* Text column */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: n.read_at ? 600 : 700, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                          {notifMessage(n)}
-                        </div>
-                        {n.spotTitle && (
-                          <div style={{ fontSize: 11, color: '#d4785a', fontWeight: 700, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.spotTitle}</div>
+                        {n.actorUsername && (
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{n.actorUsername}</div>
                         )}
-                        <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 4 }}>
-                          {relativeTime(n.created_at)}
-                        </div>
+                        <div style={{ fontSize: 11, fontWeight: n.read_at ? 600 : 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{actionText}</div>
+                        {n.spotTitle && (
+                          <div style={{ fontSize: 11, color: '#d4785a', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.spotTitle}</div>
+                        )}
                       </div>
 
-                      {/* Unread dot */}
-                      {!n.read_at && (
-                        <div style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: '#d4785a', marginTop: 5 }} />
+                      {/* View button */}
+                      {(n.spotSlug || n.spot_id) && (
+                        <div
+                          onClick={() => handleNotifTap(n)}
+                          style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '7px 12px', cursor: 'pointer' }}
+                        >
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: 0.5, textTransform: 'uppercase' }}>View</span>
+                        </div>
                       )}
                     </div>
-
-                    {/* View Spot button */}
-                    {(n.spotSlug || n.spot_id) && (
-                      <div
-                        onClick={() => handleNotifTap(n)}
-                        style={{ borderTop: '1px solid #f0e8de', padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, cursor: 'pointer' }}
-                      >
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase' }}>View Spot</span>
-                        <svg width="8" height="12" viewBox="0 0 8 12" fill="none">
-                          <path d="M1 1L7 6L1 11" stroke="#d4785a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
                 {notifHasMore && (
                   <div
                     onClick={() => onFetchNotifications?.()}

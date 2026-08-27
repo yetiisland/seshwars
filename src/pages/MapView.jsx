@@ -25,53 +25,28 @@ function bustStyle(rating) {
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
 }
 
-function HeartPinSVG({ active = false }) {
-  const fill = active ? '#fff' : '#d4785a'
-  const stroke = active ? '#d4785a' : '#fff'
-  const strokeW = active ? 2 : 1.2
-  const size = active ? 36 : 28
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.45))', display: 'block', overflow: 'visible' }}>
-      <path d="M12 20.5C12 20.5 3 15 3 8.5C3 5.5 5.5 3 8.5 3C10 3 11.3 3.7 12 4.8C12.7 3.7 14 3 15.5 3C18.5 3 21 5.5 21 8.5C21 15 12 20.5 12 20.5Z" fill={fill} stroke={stroke} strokeWidth={strokeW} strokeLinejoin="round" />
-    </svg>
-  )
+const CLOSED_REPORTS = new Set(['No Longer Skateable', 'Spot Destroyed', "Spot Doesn't Exist", 'No Longer Exists', 'Skate Stopped'])
+
+function getSpotPinColors(spot) {
+  const report = spot.most_recent_report
+  const active = report && report !== 'Skateable Again' ? report : null
+  if (CLOSED_REPORTS.has(active)) return { fill: '#C8CAD4', stroke: '#6a6c7a' }
+  if (active) return { fill: '#f5c518', stroke: '#000000' }
+  const type = spot.type === 'Park' ? 'Skatepark' : spot.type
+  if (type === 'Skatepark') return { fill: '#FFFFFF', stroke: '#d4785a' }
+  return { fill: '#d4785a', stroke: '#FFFFFF' }
 }
 
-function ShopPinSVG({ active = false }) {
-  const color = active ? '#fff' : '#3D4454'
-  const stroke = active ? '#3D4454' : '#fff'
-  const strokeW = active ? 2.5 : 1.5
-  const size = active ? 36 : 28
+function SpotPin({ fill, stroke, selected = false }) {
+  const size = selected ? 36 : 28
+  const strokeW = selected ? 2.5 : 1.5
+  const shadow = selected
+    ? 'drop-shadow(0 0 8px rgba(0,0,0,0.55)) drop-shadow(0 2px 6px rgba(0,0,0,0.45))'
+    : 'drop-shadow(0 2px 6px rgba(0,0,0,0.45))'
   return (
-    <svg width={size * 0.83} height={size} viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.45))', display: 'block', overflow: 'visible' }}>
-      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill={color} stroke={stroke} strokeWidth={strokeW} />
-      <circle cx="10" cy="10" r="4" fill={active ? '#3D4454' : '#fff'} />
-    </svg>
-  )
-}
-
-function ParkPinSVG({ active = false }) {
-  const color = active ? '#fff' : '#d4785a'
-  const stroke = active ? '#d4785a' : '#fff'
-  const strokeW = active ? 2.5 : 1.5
-  const size = active ? 36 : 28
-  return (
-    <svg width={size * 0.83} height={size} viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.45))', display: 'block', overflow: 'visible' }}>
-      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill={color} stroke={stroke} strokeWidth={strokeW} />
-      <circle cx="10" cy="10" r="4" fill={active ? '#d4785a' : '#fff'} />
-    </svg>
-  )
-}
-
-function PinSVG({ active = false }) {
-  const color = active ? '#fff' : '#d4785a'
-  const stroke = active ? '#d4785a' : '#fff'
-  const strokeW = active ? 2.5 : 1.5
-  const size = active ? 36 : 28
-  return (
-    <svg width={size * 0.83} height={size} viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.45))', display: 'block', overflow: 'visible' }}>
-      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill={color} stroke={stroke} strokeWidth={strokeW} />
-      <circle cx="10" cy="10" r="4" fill={active ? '#d4785a' : '#fff'} />
+    <svg width={size * 0.83} height={size} viewBox="0 0 20 24" fill="none" style={{ filter: shadow, display: 'block', overflow: 'visible' }}>
+      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill={fill} stroke={stroke} strokeWidth={strokeW} />
+      <circle cx="10" cy="10" r="4" fill={stroke} />
     </svg>
   )
 }
@@ -165,6 +140,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
   const initializedRef = useRef(!!_savedViewState)
   const mapRef = useRef()
   const peekCardRef = useRef(null)
+  const regionFitRef = useRef(null)
 
   useEffect(() => {
     const handler = () => setIsDesktop(window.innerWidth >= 769)
@@ -216,6 +192,8 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
 
   useEffect(() => {
     if (!searchLocation?.isRegion || !mapReady) return
+    // Only auto-fit once per unique region name. Manual zoom/pan after that is permanent.
+    if (regionFitRef.current === searchLocation.name) return
     const coords = spots.filter(s => s.latitude && s.longitude)
     if (coords.length === 0) return
     const lngs = coords.map(s => s.longitude)
@@ -227,7 +205,14 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     } else {
       setViewState(v => ({ ...v, longitude: (bounds[0][0] + bounds[1][0]) / 2, latitude: (bounds[0][1] + bounds[1][1]) / 2, zoom: 9 }))
     }
+    regionFitRef.current = searchLocation.name
   }, [searchLocation?.isRegion, searchLocation?.name, mapReady, spots])
+
+  useEffect(() => {
+    // Clear the fitted-region guard whenever searchLocation changes so a new
+    // search always triggers an auto-fit, even if the name happens to repeat.
+    if (!searchLocation) regionFitRef.current = null
+  }, [searchLocation])
 
   useEffect(() => {
     if (!fitOnMount || fitDone || !mapReady) return
@@ -387,6 +372,8 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           style={{ width: '100%', height: '100%' }}
           interactiveLayerIds={['clusters']}
           onError={() => { if (!satellite) setBaseStyle(STYLE_LIGHT) }}
+          minZoom={2}
+          maxBounds={[[-180, -85.05], [180, 85.05]]}
         >
           <Source id="spots" type="geojson" data={geojson} cluster={true} clusterMaxZoom={9} clusterRadius={50}>
             <Layer {...clusterCircleLayer} />
@@ -410,13 +397,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
                 onClick={e => { e.originalEvent.stopPropagation(); handlePinClick(spot) }}
                 style={{ overflow: 'visible' }}
               >
-                {spot.type === 'Skate Shop'
-                  ? <ShopPinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />
-                  : (spot.type === 'Park' || spot.type === 'Skatepark')
-                    ? <ParkPinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />
-                    : saved.has(spot.id)
-                      ? <HeartPinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />
-                      : <PinSVG active={selected?.id === spot.id || highlightedSpotId === spot.id} />}
+                <SpotPin {...getSpotPinColors(spot)} selected={selected?.id === spot.id || highlightedSpotId === spot.id} />
               </Marker>
             ) : null
           )}
@@ -427,30 +408,10 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
             {isDesktop ? (
               <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-                <FiltersModal active={activeFilters} onChange={handleFiltersChange} compact distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} />
-                {searchLocation && (
-                  <div style={{ padding: '0 16px 6px' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(253,248,240,0.95)', border: '1px solid #e8c0b0', borderRadius: 6, padding: '5px 10px 5px 8px' }}>
-                      <svg width="10" height="12" viewBox="0 0 10 12" fill="none"><path d="M5 0C2.25 0 0 2.25 0 5C0 7.75 5 12 5 12C5 12 10 7.75 10 5C10 2.25 7.75 0 5 0Z" fill="#d4785a" /><circle cx="5" cy="5" r="2" fill="#fff" /></svg>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase' }}>Near {searchLocation.name}</span>
-                      {onClearSearch && <div onClick={onClearSearch} style={{ marginLeft: 2, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" fill="rgba(212,120,90,0.15)" /><line x1="4" y1="4" x2="8" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" /><line x1="8" y1="4" x2="4" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" /></svg></div>}
-                    </div>
-                  </div>
-                )}
+                <FiltersModal active={activeFilters} onChange={handleFiltersChange} compact distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} searchLocation={searchLocation} onClearSearch={onClearSearch} />
               </div>
             ) : (
-              <>
-                <FiltersModal active={activeFilters} onChange={handleFiltersChange} compact distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} />
-                {searchLocation && (
-                  <div style={{ padding: '0 16px 6px' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(253,248,240,0.95)', border: '1px solid #e8c0b0', borderRadius: 6, padding: '5px 10px 5px 8px' }}>
-                      <svg width="10" height="12" viewBox="0 0 10 12" fill="none"><path d="M5 0C2.25 0 0 2.25 0 5C0 7.75 5 12 5 12C5 12 10 7.75 10 5C10 2.25 7.75 0 5 0Z" fill="#d4785a" /><circle cx="5" cy="5" r="2" fill="#fff" /></svg>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase' }}>Near {searchLocation.name}</span>
-                      {onClearSearch && <div onClick={onClearSearch} style={{ marginLeft: 2, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" fill="rgba(212,120,90,0.15)" /><line x1="4" y1="4" x2="8" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" /><line x1="8" y1="4" x2="4" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" /></svg></div>}
-                    </div>
-                  </div>
-                )}
-              </>
+              <FiltersModal active={activeFilters} onChange={handleFiltersChange} compact distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} searchLocation={searchLocation} onClearSearch={onClearSearch} />
             )}
           </div>
         )}

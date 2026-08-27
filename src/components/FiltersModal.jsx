@@ -2,11 +2,34 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SPOT_FIELDS, bustChipActiveStyle } from '../lib/spotFields'
 
+function LocationChip({ location, onClear }) {
+  return (
+    <div style={{ padding: '6px 16px 0', flexShrink: 0 }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', borderRadius: 6, padding: '5px 10px 5px 8px' }}>
+        <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
+          <path d="M5 0C2.25 0 0 2.25 0 5C0 7.75 5 12 5 12C5 12 10 7.75 10 5C10 2.25 7.75 0 5 0Z" fill="#d4785a" />
+          <circle cx="5" cy="5" r="2" fill="#fff" />
+        </svg>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+          Near {location.name}
+        </span>
+        <div onClick={onClear} style={{ marginLeft: 2, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="5" fill="rgba(212,120,90,0.15)" />
+            <line x1="4" y1="4" x2="8" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
+            <line x1="8" y1="4" x2="4" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const typeField = SPOT_FIELDS.find(f => f.key === 'type')
 const TYPE_OPTIONS = ['All', ...typeField.options]
 const filterableFields = SPOT_FIELDS.filter(f => f.filterable && f.key !== 'type')
 const DISTANCE_OPTIONS = [null, 5, 10, 25, 50, 100]
-export default function FiltersModal({ active, onChange, compact = false, distance, onDistanceChange, sortMode, onSortModeChange }) {
+export default function FiltersModal({ active, onChange, compact = false, distance, onDistanceChange, sortMode, onSortModeChange, searchLocation, onClearSearch }) {
   const [open, setOpen] = useState(false)
   const [distanceOpen, setDistanceOpen] = useState(false)
   const [filterClosing, setFilterClosing] = useState(false)
@@ -41,6 +64,7 @@ export default function FiltersModal({ active, onChange, compact = false, distan
 
   return (
     <>
+      {searchLocation && <LocationChip location={searchLocation} onClear={onClearSearch} />}
       <div
         className="hide-scroll"
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: compact ? '5px 16px 6px' : '8px 16px 10px' }}
@@ -110,9 +134,9 @@ export default function FiltersModal({ active, onChange, compact = false, distan
               }}
             >
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                <circle cx="6" cy="6" r="5" stroke={sortMode === 'new' ? '#fff' : '#d4785a'} strokeWidth="1.2" />
-                <line x1="6" y1="3" x2="6" y2="6.5" stroke={sortMode === 'new' ? '#fff' : '#d4785a'} strokeWidth="1.2" strokeLinecap="round" />
-                <line x1="6" y1="6.5" x2="8.2" y2="8.2" stroke={sortMode === 'new' ? '#fff' : '#d4785a'} strokeWidth="1.2" strokeLinecap="round" />
+                <circle cx="6" cy="6" r="5" fill={sortMode === 'new' ? '#fff' : '#d4785a'} />
+                <line x1="6" y1="3" x2="6" y2="6.5" stroke={sortMode === 'new' ? '#d4785a' : '#FDF8F0'} strokeWidth="1.2" strokeLinecap="round" />
+                <line x1="6" y1="6.5" x2="8.2" y2="8.2" stroke={sortMode === 'new' ? '#d4785a' : '#FDF8F0'} strokeWidth="1.2" strokeLinecap="round" />
               </svg>
               <span style={{ fontSize: 10, fontWeight: 700, color: sortMode === 'new' ? '#fff' : '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
                 Recent
@@ -127,9 +151,10 @@ export default function FiltersModal({ active, onChange, compact = false, distan
                 borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
               }}
             >
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                <line x1="6" y1="10" x2="6" y2="2" stroke={sortMode === 'rated' ? '#fff' : '#d4785a'} strokeWidth="1.3" strokeLinecap="round" />
-                <path d="M3 5L6 2L9 5" stroke={sortMode === 'rated' ? '#fff' : '#d4785a'} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="10" height="10" viewBox="0 0 48 48" fill="none">
+                <path d="M24 6L28.5 19.5H42L31.5 27L34.5 40.5L24 33L13.5 40.5L16.5 27L6 19.5H19.5L24 6Z"
+                  fill={sortMode === 'rated' ? '#fff' : '#d4785a'} stroke={sortMode === 'rated' ? '#fff' : '#d4785a'}
+                  strokeWidth="1.5" strokeLinejoin="round" />
               </svg>
               <span style={{ fontSize: 10, fontWeight: 700, color: sortMode === 'rated' ? '#fff' : '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
                 Rating

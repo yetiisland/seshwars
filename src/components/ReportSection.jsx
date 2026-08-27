@@ -78,13 +78,13 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
         onClick={() => { if (!user) { onGoProfile?.(); return } setOpen(true) }}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          border: '1.5px solid #d4785a', borderRadius: 6, padding: 13,
+          border: '1.5px solid #000000', borderRadius: 6, padding: 13,
           cursor: 'pointer', marginBottom: 20,
-          background: 'transparent', opacity: submitted ? 0.55 : 1,
+          background: '#f5c518', opacity: submitted ? 0.55 : 1,
         }}
       >
-        <CautionSVG size={13} color="#d4785a" />
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#d4785a', letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
+        <CautionSVG size={13} color="#000000" />
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#000000', letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
           {submitted ? 'Report Submitted' : user ? 'Report This Spot' : 'Sign in to Report'}
         </span>
       </div>
