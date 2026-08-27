@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { compressImage } from '../utils/compressImage'
 import { useProfileStore, setProfileDirect, reloadProfile } from '../lib/profileStore'
 import Navbar from '../components/Navbar'
+import TabBar from '../components/TabBar'
 import SpotCard from '../components/SpotCard'
 import TermsOfService from './TermsOfService'
 import PrivacyPolicy from './PrivacyPolicy'
@@ -40,7 +41,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -95,7 +96,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const avatarRef = useRef()
 
   const identifier = user?.email?.split('@')[0] || ''
-  const mySpots = spots.filter(s => s.added_by === identifier || s.added_by === user?.id)
+  const mySpots = spots.filter(s => s.added_by === user?.id || (identifier && s.added_by === identifier))
   const hiddenSpots = spots.filter(s => hiddenSpotIds.has(s.id))
 
   const loadHiddenSpots = useCallback(async ({ force = false } = {}) => {
@@ -257,7 +258,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const handleNotifTap = async (notif) => {
     if (!notif.spotSlug && !notif.spot_id) return
     await onMarkNotificationRead?.(notif.id)
-    if (notif.spotSlug) onSpotClick?.({ slug: notif.spotSlug, id: notif.spot_id })
+    const fullSpot = spots.find(s => s.id === notif.spot_id) || { slug: notif.spotSlug, id: notif.spot_id }
+    onSpotClick?.(fullSpot)
   }
 
   const handleSignOut = async () => {
@@ -338,7 +340,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     )
   }
 
-  const displayName = storeProfile?.displayName || identifier
+  const displayName = storeProfile?.first_name
+    ? `${storeProfile.first_name}${storeProfile.last_name ? ' ' + storeProfile.last_name : ''}`
+    : storeProfile?.username || ''
 
   if (!storeProfile) return null
 
@@ -384,7 +388,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   </svg>
                 </div>
               )}
-              {storeProfile.avatar_url && (
+              {storeProfile.avatar_url && editDraft && (
                 <div onClick={handleRemoveAvatar} style={{ position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: '50%', background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><line x1="1" y1="1" x2="7" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /><line x1="7" y1="1" x2="1" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /></svg>
                 </div>
@@ -393,7 +397,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>@{storeProfile.username || identifier}</div>
+              {storeProfile.username && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>@{storeProfile.username}</div>}
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{user.email}</div>
             </div>
             {/* Bell icon — notifications */}
@@ -698,6 +702,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             )}
             <div style={{ height: BOTTOM_PAD }} />
           </div>
+          {onTabChange && <TabBar active="profile" onChange={t => { setShowHiddenSpots(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
         </div>,
         document.body
       )}
@@ -756,31 +761,21 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               </div>
             ) : (
               mySpots.map(spot => (
-                <div key={spot.id} style={{ position: 'relative' }}>
-                  <SpotCard
-                    spot={spot}
-                    saved={saved?.has(spot.id) ?? false}
-                    onSavePress={onSavePress}
-                    onClick={s => {
-                      _mySpotsScrollTop = mySpotsScrollRef.current?.scrollTop || 0
-                      onSpotClick?.(s)
-                    }}
-                  />
-                  {spot.visibility && spot.visibility !== 'public' && (
-                    <div style={{
-                      position: 'absolute', top: 8, right: 44, zIndex: 5,
-                      background: spot.visibility === 'private' ? 'rgba(42,30,20,0.78)' : 'rgba(70,55,35,0.72)',
-                      color: '#fff', fontSize: 8, fontWeight: 700, letterSpacing: 1,
-                      textTransform: 'uppercase', padding: '3px 7px', borderRadius: 4,
-                    }}>
-                      {spot.visibility}
-                    </div>
-                  )}
-                </div>
+                <SpotCard
+                  key={spot.id}
+                  spot={spot}
+                  saved={saved?.has(spot.id) ?? false}
+                  onSavePress={onSavePress}
+                  onClick={s => {
+                    _mySpotsScrollTop = mySpotsScrollRef.current?.scrollTop || 0
+                    onSpotClick?.(s)
+                  }}
+                />
               ))
             )}
             <div style={{ height: BOTTOM_PAD }} />
           </div>
+          {onTabChange && <TabBar active="profile" onChange={t => { sessionStorage.removeItem('mySpots:open'); setShowMySpots(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
         </div>,
         document.body
       )}
@@ -867,29 +862,63 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 {notifications.map(n => (
                   <div
                     key={n.id}
-                    onClick={() => handleNotifTap(n)}
                     style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 12,
-                      padding: '14px 16px',
-                      borderBottom: '1px solid #f0e8de',
-                      background: !n.read_at ? 'rgba(212,120,90,0.06)' : 'transparent',
-                      cursor: n.spotSlug || n.spot_id ? 'pointer' : 'default',
+                      margin: '8px 12px',
+                      borderRadius: 10,
+                      background: !n.read_at ? 'rgba(212,120,90,0.07)' : '#FFFFFF',
+                      border: `1px solid ${!n.read_at ? 'rgba(212,120,90,0.3)' : '#EAD8C8'}`,
+                      overflow: 'hidden',
                     }}
                   >
-                    <div style={{ flexShrink: 0, width: 8, marginTop: 4 }}>
-                      {!n.read_at && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#d4785a' }} />}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: n.read_at ? 600 : 700, color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: 4 }}>
-                        {notifMessage(n)}
+                    <div style={{ display: 'flex', gap: 12, padding: '12px 12px', alignItems: 'flex-start' }}>
+                      {/* Actor avatar */}
+                      <div style={{ flexShrink: 0, width: 38, height: 38, borderRadius: '50%', background: '#ECEDF2', border: '1px solid #C8CAD4', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {n.type === 'admin_update' ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
+                            <path d="M2 17l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
+                            <path d="M2 12l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
+                          </svg>
+                        ) : n.actorAvatar ? (
+                          <img src={n.actorAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: 15, fontWeight: 900, color: '#6a6c7a' }}>
+                            {n.actorUsername ? n.actorUsername[0].toUpperCase() : '?'}
+                          </span>
+                        )}
                       </div>
-                      {n.spotTitle && (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 2 }}>{n.spotTitle}</div>
+
+                      {/* Content */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: n.read_at ? 600 : 700, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                          {notifMessage(n)}
+                        </div>
+                        {n.spotTitle && (
+                          <div style={{ fontSize: 11, color: '#d4785a', fontWeight: 700, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.spotTitle}</div>
+                        )}
+                        <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 4 }}>
+                          {relativeTime(n.created_at)}
+                        </div>
+                      </div>
+
+                      {/* Unread dot */}
+                      {!n.read_at && (
+                        <div style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: '#d4785a', marginTop: 5 }} />
                       )}
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                        {relativeTime(n.created_at)}
-                      </div>
                     </div>
+
+                    {/* View Spot button */}
+                    {(n.spotSlug || n.spot_id) && (
+                      <div
+                        onClick={() => handleNotifTap(n)}
+                        style={{ borderTop: '1px solid #f0e8de', padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, cursor: 'pointer' }}
+                      >
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase' }}>View Spot</span>
+                        <svg width="8" height="12" viewBox="0 0 8 12" fill="none">
+                          <path d="M1 1L7 6L1 11" stroke="#d4785a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {notifHasMore && (
@@ -904,6 +933,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             )}
             <div style={{ height: BOTTOM_PAD }} />
           </div>
+          {onTabChange && <TabBar active="profile" onChange={t => { setShowNotifications(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
         </div>,
         document.body
       )}

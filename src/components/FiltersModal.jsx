@@ -109,8 +109,13 @@ export default function FiltersModal({ active, onChange, compact = false, distan
                 borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
               }}
             >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <circle cx="6" cy="6" r="5" stroke={sortMode === 'new' ? '#fff' : '#d4785a'} strokeWidth="1.2" />
+                <line x1="6" y1="3" x2="6" y2="6.5" stroke={sortMode === 'new' ? '#fff' : '#d4785a'} strokeWidth="1.2" strokeLinecap="round" />
+                <line x1="6" y1="6.5" x2="8.2" y2="8.2" stroke={sortMode === 'new' ? '#fff' : '#d4785a'} strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
               <span style={{ fontSize: 10, fontWeight: 700, color: sortMode === 'new' ? '#fff' : '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
-                New Spots
+                Recent
               </span>
             </div>
             <div
@@ -122,8 +127,12 @@ export default function FiltersModal({ active, onChange, compact = false, distan
                 borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
               }}
             >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <line x1="6" y1="10" x2="6" y2="2" stroke={sortMode === 'rated' ? '#fff' : '#d4785a'} strokeWidth="1.3" strokeLinecap="round" />
+                <path d="M3 5L6 2L9 5" stroke={sortMode === 'rated' ? '#fff' : '#d4785a'} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
               <span style={{ fontSize: 10, fontWeight: 700, color: sortMode === 'rated' ? '#fff' : '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
-                Top Rated
+                Rating
               </span>
             </div>
           </>

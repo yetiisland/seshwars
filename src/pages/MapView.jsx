@@ -151,7 +151,7 @@ function CautionChip({ report, reportCustom, small = false }) {
   )
 }
 
-export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, sortBy, onSortChange, hasLocation, searchLocation, highlightedSpotId, onSearch, fitOnMount = false, onHidePress, isActive = true }) {
+export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, sortMode, onSortModeChange, searchLocation, onClearSearch, highlightedSpotId, onSearch, fitOnMount = false, onHidePress, isActive = true }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
   const [viewState, setViewState] = useState(_savedViewState ?? FALLBACK)
@@ -209,10 +209,25 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
   }, [isActive])
 
   useEffect(() => {
-    if (searchLocation) {
-      setViewState(v => ({ ...v, longitude: searchLocation.longitude, latitude: searchLocation.latitude, zoom: 10 }))
-    }
+    if (!searchLocation) return
+    if (searchLocation.isRegion) return // handled by fitBounds effect below
+    setViewState(v => ({ ...v, longitude: searchLocation.longitude, latitude: searchLocation.latitude, zoom: 10 }))
   }, [searchLocation])
+
+  useEffect(() => {
+    if (!searchLocation?.isRegion || !mapReady) return
+    const coords = spots.filter(s => s.latitude && s.longitude)
+    if (coords.length === 0) return
+    const lngs = coords.map(s => s.longitude)
+    const lats = coords.map(s => s.latitude)
+    const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]]
+    const map = mapRef.current?.getMap()
+    if (map) {
+      map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 600 })
+    } else {
+      setViewState(v => ({ ...v, longitude: (bounds[0][0] + bounds[1][0]) / 2, latitude: (bounds[0][1] + bounds[1][1]) / 2, zoom: 9 }))
+    }
+  }, [searchLocation?.isRegion, searchLocation?.name, mapReady, spots])
 
   useEffect(() => {
     if (!fitOnMount || fitDone || !mapReady) return
@@ -412,10 +427,30 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
             {isDesktop ? (
               <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-                <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} sortBy={sortBy} onSortChange={onSortChange} hasLocation={hasLocation} />
+                <FiltersModal active={activeFilters} onChange={handleFiltersChange} compact distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} />
+                {searchLocation && (
+                  <div style={{ padding: '0 16px 6px' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(253,248,240,0.95)', border: '1px solid #e8c0b0', borderRadius: 6, padding: '5px 10px 5px 8px' }}>
+                      <svg width="10" height="12" viewBox="0 0 10 12" fill="none"><path d="M5 0C2.25 0 0 2.25 0 5C0 7.75 5 12 5 12C5 12 10 7.75 10 5C10 2.25 7.75 0 5 0Z" fill="#d4785a" /><circle cx="5" cy="5" r="2" fill="#fff" /></svg>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase' }}>Near {searchLocation.name}</span>
+                      {onClearSearch && <div onClick={onClearSearch} style={{ marginLeft: 2, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" fill="rgba(212,120,90,0.15)" /><line x1="4" y1="4" x2="8" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" /><line x1="8" y1="4" x2="4" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" /></svg></div>}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} sortBy={sortBy} onSortChange={onSortChange} hasLocation={hasLocation} />
+              <>
+                <FiltersModal active={activeFilters} onChange={handleFiltersChange} compact distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} />
+                {searchLocation && (
+                  <div style={{ padding: '0 16px 6px' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(253,248,240,0.95)', border: '1px solid #e8c0b0', borderRadius: 6, padding: '5px 10px 5px 8px' }}>
+                      <svg width="10" height="12" viewBox="0 0 10 12" fill="none"><path d="M5 0C2.25 0 0 2.25 0 5C0 7.75 5 12 5 12C5 12 10 7.75 10 5C10 2.25 7.75 0 5 0Z" fill="#d4785a" /><circle cx="5" cy="5" r="2" fill="#fff" /></svg>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase' }}>Near {searchLocation.name}</span>
+                      {onClearSearch && <div onClick={onClearSearch} style={{ marginLeft: 2, cursor: 'pointer', display: 'flex', alignItems: 'center' }}><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" fill="rgba(212,120,90,0.15)" /><line x1="4" y1="4" x2="8" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" /><line x1="8" y1="4" x2="4" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" /></svg></div>}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

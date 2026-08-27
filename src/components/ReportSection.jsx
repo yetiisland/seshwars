@@ -9,12 +9,10 @@ const REPORT_TYPES = [
   'Temporarily Closed',
   "Spot Doesn't Exist",
   'Chance of Getting Arrested',
-  'Nudity',
-  'Gore',
   'Other',
 ]
 
-const CONTENT_REPORT_TYPES = new Set(['Nudity', 'Gore'])
+const CONTENT_REPORT_TYPES = new Set([])
 
 function CautionSVG({ size = 13, color = '#c8a020' }) {
   return (
@@ -113,7 +111,7 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
                   <div
                     key={type}
                     className={`chip ${selectedType === type ? 'active' : ''}`}
-                    style={selectedType === type ? { background: '#d4785a', borderColor: '#c06848', color: '#fff' } : undefined}
+                    style={selectedType === type ? { background: '#f5c518', borderColor: '#d4aa00', color: '#000' } : undefined}
                     onClick={() => { setSelectedType(t => t === type ? null : type); setCustomText('') }}
                   >
                     {type}

@@ -16,10 +16,11 @@ export default function SpotPage() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [spot, setSpot] = useState(location.state?.spot || null)
-  const [loading, setLoading] = useState(!location.state?.spot)
+  const stateSpot = location.state?.spot?.title ? location.state.spot : null
+  const [spot, setSpot] = useState(stateSpot)
+  const [loading, setLoading] = useState(!stateSpot)
   const [user, setUser] = useState(null)
-  const [authLoaded, setAuthLoaded] = useState(!!location.state?.spot)
+  const [authLoaded, setAuthLoaded] = useState(!!stateSpot)
   const [saveModalSpot, setSaveModalSpot] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
   const [sheetPad, setSheetPad] = useState(0)
@@ -52,7 +53,7 @@ export default function SpotPage() {
   }, [])
 
   useEffect(() => {
-    if (location.state?.spot) return
+    if (stateSpot) return
     async function fetchSpot() {
       let { data } = await supabase.from('spots').select('*').eq('slug', slug).single()
       if (!data) {

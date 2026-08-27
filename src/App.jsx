@@ -600,11 +600,14 @@ export default function App() {
                   onAddSpot={openAdd}
                   userLocation={userLocation}
                   searchLocation={searchLocation}
+                  onClearSearch={handleClearSearch}
                   showNav={false}
                   filters={filters}
                   onFiltersChange={handleFiltersChange}
                   distance={distanceRadius}
                   onDistanceChange={handleDistanceChange}
+                  sortMode={sortMode}
+                  onSortModeChange={handleSortModeChange}
                   onHidePress={handleHidePress}
                 />
               </div>
@@ -638,6 +641,7 @@ export default function App() {
                 onFetchNotifications={fetchNotifications}
                 onMarkNotificationRead={markRead}
                 onMarkAllNotificationsRead={markAllRead}
+                onTabChange={handleTabChange}
               />
             )}
           </div>
@@ -667,7 +671,7 @@ export default function App() {
                       {profileAvatar ? <img src={profileAvatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{profileInitials}</span>}
                     </div>
                     {unreadCount > 0 && (
-                      <div style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: '#d4785a', border: '1.5px solid #3D4454', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                      <div style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: '#d4785a', border: '2px solid #FDF8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
                         <span style={{ fontSize: 8, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{unreadCount > 99 ? '99+' : String(unreadCount)}</span>
                       </div>
                     )}
@@ -732,6 +736,7 @@ export default function App() {
                   onFetchNotifications={fetchNotifications}
                   onMarkNotificationRead={markRead}
                   onMarkAllNotificationsRead={markAllRead}
+                  onTabChange={handleTabChange}
                 />
               )}
             </>
@@ -755,11 +760,14 @@ export default function App() {
                 onAddSpot={openAdd}
                 userLocation={userLocation}
                 searchLocation={searchLocation}
+                onClearSearch={handleClearSearch}
                 onSearch={openSearch}
                 filters={filters}
                 onFiltersChange={handleFiltersChange}
                 distance={distanceRadius}
                 onDistanceChange={handleDistanceChange}
+                sortMode={sortMode}
+                onSortModeChange={handleSortModeChange}
                 onHidePress={handleHidePress}
               />
             </div>

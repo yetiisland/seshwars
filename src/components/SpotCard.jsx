@@ -63,7 +63,16 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
           )}
         </div>
         {(spot.most_recent_report && spot.most_recent_report !== 'Skateable Again' || (spot.visibility && spot.visibility !== 'public')) && (
-          <div style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 3, display: 'flex', gap: 4, alignItems: 'center', maxWidth: 'calc(100% - 16px)' }}>
+          <div style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 3, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', maxWidth: 'calc(100% - 16px)' }}>
+            {spot.visibility && spot.visibility !== 'public' && (
+              <div style={{ background: 'rgba(212,120,90,0.22)', border: '1px solid #d4785a', borderRadius: 6, padding: '4px 10px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
+                  <rect x="1" y="4.5" width="6" height="5" rx="1" stroke="#fff" strokeWidth="1.1" />
+                  <path d="M2 4.5V3a2 2 0 014 0v1.5" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
+                </svg>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility}</span>
+              </div>
+            )}
             {spot.most_recent_report && spot.most_recent_report !== 'Skateable Again' && (
               <div style={{ background: '#f5c518', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, minWidth: 0 }}>
                 <svg width="9" height="8" viewBox="0 0 18 16" fill="none" style={{ flexShrink: 0 }}>
@@ -72,11 +81,6 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
                   <circle cx="9" cy="12.5" r="0.9" fill="#000" />
                 </svg>
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#000', letterSpacing: 0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cautionText}</span>
-              </div>
-            )}
-            {spot.visibility && spot.visibility !== 'public' && (
-              <div style={{ background: spot.visibility === 'private' ? 'rgba(42,30,20,0.78)' : 'rgba(70,55,35,0.72)', borderRadius: 6, padding: '4px 8px', flexShrink: 0 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility}</span>
               </div>
             )}
           </div>

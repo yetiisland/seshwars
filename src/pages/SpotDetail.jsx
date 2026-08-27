@@ -148,9 +148,6 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           if (data.username) setPublisherUsername(data.username)
           else if (data.first_name) setPublisherUsername(data.first_name)
         } else {
-          // Profile not found. For non-UUID added_by, show the raw value so old spots
-          // always have attribution regardless of auth state.
-          if (!isUUID) setPublisherUsername(spot.added_by)
           if (isOwner && user?.id) {
             // Also try current user's profile for the avatar/current username
             supabase.from('profiles').select('avatar_url, first_name, username').eq('id', user.id).maybeSingle()
@@ -648,7 +645,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               ))}
             </div>
           )}
-          {/* Caution + visibility chips — bottom left */}
+          {/* Visibility + caution chips — bottom left, stacked */}
           {(() => {
             const hasReport = liveReport?.most_recent_report
               ? liveReport.most_recent_report !== 'Skateable Again'
@@ -656,7 +653,16 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             const hasVisibility = spot.visibility && spot.visibility !== 'public'
             if (!hasReport && !hasVisibility) return null
             return (
-              <div style={{ position: 'absolute', bottom: 14, left: 12, zIndex: 10, display: 'flex', gap: 4, alignItems: 'center', maxWidth: 'calc(100% - 24px)' }}>
+              <div style={{ position: 'absolute', bottom: 14, left: 12, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', maxWidth: 'calc(100% - 24px)' }}>
+                {hasVisibility && (
+                  <div style={{ background: 'rgba(212,120,90,0.22)', border: '1px solid #d4785a', borderRadius: 6, padding: '4px 10px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
+                      <rect x="1" y="4.5" width="6" height="5" rx="1" stroke="#fff" strokeWidth="1.1" />
+                      <path d="M2 4.5V3a2 2 0 014 0v1.5" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
+                    </svg>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility}</span>
+                  </div>
+                )}
                 {hasReport && (
                   <div style={{ background: '#f5c518', borderRadius: 6, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, minWidth: 0 }}>
                     <svg width="9" height="8" viewBox="0 0 18 16" fill="none" style={{ flexShrink: 0 }}>
@@ -671,11 +677,6 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                         return r === 'Other' ? (rc || 'Spot Reported') : r
                       })()}
                     </span>
-                  </div>
-                )}
-                {hasVisibility && (
-                  <div style={{ background: spot.visibility === 'private' ? 'rgba(42,30,20,0.78)' : 'rgba(70,55,35,0.72)', borderRadius: 6, padding: '4px 8px', flexShrink: 0 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility}</span>
                   </div>
                 )}
               </div>
@@ -720,16 +721,17 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
           {/* Publisher row */}
           {(publisherAvatar || publisherUsername || spot.added_by === null) && (
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, minWidth: 0, gap: 8 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', flexShrink: 0 }}>Added by</span>
               {spot.added_by === null ? (
                 <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700 }}>Anonymous</span>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                  <div style={{ width: 27, height: 27, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
                     {publisherAvatar ? (
                       <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <span style={{ fontSize: 12, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial}</span>
+                      <span style={{ fontSize: 10, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial}</span>
                     )}
                   </div>
                   {publisherUsername && (
