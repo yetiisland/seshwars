@@ -62,6 +62,10 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [pwError, setPwError] = useState('')
   const [pwSuccess, setPwSuccess] = useState(false)
   const [pwLoading, setPwLoading] = useState(false)
+  const [showPassAuth, setShowPassAuth] = useState(false)
+  const [showPwCurrent, setShowPwCurrent] = useState(false)
+  const [showPwNew, setShowPwNew] = useState(false)
+  const [showPwConfirm, setShowPwConfirm] = useState(false)
   const mySpotsScrollRef = useRef(null)
   const mySpotsScrollRestoredRef = useRef(false)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
@@ -226,8 +230,25 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     setProfileDirect({ ...storeProfile, avatar_url: null }, user)
   }
 
+  const EyeIcon = ({ visible }) => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {visible ? (
+        <>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      ) : (
+        <>
+          <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+          <line x1="1" y1="1" x2="23" y2="23" />
+        </>
+      )}
+    </svg>
+  )
+
   const openPasswordModal = () => {
     setPwCurrent(''); setPwNew(''); setPwConfirm(''); setPwError(''); setPwSuccess(false)
+    setShowPwCurrent(false); setShowPwNew(false); setShowPwConfirm(false)
     setShowPasswordModal(true)
   }
   const closePasswordModal = () => {
@@ -322,8 +343,16 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               </div>
             )}
             <input className="form-input" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-            <input className="form-input" type="password" placeholder="Password" value={password}
-              onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAuth()} />
+            <div style={{ position: 'relative' }}>
+              <input className="form-input" type={showPassAuth ? 'text' : 'password'} placeholder="Password" value={password}
+                onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAuth()}
+                style={{ paddingRight: 44 }} />
+              <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPassAuth(v => !v)}
+                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
+                tabIndex={-1}>
+                <EyeIcon visible={showPassAuth} />
+              </button>
+            </div>
             {error && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700 }}>{error}</div>}
             {message && <div style={{ fontSize: 11, color: '#d4785a', fontWeight: 700 }}>{message}</div>}
             <button className="btn-salmon" onClick={handleAuth} disabled={loading}>
@@ -801,15 +830,36 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
                   <div className="section-label" style={{ marginBottom: 4 }}>Current Password</div>
-                  <input className="form-input" type="password" placeholder="Current password" value={pwCurrent} onChange={e => setPwCurrent(e.target.value)} />
+                  <div style={{ position: 'relative' }}>
+                    <input className="form-input" type={showPwCurrent ? 'text' : 'password'} placeholder="Current password" value={pwCurrent} onChange={e => setPwCurrent(e.target.value)} style={{ paddingRight: 44 }} />
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPwCurrent(v => !v)}
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
+                      tabIndex={-1}>
+                      <EyeIcon visible={showPwCurrent} />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <div className="section-label" style={{ marginBottom: 4 }}>New Password</div>
-                  <input className="form-input" type="password" placeholder="New password" value={pwNew} onChange={e => setPwNew(e.target.value)} />
+                  <div style={{ position: 'relative' }}>
+                    <input className="form-input" type={showPwNew ? 'text' : 'password'} placeholder="New password" value={pwNew} onChange={e => setPwNew(e.target.value)} style={{ paddingRight: 44 }} />
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPwNew(v => !v)}
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
+                      tabIndex={-1}>
+                      <EyeIcon visible={showPwNew} />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <div className="section-label" style={{ marginBottom: 4 }}>Confirm New Password</div>
-                  <input className="form-input" type="password" placeholder="Confirm new password" value={pwConfirm} onChange={e => setPwConfirm(e.target.value)} />
+                  <div style={{ position: 'relative' }}>
+                    <input className="form-input" type={showPwConfirm ? 'text' : 'password'} placeholder="Confirm new password" value={pwConfirm} onChange={e => setPwConfirm(e.target.value)} style={{ paddingRight: 44 }} />
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setShowPwConfirm(v => !v)}
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#9a8878', display: 'flex', alignItems: 'center' }}
+                      tabIndex={-1}>
+                      <EyeIcon visible={showPwConfirm} />
+                    </button>
+                  </div>
                 </div>
                 {pwError && (
                   <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700 }}>{pwError}</div>

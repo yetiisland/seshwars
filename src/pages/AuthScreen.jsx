@@ -264,7 +264,7 @@ export default function AuthScreen({ onClose }) {
             </button>
             <div style={{ textAlign: 'center', marginTop: 4 }}>
               {resetSent ? (
-                <span style={{ fontSize: 12, color: '#2a8a4a', fontWeight: 700 }}>Password reset email sent!</span>
+                <span style={{ fontSize: 12, color: '#2a8a4a', fontWeight: 700 }}>Password reset email sent! Check your spam folder if you don't see it.</span>
               ) : (
                 <span
                   onClick={handleForgotPassword}
