@@ -1020,9 +1020,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                       {(n.spotSlug || n.spot_id) && (
                         <div
                           onClick={() => handleNotifTap(n)}
-                          style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '7px 12px', cursor: 'pointer' }}
+                          style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         >
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: 0.5, textTransform: 'uppercase' }}>View</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }}>View</span>
                         </div>
                       )}
                     </div>

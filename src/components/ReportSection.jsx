@@ -17,9 +17,9 @@ const CONTENT_REPORT_TYPES = new Set([])
 function CautionSVG({ size = 13, color = '#c8a020' }) {
   return (
     <svg width={size} height={Math.round(size * 0.88)} viewBox="0 0 18 16" fill="none" style={{ flexShrink: 0 }}>
-      <path d="M9 1L17 15H1L9 1Z" fill={color} />
-      <line x1="9" y1="5.5" x2="9" y2="10" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="9" cy="12.5" r="1" fill="#fff" />
+      <path d="M9 1L17 15H1L9 1Z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+      <line x1="9" y1="5.5" x2="9" y2="10" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="9" cy="12.5" r="0.9" fill={color} />
     </svg>
   )
 }
@@ -78,7 +78,7 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
         onClick={() => { if (!user) { onGoProfile?.(); return } setOpen(true) }}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          border: '1.5px solid #000000', borderRadius: 6, padding: 13,
+          border: 'none', borderRadius: 6, padding: 13,
           cursor: 'pointer', marginBottom: 20,
           background: '#f5c518', opacity: submitted ? 0.55 : 1,
         }}

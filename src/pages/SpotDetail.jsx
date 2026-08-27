@@ -721,26 +721,20 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
           {/* Publisher row */}
           {(publisherAvatar || publisherUsername || spot.added_by === null) && (
-            <div style={{ display: 'flex', flexDirection: 'column', marginBottom: 12, gap: 4 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Added by</span>
-              {spot.added_by === null ? (
-                <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700 }}>Anonymous</span>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                  <div style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
-                    {publisherAvatar ? (
-                      <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: 10, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial}</span>
-                    )}
-                  </div>
-                  {publisherUsername && (
-                    <span style={{ display: 'block', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: 'var(--text-primary)', fontWeight: 700 }}>
-                      @{publisherUsername}
-                    </span>
-                  )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
+                {publisherAvatar ? (
+                  <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial || '?'}</span>
+                )}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3 }}>Added by</div>
+                <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+                  {spot.added_by === null ? 'Anonymous' : publisherUsername ? `@${publisherUsername}` : ''}
                 </div>
-              )}
+              </div>
             </div>
           )}
 

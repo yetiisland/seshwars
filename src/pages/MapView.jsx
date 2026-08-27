@@ -405,13 +405,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
         {/* Filters row — top */}
         {showFilterChips && (
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-            {isDesktop ? (
-              <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-                <FiltersModal active={activeFilters} onChange={handleFiltersChange} compact distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} searchLocation={searchLocation} onClearSearch={onClearSearch} />
-              </div>
-            ) : (
-              <FiltersModal active={activeFilters} onChange={handleFiltersChange} compact distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} searchLocation={searchLocation} onClearSearch={onClearSearch} />
-            )}
+            <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} searchLocation={searchLocation} onClearSearch={onClearSearch} />
           </div>
         )}
 
