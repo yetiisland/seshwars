@@ -157,7 +157,7 @@ export default function AuthScreen({ onClose }) {
   )
 
   return (
-    <div style={{
+    <div className="desktop-page-root" style={{
       position: 'fixed', inset: 0, zIndex: 100000,
       background: '#FDF8F0',
       overflowY: 'auto',

@@ -1,26 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { haversineDistance } from '../hooks/useGeolocation'
+import { fetchLocationSuggestions, toSearchLocationEntry } from '../lib/locationSearch'
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const LS_RECENT_KEY = 'seshwars_recent_searches'
-const KM_PER_MILE = 1.60934
-const SEARCH_RADIUS_MILES = 50 / KM_PER_MILE // ~31 miles = 50km
-
-function countSpotsNear(spots, lat, lng) {
-  return spots.filter(s => {
-    if (!s.latitude || !s.longitude) return false
-    return haversineDistance(lat, lng, s.latitude, s.longitude) <= SEARCH_RADIUS_MILES
-  }).length
-}
-
-function countSpotsInState(spots, stateName) {
-  const lower = stateName.toLowerCase()
-  return spots.filter(s => s.address && s.address.toLowerCase().includes(lower)).length
-}
-
-function getState(context = []) {
-  return context.find(c => c.id?.startsWith('region'))?.text || ''
-}
 
 function PinSVG({ filled }) {
   return filled ? (
@@ -69,25 +50,7 @@ export default function SearchPage({ spots, onSelect, onClose }) {
     setLoading(true)
     timer.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?types=place,region,postcode&country=US&access_token=${MAPBOX_TOKEN}&limit=5`
-        )
-        const data = await res.json()
-        setSuggestions((data.features || []).map(f => {
-          const isRegion = f.id?.startsWith('region.')
-          return {
-            id: f.id,
-            name: f.text,
-            placeName: f.place_name,
-            stateName: getState(f.context),
-            longitude: f.geometry.coordinates[0],
-            latitude: f.geometry.coordinates[1],
-            isRegion,
-            spotCount: isRegion
-              ? countSpotsInState(spots, f.text)
-              : countSpotsNear(spots, f.geometry.coordinates[1], f.geometry.coordinates[0]),
-          }
-        }))
+        setSuggestions(await fetchLocationSuggestions(query, spots))
       } catch { setSuggestions([]) }
       setLoading(false)
     }, 300)
@@ -95,15 +58,7 @@ export default function SearchPage({ spots, onSelect, onClose }) {
   }, [query, spots])
 
   const handleSelect = (item) => {
-    const entry = {
-      name: item.name,
-      placeName: item.placeName,
-      stateName: item.stateName || '',
-      longitude: item.longitude,
-      latitude: item.latitude,
-      spotCount: item.spotCount ?? 0,
-      isRegion: item.isRegion || false,
-    }
+    const entry = toSearchLocationEntry(item)
     try {
       const prev = JSON.parse(localStorage.getItem(LS_RECENT_KEY) || '[]')
       const updated = [entry, ...prev.filter(r => r.placeName !== entry.placeName)].slice(0, 5)
@@ -116,7 +71,7 @@ export default function SearchPage({ spots, onSelect, onClose }) {
   const items = showSuggestions ? suggestions : recentSearches
 
   return (
-    <div style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 500, display: 'flex', flexDirection: 'column' }}>
+    <div className="desktop-page-root" style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 500, display: 'flex', flexDirection: 'column' }}>
       {/* Header — no borderBottom since the Navbar above provides separation */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

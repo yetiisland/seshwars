@@ -711,7 +711,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
       {/* Hidden Spots overlay — full screen */}
       {showHiddenSpots && createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '14px 14px 10px', paddingTop: 'calc(env(safe-area-inset-top) + 14px)',
@@ -776,7 +776,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
       {/* My Spots overlay — full screen, covers top nav */}
       {showMySpots && createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center',
             padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
@@ -964,7 +964,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
       {/* Notifications overlay — full screen */}
       {showNotifications && createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center',
             padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',

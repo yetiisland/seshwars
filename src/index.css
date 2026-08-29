@@ -276,22 +276,24 @@ body {
     --desktop-nav-height: 85.5px;
     --desktop-nav-total: calc(var(--desktop-nav-height) + 20px);
     --desktop-nav-clearance: calc(var(--desktop-nav-total) + 24px);
+    /* Single source of truth for the desktop content column width — same
+       480px .desktop-float-nav has always used. Every page and modal/sheet
+       (except map and list, which stay full-width) reuses this instead of
+       a separately hardcoded number, via .desktop-page-root. */
+    --desktop-content-max-width: 480px;
   }
 
-  /* The list/map switcher pill and the map's peek card both anchor to
-     --desktop-nav-clearance, so by default the pill sits at the same height
-     as the peek card's bottom edge — fine when no card is showing, but the
-     pill would render on top of the card once one is. MapView measures the
-     peek card's live rendered height with a ResizeObserver and writes it to
-     --desktop-peek-card-height, flipping --desktop-peek-card-open to 1 only
-     while a card is actually mounted. --desktop-peek-card-lift resolves to
-     0px normally, or (card height + 16px) while a card is shown, so the pill
-     sits exactly 16px above the card's top edge without a hardcoded height
-     that would drift if a spot's description/title made the card taller. */
+  /* The list/map switcher pill sits directly on --desktop-nav-clearance
+     (same offset as before), and the map's peek card now sits ABOVE the
+     pill instead of the other way around. Rendered height of the pill,
+     measured live via getBoundingClientRect() (not estimated): 33px.
+     --desktop-peek-card-bottom = nav-clearance + pill height + 16px gap,
+     placing the card's bottom edge exactly 16px above the pill's top edge.
+     Re-measure and update --desktop-toggle-height if the pill's padding or
+     font size changes. */
   :root {
-    --desktop-peek-card-open: 0;
-    --desktop-peek-card-height: 0px;
-    --desktop-peek-card-lift: calc(var(--desktop-peek-card-open) * (var(--desktop-peek-card-height) + 16px));
+    --desktop-toggle-height: 33px;
+    --desktop-peek-card-bottom: calc(var(--desktop-nav-clearance) + var(--desktop-toggle-height) + 16px);
   }
 
   /* Floating bottom nav pill */
@@ -301,7 +303,7 @@ body {
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    max-width: 480px;
+    max-width: var(--desktop-content-max-width);
     width: calc(100% - 48px);
     background: #d4785a;
     border-radius: 20px;
@@ -716,9 +718,15 @@ textarea.form-input {
     overflow: hidden;
   }
 
-  /* Standalone route pages (SpotPage, SharedListPage) */
+  /* Every standalone page and full-screen overlay (SpotPage, SharedListPage,
+     AuthScreen, SearchPage, TermsOfService, PrivacyPolicy, SupportPage,
+     DeleteAccountPage, ProfileView's My Spots/Hidden Spots/Notifications
+     overlays, SavedView's collection overlay, SpotDetail's edit form) shares
+     this one class, whether it's normal-flow or position:fixed;inset:0 — in
+     both cases max-width + margin:auto centers it the same way. Map and
+     list are the only exceptions and don't use this class. */
   .desktop-page-root {
-    max-width: 1200px;
+    max-width: var(--desktop-content-max-width);
     margin: 0 auto;
   }
 
@@ -728,6 +736,6 @@ textarea.form-input {
   }
 
   .modal-sheet {
-    max-width: 1200px;
+    max-width: var(--desktop-content-max-width);
   }
 }

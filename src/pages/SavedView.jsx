@@ -142,7 +142,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
   }
 
   return (
-    <div style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
+    <div className="desktop-page-root" style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
       <div style={{
         display: 'flex', alignItems: 'center',
         padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',

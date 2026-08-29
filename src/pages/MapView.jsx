@@ -105,7 +105,6 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
   // Skip auto-centering on userLocation if we already have a saved position
   const initializedRef = useRef(!!_savedViewState)
   const mapRef = useRef()
-  const peekCardRef = useRef(null)
   const regionFitRef = useRef(null)
 
   useEffect(() => {
@@ -113,27 +112,6 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
-
-  // Report the desktop peek card's live height to the LIST/MAP pill (in App.jsx)
-  // via a CSS var, so the pill can lift itself 16px above the card instead of
-  // rendering on top of it — see --desktop-peek-card-lift in index.css.
-  useEffect(() => {
-    const root = document.documentElement
-    if (!isDesktop || !showPeekCard || !selected || !peekCardRef.current) {
-      root.style.setProperty('--desktop-peek-card-open', '0')
-      return
-    }
-    const el = peekCardRef.current
-    root.style.setProperty('--desktop-peek-card-open', '1')
-    const observer = new ResizeObserver(([entry]) => {
-      root.style.setProperty('--desktop-peek-card-height', `${entry.contentRect.height}px`)
-    })
-    observer.observe(el)
-    return () => {
-      observer.disconnect()
-      root.style.setProperty('--desktop-peek-card-open', '0')
-    }
-  }, [isDesktop, showPeekCard, selected])
 
   useEffect(() => {
     if (userLocation && !initializedRef.current) {
@@ -279,7 +257,11 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
       map.flyTo({
         center: [spot.longitude, spot.latitude],
         zoom: Math.max(mapRef.current?.getMap().getZoom() || 14, 14),
-        padding: { top: 60, bottom: isDesktop ? 320 : 280, left: 0, right: 0 },
+        // Desktop bottom padding is 16px larger than mobile's, on top of the
+        // existing offset — larger bottom padding shrinks the map's centered
+        // viewport from below, pushing the selected pin up by that much so
+        // it clears the peek card + LIST/MAP pill now stacked beneath it.
+        padding: { top: 60, bottom: isDesktop ? 336 : 280, left: 0, right: 0 },
         duration: 400,
         essential: true,
       })
@@ -421,7 +403,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
         {/* Peek card — desktop: compact floating, mobile: full-width */}
         {showPeekCard && selected && (
           isDesktop ? (
-            <div ref={peekCardRef} className="desktop-peek-card" style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 12px', zIndex: 100 }}>
+            <div className="desktop-peek-card" style={{ position: 'fixed', bottom: 'var(--desktop-peek-card-bottom)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 12px', zIndex: 100 }}>
               <SpotCard
                 spot={selected}
                 saved={saved.has(selected.id)}

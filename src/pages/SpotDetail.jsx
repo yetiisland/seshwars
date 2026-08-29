@@ -124,6 +124,21 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const scrollAreaRef = useRef()
 
   const photos = spot.photos || []
+
+  // Desktop-only affordance: Escape closes the lightbox, left/right arrow
+  // keys step between photos. Mobile has no physical keyboard, so this is
+  // additive and can't affect the existing swipe/dot-tap navigation there.
+  useEffect(() => {
+    if (!lightboxOpen) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') { setLightboxOpen(false); resetLbZoom() }
+      else if (e.key === 'ArrowLeft' && lightboxIndex > 0) { setLbTransitioning(true); setLightboxIndex(i => i - 1); resetLbZoom() }
+      else if (e.key === 'ArrowRight' && lightboxIndex < photos.length - 1) { setLbTransitioning(true); setLightboxIndex(i => i + 1); resetLbZoom() }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [lightboxOpen, lightboxIndex, photos.length])
+
   const isAdmin = isAdminUser(user)
   const isOwner = !!user && (
     user.id === spot.added_by ||
@@ -582,6 +597,18 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           onTouchStart={onPhotoTouchStart}
           onTouchMove={onPhotoTouchMove}
           onTouchEnd={onPhotoTouchEnd}
+          onClick={() => {
+            // Opening the lightbox was gated entirely behind touch handlers
+            // (onPhotoTouchEnd's tap detection) with no click equivalent, so
+            // desktop/mouse users could never open it. This click handler is
+            // the desktop path; onPhotoTouchEnd still handles the mobile tap
+            // (and swipe) gesture unchanged.
+            if (photos.length > 0) {
+              setLightboxIndex(photoIndex)
+              resetLbZoom()
+              setLightboxOpen(true)
+            }
+          }}
         >
           {photos.length > 0 ? (
             photos.map((photo, i) => (
@@ -982,7 +1009,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
       {/* ── Edit form overlay ─────────────────────────────── */}
       {showEditForm && editForm && createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
             <div style={{ width: 28 }} />
@@ -1157,8 +1184,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           onTouchStart={onLbTouchStart}
           onTouchMove={onLbTouchMove}
           onTouchEnd={onLbTouchEnd}
+          onClick={() => { setLightboxOpen(false); resetLbZoom() }}
         >
-          <div onClick={() => { setLightboxOpen(false); resetLbZoom() }} style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000 }}>
+          <div onClick={e => { e.stopPropagation(); setLightboxOpen(false); resetLbZoom() }} style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000 }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="2" y1="2" x2="12" y2="12" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" /><line x1="12" y1="2" x2="2" y2="12" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" /></svg>
           </div>
           {photos.length > 1 && (
@@ -1202,7 +1230,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           {photos.length > 1 && lbScale <= 1 && (
             <div style={{ position: 'absolute', bottom: 48, display: 'flex', gap: 6 }}>
               {photos.map((_, i) => (
-                <div key={i} onClick={() => { setLbTransitioning(true); setLightboxIndex(i); resetLbZoom() }}
+                <div key={i} onClick={e => { e.stopPropagation(); setLbTransitioning(true); setLightboxIndex(i); resetLbZoom() }}
                   style={{ width: i === lightboxIndex ? 8 : 6, height: i === lightboxIndex ? 8 : 6, borderRadius: '50%', background: i === lightboxIndex ? '#d4785a' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'all 0.15s' }} />
               ))}
             </div>

@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 export function MapFoldedIcon({ color = '#ffffff', size = 22, filled = false }) {
   if (filled) {
     return (
@@ -52,6 +54,7 @@ export function ListIcon({ color = '#ffffff', size = 22, filled = false }) {
 }
 
 export function MapPinIcon({ color = '#ffffff', size = 22, filled = false }) {
+  const clipId = useId()
   if (filled) {
     return (
       // viewBox padded 1.5px on all sides to prevent edge clipping
@@ -69,11 +72,11 @@ export function MapPinIcon({ color = '#ffffff', size = 22, filled = false }) {
     // viewBox padded 1.5px on all sides; clipPath clips stroke to inside the pin shape
     <svg width={size * 0.83} height={size} viewBox="-1.5 -1.5 23 27" fill="none">
       <defs>
-        <clipPath id="sw-pin-clip">
+        <clipPath id={clipId}>
           <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" />
         </clipPath>
       </defs>
-      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" stroke={color} strokeWidth="3" fill="none" clipPath="url(#sw-pin-clip)" />
+      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" stroke={color} strokeWidth="3" fill="none" clipPath={`url(#${clipId})`} />
       <circle cx="10" cy="10" r="3.25" stroke={color} strokeWidth="1.5" fill="none" />
     </svg>
   )
@@ -81,6 +84,13 @@ export function MapPinIcon({ color = '#ffffff', size = 22, filled = false }) {
 
 export function BookmarkIcon({ color = '#6a6c7a', size = 22, filled = false }) {
   const path = 'M8,4 H40 V46 L24,34 L8,46 Z'
+  // clipPath id must be unique per instance — a shared hardcoded id collides
+  // across the many BookmarkIcon instances mounted at once (nav tabs, list
+  // card save buttons, peek card, etc.), and since SVG id references resolve
+  // document-globally, unmounting one instance mid-transition could leave
+  // another instance's clip-path pointing at a removed node, rendering its
+  // raw unclipped strokeWidth="7" path (much thicker than intended).
+  const clipId = useId()
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
       {filled ? (
@@ -88,11 +98,11 @@ export function BookmarkIcon({ color = '#6a6c7a', size = 22, filled = false }) {
       ) : (
         <>
           <defs>
-            <clipPath id="sw-bm-clip">
+            <clipPath id={clipId}>
               <path d={path} />
             </clipPath>
           </defs>
-          <path d={path} stroke={color} strokeWidth="7" strokeLinejoin="round" fill="none" clipPath="url(#sw-bm-clip)" />
+          <path d={path} stroke={color} strokeWidth="7" strokeLinejoin="round" fill="none" clipPath={`url(#${clipId})`} />
         </>
       )}
     </svg>
@@ -132,6 +142,7 @@ export function StarFilledIcon({ color = '#FFFFFF' }) {
 const PROFILE_PATH = 'M24 6C29 6 33 10 33 15C33 20 29 24 24 24C32 25 42 34 44 44L4 44C6 34 16 25 24 24C19 24 15 20 15 15C15 10 19 6 24 6Z'
 
 export function ProfileIcon({ color = '#ffffff', size = 22, filled = false }) {
+  const clipId = useId()
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
       {filled ? (
@@ -139,11 +150,11 @@ export function ProfileIcon({ color = '#ffffff', size = 22, filled = false }) {
       ) : (
         <>
           <defs>
-            <clipPath id="sw-prof-clip">
+            <clipPath id={clipId}>
               <path d={PROFILE_PATH} />
             </clipPath>
           </defs>
-          <path d={PROFILE_PATH} stroke={color} strokeWidth="5" fill="none" strokeLinejoin="round" clipPath="url(#sw-prof-clip)" />
+          <path d={PROFILE_PATH} stroke={color} strokeWidth="5" fill="none" strokeLinejoin="round" clipPath={`url(#${clipId})`} />
         </>
       )}
     </svg>

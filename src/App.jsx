@@ -12,6 +12,7 @@ import TabBar from './components/TabBar'
 import Logo from './components/Logo'
 import { PlusIcon } from './components/Icons'
 import { NAV_TABS } from './lib/navTabs'
+import { fetchLocationSuggestions, toSearchLocationEntry } from './lib/locationSearch'
 import SaveToListModal from './components/SaveToListModal'
 import ListView from './pages/ListView'
 import MapView from './pages/MapView'
@@ -19,8 +20,6 @@ import SavedView from './pages/SavedView'
 import ProfileView from './pages/ProfileView'
 import AddSpot from './pages/AddSpot'
 import SearchPage from './pages/SearchPage'
-
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
 // Module-level auth cache — survives App unmount/remount so there's no loading flash
 // when navigating back from a spot page.
@@ -113,22 +112,12 @@ function DesktopSearchBar({ spots, searchLocation, onSelect, onClear }) {
     setOpen(true)
     timer.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?types=place,region,postcode&country=US&access_token=${MAPBOX_TOKEN}&limit=5`
-        )
-        const data = await res.json()
-        setSuggestions((data.features || []).map(f => ({
-          id: f.id,
-          name: f.text,
-          placeName: f.place_name,
-          longitude: f.geometry.coordinates[0],
-          latitude: f.geometry.coordinates[1],
-        })))
+        setSuggestions(await fetchLocationSuggestions(query, spots))
       } catch { setSuggestions([]) }
       setLoading(false)
     }, 300)
     return () => clearTimeout(timer.current)
-  }, [query])
+  }, [query, spots])
 
   useEffect(() => {
     const handler = (e) => {
@@ -143,7 +132,7 @@ function DesktopSearchBar({ spots, searchLocation, onSelect, onClear }) {
     setQuery(item.name)
     setOpen(false)
     setSuggestions([])
-    onSelect({ name: item.name, placeName: item.placeName, longitude: item.longitude, latitude: item.latitude })
+    onSelect(toSearchLocationEntry(item))
   }
 
   const handleClear = () => {
@@ -214,8 +203,11 @@ function DesktopSearchBar({ spots, searchLocation, onSelect, onClear }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{item.name}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.placeName?.split(', ').slice(1).join(', ')}
+                  {item.stateName || item.placeName?.split(', ').slice(1).join(', ')}
                 </div>
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#d4785a', flexShrink: 0 }}>
+                {(item.spotCount ?? 0)} spot{item.spotCount !== 1 ? 's' : ''}
               </div>
             </div>
           ))}
@@ -589,44 +581,48 @@ export default function App() {
               </div>
             )}
             {effectiveTab === 'saved' && (
-              <SavedView
-                spots={visibleSpots}
-                saved={saved}
-                onSavePress={handleSavePress}
-                onSpotClick={handleSpotClick}
-                onAddSpot={openAdd}
-                onSearch={openSearch}
-                showNav={false}
-                user={user}
-              />
+              <div className="desktop-page-root" style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <SavedView
+                  spots={visibleSpots}
+                  saved={saved}
+                  onSavePress={handleSavePress}
+                  onSpotClick={handleSpotClick}
+                  onAddSpot={openAdd}
+                  onSearch={openSearch}
+                  showNav={false}
+                  user={user}
+                />
+              </div>
             )}
             {effectiveTab === 'profile' && (
-              <ProfileView
-                user={user}
-                spots={spots}
-                onAddSpot={openAdd}
-                onSearch={openSearch}
-                showNav={false}
-                saved={saved}
-                onSavePress={handleSavePress}
-                onSpotClick={handleSpotClick}
-                notifications={notifications}
-                unreadCount={unreadCount}
-                notifLoading={notifLoading}
-                notifHasMore={notifHasMore}
-                onFetchNotifications={fetchNotifications}
-                onMarkNotificationRead={markRead}
-                onMarkAllNotificationsRead={markAllRead}
-                onTabChange={handleTabChange}
-                hiddenIds={hiddenIds}
-                onUnhideSpot={unhideSpot}
-              />
+              <div className="desktop-page-root" style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <ProfileView
+                  user={user}
+                  spots={spots}
+                  onAddSpot={openAdd}
+                  onSearch={openSearch}
+                  showNav={false}
+                  saved={saved}
+                  onSavePress={handleSavePress}
+                  onSpotClick={handleSpotClick}
+                  notifications={notifications}
+                  unreadCount={unreadCount}
+                  notifLoading={notifLoading}
+                  notifHasMore={notifHasMore}
+                  onFetchNotifications={fetchNotifications}
+                  onMarkNotificationRead={markRead}
+                  onMarkAllNotificationsRead={markAllRead}
+                  onTabChange={handleTabChange}
+                  hiddenIds={hiddenIds}
+                  onUnhideSpot={unhideSpot}
+                />
+              </div>
             )}
           </div>
 
           {/* Spots view toggle pill for desktop */}
           {effectiveTab === 'spots' && (
-            <div style={{ position: 'fixed', bottom: 'calc(var(--desktop-nav-clearance) + var(--desktop-peek-card-lift))', left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
+            <div style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
               <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
                 <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
                 <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
@@ -788,7 +784,7 @@ export default function App() {
         >
           <div
             style={isDesktop
-              ? { background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 520, maxHeight: 'calc(100dvh - 48px)', display: 'flex', flexDirection: 'column', position: 'relative' }
+              ? { background: '#FDF8F0', borderRadius: 12, overflow: 'hidden', width: '100%', maxWidth: 'var(--desktop-content-max-width)', maxHeight: 'calc(100dvh - 48px)', display: 'flex', flexDirection: 'column', position: 'relative' }
               : { height: '100%', background: '#FDF8F0', display: 'flex', flexDirection: 'column' }
             }
             onClick={isDesktop ? e => e.stopPropagation() : undefined}

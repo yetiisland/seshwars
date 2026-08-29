@@ -146,7 +146,7 @@ export default function SpotPage() {
   }
 
   return (
-    <div className="desktop-page-root" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#FDF8F0', overflow: 'hidden' }}>
+    <div className="desktop-page-root" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: '#FDF8F0', overflow: 'hidden' }}>
       {/* Cream navbar with back button + spot title */}
       <div style={{
         display: 'flex', alignItems: 'center',
