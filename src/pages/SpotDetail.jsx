@@ -493,9 +493,17 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const handleDeleteSpot = async () => {
     setDeleting(true)
     setDeleteError('')
-    const { error } = await supabase.from('spots').delete().eq('id', spot.id)
+    // .select() is required here — an RLS-denied delete returns
+    // { data: null, error: null } just like a real success unless we chain
+    // it and check the returned rows, so this is the only way to tell a
+    // silent no-op apart from an actual delete.
+    const { data, error } = await supabase.from('spots').delete().eq('id', spot.id).select()
     setDeleting(false)
     if (error) { setDeleteError(error.message); return }
+    if (!data || data.length === 0) {
+      setDeleteError("Couldn't delete this spot — you may not have permission.")
+      return
+    }
     setShowDeleteConfirm(false)
     setShowEditForm(false)
     window.dispatchEvent(new Event('seshwars:spots-changed'))
