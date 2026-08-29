@@ -1,6 +1,7 @@
 import { BookmarkIcon, ArrowIcon } from './Icons'
 import TagsRow from './TagsRow'
 import { transformImageUrl } from '../utils/imageUrl'
+import { SHOP_STYLE } from '../lib/spotFields'
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
@@ -38,7 +39,7 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
       data-spot-id={spot.id}
       style={{
         ...(highlighted ? { borderColor: '#d4785a', boxShadow: '0 0 0 2px rgba(212,120,90,0.2)' } : {}),
-        ...(isShop ? { background: '#3D4454', border: '1px solid #2e3344' } : {}),
+        ...(isShop ? { background: SHOP_STYLE.bg, border: `1px solid ${SHOP_STYLE.border}` } : {}),
       }}
       onClick={() => onClick(spot)}
     >

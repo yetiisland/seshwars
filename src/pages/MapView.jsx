@@ -5,6 +5,7 @@ import FiltersModal from '../components/FiltersModal'
 import SpotCard from '../components/SpotCard'
 import { BookmarkIcon, ArrowIcon } from '../components/Icons'
 import TagsRow from '../components/TagsRow'
+import { SHOP_STYLE } from '../lib/spotFields'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const FALLBACK = { longitude: -104.9903, latitude: 39.7392, zoom: 13 }
@@ -33,6 +34,7 @@ function getSpotPinColors(spot) {
   if (CLOSED_REPORTS.has(active)) return { fill: '#C8CAD4', stroke: '#6a6c7a' }
   if (active) return { fill: '#f5c518', stroke: '#000000' }
   const type = spot.type === 'Park' ? 'Skatepark' : spot.type
+  if (type === 'Skate Shop') return { fill: SHOP_STYLE.bg, stroke: '#FFFFFF' }
   if (type === 'Skatepark') return { fill: '#FFFFFF', stroke: '#d4785a' }
   return { fill: '#d4785a', stroke: '#FFFFFF' }
 }
@@ -455,18 +457,21 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
             <div style={{ position: 'absolute', bottom: 60, left: 0, right: 0, padding: '0 12px 8px', zIndex: 10 }}>
               <div style={{ width: 32, height: 3, background: '#C8CAD4', borderRadius: 2, margin: '8px auto 10px' }} />
               <div
-                style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }}
+                style={{
+                  border: '1px solid #EAD8C8', borderRadius: 8, overflow: 'hidden', cursor: 'pointer',
+                  ...(selected.type === 'Skate Shop' ? { background: SHOP_STYLE.bg, border: `1px solid ${SHOP_STYLE.border}` } : { background: '#FFFFFF' }),
+                }}
                 onClick={() => onSpotClick(selected)}
               >
                 <div className="spot-card-img">
                   {selected.photos?.[0] ? (
                     <img src={selected.photos[0]} alt={selected.title} width="800" height="450" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <div style={{ width: '100%', height: '100%', background: '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '100%', height: '100%', background: selected.type === 'Skate Shop' ? '#2e3344' : '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="40" height="24" viewBox="0 0 40 24" fill="none">
-                        <rect x="1" y="15" width="38" height="6" rx="1" fill="#ddd0bc" />
-                        <rect x="3" y="8" width="34" height="6" rx="1" fill="#e0cebc" />
-                        <rect x="6" y="2" width="28" height="5" rx="1" fill="#e8d8c8" />
+                        <rect x="1" y="15" width="38" height="6" rx="1" fill={selected.type === 'Skate Shop' ? '#3a3d50' : '#ddd0bc'} />
+                        <rect x="3" y="8" width="34" height="6" rx="1" fill={selected.type === 'Skate Shop' ? '#434658' : '#e0cebc'} />
+                        <rect x="6" y="2" width="28" height="5" rx="1" fill={selected.type === 'Skate Shop' ? '#4c5060' : '#e8d8c8'} />
                       </svg>
                     </div>
                   )}
@@ -492,16 +497,19 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
                 </div>
                 <div style={{ padding: '8px 10px 10px' }}>
                   <div className="spot-title-row">
-                    <div className="spot-title" style={{ fontSize: 12 }}>{selected.title}</div>
+                    <div className="spot-title" style={{ fontSize: 12, ...(selected.type === 'Skate Shop' ? { color: '#FFFFFF', fontWeight: 900 } : {}) }}>{selected.title}</div>
                     {selected.distance != null && <div className="dist-text">{selected.distance} mi</div>}
                   </div>
                   {selected.description ? (
-                    <div style={{ fontSize: 11, color: '#9a8878', marginBottom: 6, lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    <div style={{ fontSize: 11, color: selected.type === 'Skate Shop' ? 'rgba(255,255,255,0.85)' : '#9a8878', marginBottom: 6, lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {selected.description}
                     </div>
                   ) : null}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <TagsRow features={selected.features || []} />
+                    {selected.type === 'Skate Shop'
+                      ? <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.75)', letterSpacing: 0.3, flex: 1 }}>Support Your Local Skate Shop</span>
+                      : <TagsRow features={selected.features || []} />
+                    }
                     <div className="arrow-btn" style={{ width: 24, height: 24, flexShrink: 0 }}>
                       <ArrowIcon size={10} />
                     </div>

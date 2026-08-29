@@ -57,6 +57,10 @@ export const SPOT_FIELDS = [
   },
 ]
 
+// Single source of truth for the Skate Shop dark-navy treatment, shared by
+// SpotCard (ListView + desktop map peek card) and MapView (pins + mobile peek card).
+export const SHOP_STYLE = { bg: '#3D4454', border: '#2e3344' }
+
 export function bustChipActiveStyle(rating) {
   if (rating === 'No Bust') return { background: '#4a7a3a', borderColor: '#3d6830', color: '#ffffff' }
   if (rating === 'Bust') return { background: '#c0453a', borderColor: '#a83830', color: '#ffffff' }
