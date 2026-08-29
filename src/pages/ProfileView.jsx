@@ -76,6 +76,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showSupport, setShowSupport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showDeleteAccountPage, setShowDeleteAccountPage] = useState(false)
+  const [showSettingsSheet, setShowSettingsSheet] = useState(false)
+  const [settingsSheetClosing, setSettingsSheetClosing] = useState(false)
   const [showHiddenSpots, setShowHiddenSpots] = useState(false)
   const [unhideTarget, setUnhideTarget] = useState(null)
   const [showUnhideConfirm, setShowUnhideConfirm] = useState(false)
@@ -233,6 +235,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const closeEditSheet = () => {
     setEditSheetClosing(true)
     setTimeout(() => { setEditSheetClosing(false); setShowEditSheet(false); setEditDraft(null) }, 180)
+  }
+
+  const openSettingsSheet = () => setShowSettingsSheet(true)
+  const closeSettingsSheet = () => {
+    setSettingsSheetClosing(true)
+    setTimeout(() => { setSettingsSheetClosing(false); setShowSettingsSheet(false) }, 180)
   }
 
   const openPasswordModal = () => {
@@ -418,27 +426,40 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               {storeProfile.username && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>@{storeProfile.username}</div>}
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{user.email}</div>
             </div>
-            {/* Bell icon — notifications */}
-            <div
-              onClick={openNotifications}
-              style={{ position: 'relative', width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="#d4785a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M13.73 21a2 2 0 01-3.46 0" stroke="#d4785a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {unreadCount > 0 && (
-                <div style={{
-                  position: 'absolute', top: -6, right: -6,
-                  minWidth: 17, height: 17, borderRadius: 9,
-                  background: '#d4785a', border: '1.5px solid #FDF8F0',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
-                }}>
-                  <span style={{ fontSize: 9, fontWeight: 900, color: '#fff', lineHeight: 1 }}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                </div>
-              )}
+            {/* Settings + Bell cluster */}
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              {/* Gear icon — settings */}
+              <div
+                onClick={openSettingsSheet}
+                style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="3" stroke="#d4785a" strokeWidth="1.8" />
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#d4785a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              {/* Bell icon — notifications */}
+              <div
+                onClick={openNotifications}
+                style={{ position: 'relative', width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="#FDF8F0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M13.73 21a2 2 0 01-3.46 0" stroke="#FDF8F0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {unreadCount > 0 && (
+                  <div style={{
+                    position: 'absolute', top: -6, right: -6,
+                    minWidth: 17, height: 17, borderRadius: 9,
+                    background: '#FDF8F0', border: '1.5px solid #d4785a',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+                  }}>
+                    <span style={{ fontSize: 9, fontWeight: 900, color: '#d4785a', lineHeight: 1 }}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -515,8 +536,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </button>
           </div>
 
-          <div className="divider" />
-
           {/* Feedback bottom sheet — portalled above bottom nav */}
           {showFeedbackSheet && createPortal(
             <div
@@ -570,42 +589,63 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             document.body
           )}
 
-          <div
-            onClick={() => setShowTos(true)}
-            style={{ padding: '12px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            Terms of Service
-          </div>
-          <div
-            onClick={() => setShowPrivacy(true)}
-            style={{ padding: '4px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            Privacy Policy
-          </div>
-          <div
-            onClick={() => setShowSupport(true)}
-            style={{ padding: '4px 0 8px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            Support
-          </div>
-          <div onClick={handleSignOut} style={{ padding: '8px 0', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}>
-            Sign Out
-          </div>
-          <div className="divider" style={{ margin: '8px 0 0' }} />
-          <div
-            onClick={() => setShowDeleteConfirm(true)}
-            style={{ padding: '8px 0', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}
-          >
-            Delete Account
-          </div>
-          <div
-            onClick={() => setShowDeleteAccountPage(true)}
-            style={{ padding: '2px 0 8px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            Account Deletion Info
-          </div>
           <div style={{ height: BOTTOM_PAD }} />
           {cropFile && <ImageCropModal imageFile={cropFile} onConfirm={handleCropConfirm} onCancel={() => setCropFile(null)} />}
+
+          {/* Settings bottom sheet — same sheet component/animation as Edit Profile */}
+          {(showSettingsSheet || settingsSheetClosing) && createPortal(
+            <div className="modal-overlay" onClick={closeSettingsSheet}>
+              <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto', ...(settingsSheetClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : {}) }}>
+                <div className="modal-handle" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px 16px' }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Settings</div>
+                  <div onClick={closeSettingsSheet} style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                      <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+                <div style={{ padding: '0 16px 28px' }}>
+                  <div
+                    onClick={() => setShowTos(true)}
+                    style={{ padding: '12px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Terms of Service
+                  </div>
+                  <div
+                    onClick={() => setShowPrivacy(true)}
+                    style={{ padding: '4px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Privacy Policy
+                  </div>
+                  <div
+                    onClick={() => setShowSupport(true)}
+                    style={{ padding: '4px 0 8px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Support
+                  </div>
+                  <div onClick={handleSignOut} style={{ padding: '8px 0', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}>
+                    Sign Out
+                  </div>
+                  <div className="divider" style={{ margin: '8px 0 0' }} />
+                  <div
+                    onClick={() => setShowDeleteConfirm(true)}
+                    style={{ padding: '8px 0', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}
+                  >
+                    Delete Account
+                  </div>
+                  <div
+                    onClick={() => setShowDeleteAccountPage(true)}
+                    style={{ padding: '2px 0 8px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Account Deletion Info
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
           {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
           {showPrivacy && createPortal(<PrivacyPolicy onClose={() => setShowPrivacy(false)} />, document.body)}
           {showSupport && createPortal(<SupportPage onClose={() => setShowSupport(false)} />, document.body)}
