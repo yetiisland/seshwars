@@ -270,7 +270,7 @@ export default function App() {
   const [sortMode, setSortMode] = useState(_cachedSortMode)
   const { spots, loading, refetch } = useSpots()
   const { saved, refetchSaved } = useSavedSpots(user?.id)
-  const { hiddenIds, refetchHidden } = useHiddenSpots(user?.id)
+  const { hiddenIds, hideSpot, unhideSpot } = useHiddenSpots(user?.id)
   const [hideTarget, setHideTarget] = useState(null)
   const [showHideConfirm, setShowHideConfirm] = useState(false)
   const [hideConfirmClosing, setHideConfirmClosing] = useState(false)
@@ -449,13 +449,12 @@ export default function App() {
 
   const confirmHide = async () => {
     if (!hideTarget || !user) return
-    const { error } = await supabase.from('hidden_spots').insert({ user_id: user.id, spot_id: hideTarget.id })
+    const { error } = await hideSpot(hideTarget.id)
     if (error) {
       console.error('hide spot failed:', error)
       alert('Could not hide this spot: ' + error.message)
       return
     }
-    refetchHidden()
     closeHideConfirm()
   }
 
@@ -619,6 +618,8 @@ export default function App() {
                 onMarkNotificationRead={markRead}
                 onMarkAllNotificationsRead={markAllRead}
                 onTabChange={handleTabChange}
+                hiddenIds={hiddenIds}
+                onUnhideSpot={unhideSpot}
               />
             )}
           </div>
@@ -714,6 +715,8 @@ export default function App() {
                   onMarkNotificationRead={markRead}
                   onMarkAllNotificationsRead={markAllRead}
                   onTabChange={handleTabChange}
+                  hiddenIds={hiddenIds}
+                  onUnhideSpot={unhideSpot}
                 />
               )}
             </>

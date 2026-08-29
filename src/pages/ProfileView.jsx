@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../utils/compressImage'
@@ -13,12 +13,8 @@ import DeleteAccountPage from './DeleteAccountPage'
 import ImageCropModal from '../components/ImageCropModal'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
-const STALE_MS = 30_000
 
 let _mySpotsScrollTop = 0
-let _cachedHiddenIds = null
-let _hiddenIdsUserId = null
-let _hiddenIdsLastFetched = 0
 
 function relativeTime(iso) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -41,7 +37,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -80,9 +76,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showSupport, setShowSupport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showDeleteAccountPage, setShowDeleteAccountPage] = useState(false)
-  const [hiddenSpotIds, setHiddenSpotIds] = useState(() =>
-    _hiddenIdsUserId === user?.id && _cachedHiddenIds ? _cachedHiddenIds : new Set()
-  )
   const [showHiddenSpots, setShowHiddenSpots] = useState(false)
   const [unhideTarget, setUnhideTarget] = useState(null)
   const [showUnhideConfirm, setShowUnhideConfirm] = useState(false)
@@ -103,26 +96,11 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
   const identifier = user?.email?.split('@')[0] || ''
   const mySpots = spots.filter(s => s.added_by === user?.id || (identifier && s.added_by === identifier))
-  const hiddenSpots = spots.filter(s => hiddenSpotIds.has(s.id))
-
-  const loadHiddenSpots = useCallback(async ({ force = false } = {}) => {
-    if (!user?.id) return
-    if (!force && _hiddenIdsUserId === user.id && _cachedHiddenIds && Date.now() - _hiddenIdsLastFetched < STALE_MS) return
-    _hiddenIdsLastFetched = Date.now()
-    _hiddenIdsUserId = user.id
-    const { data } = await supabase.from('hidden_spots').select('spot_id').eq('user_id', user.id)
-    if (data) {
-      const s = new Set(data.map(d => d.spot_id))
-      _cachedHiddenIds = s
-      setHiddenSpotIds(s)
-    }
-  }, [user?.id])
-
-  useEffect(() => { loadHiddenSpots() }, [loadHiddenSpots])
+  const hiddenSpots = spots.filter(s => hiddenIds.has(s.id))
 
   const confirmUnhide = async () => {
     if (!unhideTarget) return
-    const { error } = await supabase.from('hidden_spots').delete().eq('user_id', user.id).eq('spot_id', unhideTarget.id)
+    const { error } = await onUnhideSpot(unhideTarget.id)
     if (error) {
       console.error('unhide failed:', error)
       alert('Could not unhide this spot: ' + error.message)
@@ -130,7 +108,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     }
     setShowUnhideConfirm(false)
     setUnhideTarget(null)
-    loadHiddenSpots({ force: true })
   }
 
   useEffect(() => {

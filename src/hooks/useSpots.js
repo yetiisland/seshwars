@@ -128,5 +128,41 @@ export function useHiddenSpots(userId) {
 
   useEffect(() => { refetchHidden() }, [refetchHidden])
 
-  return { hiddenIds, refetchHidden }
+  // Single source of truth for hide/unhide — every caller (map peek card,
+  // list card, Hidden Spots page) goes through these so hiddenIds updates
+  // once and every consumer re-renders from it, no refetch/reload needed.
+  // A blocked RLS write returns { data: [], error: null } and would look
+  // like success if we trusted `error` alone — chain .select() and require
+  // a non-empty result before touching local state.
+  const hideSpot = useCallback(async (spotId) => {
+    if (!userId) return { error: new Error('Not signed in') }
+    const { data, error } = await supabase
+      .from('hidden_spots')
+      .insert({ user_id: userId, spot_id: spotId })
+      .select()
+    if (error) return { error }
+    if (!data || data.length === 0) return { error: new Error('Hide was not applied') }
+    setHiddenIds(prev => new Set(prev).add(spotId))
+    return { error: null }
+  }, [userId])
+
+  const unhideSpot = useCallback(async (spotId) => {
+    if (!userId) return { error: new Error('Not signed in') }
+    const { data, error } = await supabase
+      .from('hidden_spots')
+      .delete()
+      .eq('user_id', userId)
+      .eq('spot_id', spotId)
+      .select()
+    if (error) return { error }
+    if (!data || data.length === 0) return { error: new Error('Unhide was not applied') }
+    setHiddenIds(prev => {
+      const next = new Set(prev)
+      next.delete(spotId)
+      return next
+    })
+    return { error: null }
+  }, [userId])
+
+  return { hiddenIds, refetchHidden, hideSpot, unhideSpot }
 }
