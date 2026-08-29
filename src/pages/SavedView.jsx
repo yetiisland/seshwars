@@ -7,9 +7,6 @@ import Navbar from '../components/Navbar'
 import { ArrowIcon, ShareIcon } from '../components/Icons'
 import MapView from './MapView'
 
-// Set to true to re-enable list sharing.
-const LIST_SHARING_ENABLED = false
-
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
 // Module-level state: survives App remount so back-nav restores the open collection
@@ -25,9 +22,11 @@ export function invalidateListsCache() {
   _listsUserId = null
 }
 
+// 20 bytes of crypto.getRandomValues() output, one char each — well above the
+// RPCs' 16-character minimum, with margin.
 function generateShareToken() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-  const arr = new Uint8Array(12)
+  const arr = new Uint8Array(20)
   crypto.getRandomValues(arr)
   return Array.from(arr).map(n => chars[n % chars.length]).join('')
 }
@@ -160,7 +159,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
         <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
           {title}
         </div>
-        {(isList || (isFavorites && LIST_SHARING_ENABLED)) ? (
+        {(isList || isFavorites) ? (
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             {isList && (
               <div
@@ -172,14 +171,12 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
                 </svg>
               </div>
             )}
-            {LIST_SHARING_ENABLED && (
-              <div
-                onClick={handleShare}
-                style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: sharing ? 0.6 : 1 }}
-              >
-                <ShareIcon color="#d4785a" />
-              </div>
-            )}
+            <div
+              onClick={handleShare}
+              style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: sharing ? 0.6 : 1 }}
+            >
+              <ShareIcon color="#d4785a" />
+            </div>
           </div>
         ) : (
           <div style={{ width: 36 }} />

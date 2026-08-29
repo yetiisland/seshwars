@@ -34,47 +34,48 @@ export default function SharedListPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: listData, error: listError } = await supabase
-        .from('spot_lists')
-        .select('*')
-        .eq('share_token', shareToken)
-        .maybeSingle()
+      // Both the list itself and its spots are fetched exclusively through
+      // these SECURITY DEFINER RPCs — never query spot_lists/saved_spots
+      // directly by share_token. Those tables have no public SELECT policy
+      // any more (the old "by share_token" policy let anon enumerate every
+      // token in the table); the RPCs are the only sanctioned public read
+      // path, and get_shared_list_spots already excludes private spots
+      // server-side.
+      const { data: listRows, error: listError } = await supabase
+        .rpc('get_shared_list', { p_token: shareToken })
+      const listData = listRows?.[0]
 
       if (listError || !listData) { setNotFound(true); setLoading(false); return }
       setList(listData)
 
-      const savedQuery = listData.is_favorites
-        ? supabase.from('saved_spots').select('spot_id').eq('user_id', listData.user_id).is('list_id', null)
-        : supabase.from('saved_spots').select('spot_id').eq('list_id', listData.id)
-      const { data: items } = await savedQuery
+      const { data: spotsRows, error: spotsError } = await supabase
+        .rpc('get_shared_list_spots', { p_token: shareToken })
 
-      const ids = (items || []).map(i => i.spot_id)
-      if (ids.length === 0) { setLoading(false); return }
+      if (spotsError || !spotsRows || spotsRows.length === 0) { setLoading(false); return }
 
-      const [spotsRes, reviewsRes] = await Promise.all([
-        supabase.from('spots').select('*').in('id', ids),
-        supabase.from('spot_reviews').select('spot_id, rating').in('spot_id', ids),
-      ])
+      const ids = spotsRows.map(s => s.id)
+      const { data: reviews } = await supabase
+        .from('spot_reviews').select('spot_id, rating').in('spot_id', ids)
 
-      if (spotsRes.data) {
-        const rMap = {}
-        for (const r of (reviewsRes.data || [])) {
-          if (!rMap[r.spot_id]) rMap[r.spot_id] = { sum: 0, count: 0 }
-          rMap[r.spot_id].sum += r.rating
-          rMap[r.spot_id].count++
-        }
-        const merged = spotsRes.data.map(s => ({
-          ...s,
-          avg_rating: rMap[s.id] ? parseFloat((rMap[s.id].sum / rMap[s.id].count).toFixed(1)) : null,
-          rating_count: rMap[s.id]?.count || 0,
-        }))
-        const visible = merged.filter(s => {
-          const vis = s.visibility || 'public'
-          const mod = s.moderation_status
-          return (!mod || mod === 'approved') && (vis === 'public' || vis === 'unlisted')
-        })
-        setSpots(visible)
+      const rMap = {}
+      for (const r of (reviews || [])) {
+        if (!rMap[r.spot_id]) rMap[r.spot_id] = { sum: 0, count: 0 }
+        rMap[r.spot_id].sum += r.rating
+        rMap[r.spot_id].count++
       }
+      const merged = spotsRows.map(s => ({
+        ...s,
+        avg_rating: rMap[s.id] ? parseFloat((rMap[s.id].sum / rMap[s.id].count).toFixed(1)) : null,
+        rating_count: rMap[s.id]?.count || 0,
+      }))
+      // Privacy (visibility === 'private') is already enforced server-side by
+      // the RPC. Moderation status isn't the RPC's concern, so it's still
+      // filtered here, same as before.
+      const visible = merged.filter(s => {
+        const mod = s.moderation_status
+        return !mod || mod === 'approved'
+      })
+      setSpots(visible)
       setLoading(false)
     }
     load()
