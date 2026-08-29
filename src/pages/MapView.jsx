@@ -3,8 +3,6 @@ import Map, { Marker, NavigationControl, Source, Layer } from 'react-map-gl'
 import Navbar from '../components/Navbar'
 import FiltersModal from '../components/FiltersModal'
 import SpotCard from '../components/SpotCard'
-import { BookmarkIcon, ArrowIcon } from '../components/Icons'
-import TagsRow from '../components/TagsRow'
 import { SHOP_STYLE } from '../lib/spotFields'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
@@ -17,14 +15,6 @@ const STYLE_LIGHT = 'mapbox://styles/mapbox/streets-v12'
 const STYLE_SAT = 'mapbox://styles/mapbox/satellite-streets-v12'
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
-
-function bustStyle(rating) {
-  if (!rating) return null
-  if (rating === 'No Bust') return { background: '#4a7a3a', color: '#ffffff', border: '1px solid #3d6830' }
-  if (rating === 'Bust') return { background: '#c0453a', color: '#ffffff', border: '1px solid #a83830' }
-  if (rating === 'Medium Bust' || rating === 'Weekends Only' || rating === 'Weekdays Only') return { background: '#c8a020', color: '#ffffff', border: '1px solid #b08818' }
-  return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
-}
 
 const CLOSED_REPORTS = new Set(['No Longer Skateable', 'Spot Destroyed', "Spot Doesn't Exist", 'No Longer Exists', 'Skate Stopped'])
 
@@ -100,32 +90,6 @@ const unclusteredPointLayer = {
   source: 'spots',
   filter: ['!', ['has', 'point_count']],
   paint: { 'circle-radius': 0, 'circle-opacity': 0 },
-}
-
-function CautionChip({ report, reportCustom, small = false }) {
-  const text = report === 'Other' ? (reportCustom || 'Spot Reported') : report
-  if (small) {
-    return (
-      <div style={{ position: 'absolute', bottom: 3, left: 3, right: 3, background: '#f5c518', borderRadius: 4, padding: '2px 4px', display: 'flex', alignItems: 'center', gap: 2 }}>
-        <svg width="7" height="6" viewBox="0 0 18 16" fill="none">
-          <path d="M9 1L17 15H1L9 1Z" stroke="#000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
-          <line x1="9" y1="5.5" x2="9" y2="10" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
-          <circle cx="9" cy="12.5" r="0.9" fill="#000" />
-        </svg>
-        <span style={{ fontSize: 7, fontWeight: 700, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
-      </div>
-    )
-  }
-  return (
-    <div style={{ position: 'absolute', bottom: 6, left: 6, zIndex: 3, background: '#f5c518', borderRadius: 5, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3, maxWidth: 'calc(100% - 12px)' }}>
-      <svg width="8" height="7" viewBox="0 0 18 16" fill="none">
-        <path d="M9 1L17 15H1L9 1Z" stroke="#000" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
-        <line x1="9" y1="5.5" x2="9" y2="10" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
-        <circle cx="9" cy="12.5" r="0.9" fill="#000" />
-      </svg>
-      <span style={{ fontSize: 8, fontWeight: 700, color: '#000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
-    </div>
-  )
 }
 
 export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, sortMode, onSortModeChange, searchLocation, onClearSearch, highlightedSpotId, onSearch, fitOnMount = false, onHidePress, isActive = true }) {
@@ -454,68 +418,15 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
               />
             </div>
           ) : (
-            <div style={{ position: 'absolute', bottom: 60, left: 0, right: 0, padding: '0 12px 8px', zIndex: 10 }}>
+            <div className="mobile-peek-card" style={{ position: 'absolute', bottom: 60, left: 0, right: 0, padding: '0 12px 8px', zIndex: 10 }}>
               <div style={{ width: 32, height: 3, background: '#C8CAD4', borderRadius: 2, margin: '8px auto 10px' }} />
-              <div
-                style={{
-                  border: '1px solid #EAD8C8', borderRadius: 8, overflow: 'hidden', cursor: 'pointer',
-                  ...(selected.type === 'Skate Shop' ? { background: SHOP_STYLE.bg, border: `1px solid ${SHOP_STYLE.border}` } : { background: '#FFFFFF' }),
-                }}
-                onClick={() => onSpotClick(selected)}
-              >
-                <div className="spot-card-img">
-                  {selected.photos?.[0] ? (
-                    <img src={selected.photos[0]} alt={selected.title} width="800" height="450" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', background: selected.type === 'Skate Shop' ? '#2e3344' : '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <svg width="40" height="24" viewBox="0 0 40 24" fill="none">
-                        <rect x="1" y="15" width="38" height="6" rx="1" fill={selected.type === 'Skate Shop' ? '#3a3d50' : '#ddd0bc'} />
-                        <rect x="3" y="8" width="34" height="6" rx="1" fill={selected.type === 'Skate Shop' ? '#434658' : '#e0cebc'} />
-                        <rect x="6" y="2" width="28" height="5" rx="1" fill={selected.type === 'Skate Shop' ? '#4c5060' : '#e8d8c8'} />
-                      </svg>
-                    </div>
-                  )}
-                  <div style={{ position: 'absolute', top: 6, left: 6, display: 'flex', gap: 4 }}>
-                    <div className="spot-badge">{normalizeType(selected.type)}</div>
-                    {bustStyle(selected.bust_rating) && (
-                      <div style={{ ...bustStyle(selected.bust_rating), fontSize: 9, padding: '3px 7px', borderRadius: 6, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
-                        {selected.bust_rating}
-                      </div>
-                    )}
-                  </div>
-                  {selected.most_recent_report && selected.most_recent_report !== 'Skateable Again' && (
-                    <CautionChip report={selected.most_recent_report} reportCustom={selected.most_recent_report_custom} />
-                  )}
-                  <div style={{ position: 'absolute', top: 6, right: 6 }}>
-                    <div
-                      style={{ width: 22, height: 22, borderRadius: 5, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                      onClick={e => { e.stopPropagation(); onSavePress?.(selected) }}
-                    >
-                      <BookmarkIcon color="#d4785a" size={12} filled={saved.has(selected.id)} />
-                    </div>
-                  </div>
-                </div>
-                <div style={{ padding: '8px 10px 10px' }}>
-                  <div className="spot-title-row">
-                    <div className="spot-title" style={{ fontSize: 12, ...(selected.type === 'Skate Shop' ? { color: '#FFFFFF', fontWeight: 900 } : {}) }}>{selected.title}</div>
-                    {selected.distance != null && <div className="dist-text">{selected.distance} mi</div>}
-                  </div>
-                  {selected.description ? (
-                    <div style={{ fontSize: 11, color: selected.type === 'Skate Shop' ? 'rgba(255,255,255,0.85)' : '#9a8878', marginBottom: 6, lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                      {selected.description}
-                    </div>
-                  ) : null}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {selected.type === 'Skate Shop'
-                      ? <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.75)', letterSpacing: 0.3, flex: 1 }}>Support Your Local Skate Shop</span>
-                      : <TagsRow features={selected.features || []} />
-                    }
-                    <div className="arrow-btn" style={{ width: 24, height: 24, flexShrink: 0 }}>
-                      <ArrowIcon size={10} />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <SpotCard
+                spot={selected}
+                saved={saved.has(selected.id)}
+                onSavePress={onSavePress}
+                onClick={onSpotClick}
+                onHidePress={onHidePress}
+              />
             </div>
           )
         )}

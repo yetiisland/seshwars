@@ -647,6 +647,13 @@ textarea.form-input {
 /* Fix mapbox marker clipping at map edges */
 .mapboxgl-map { overflow: visible !important; }
 
+/* Mobile map peek card wraps a plain .spot-card, same as .desktop-peek-card
+   above — zero its default 10px margin-bottom so it doesn't add a gap below
+   the card inside this positioned box. */
+.mobile-peek-card .spot-card {
+  margin-bottom: 0;
+}
+
 /* Desktop list view 3-column grid */
 @media (min-width: 769px) {
   .spots-list-grid {
