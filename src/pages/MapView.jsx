@@ -223,6 +223,19 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     return true
   })
 
+  // `selected` is local UI state pointing at a spot for the peek card — it has
+  // no automatic link to the pins actually on the map. If the selected spot
+  // drops out of `filtered` (hidden, filtered out by type/feature/bust/
+  // lighting, moderation change, etc.) this closes the peek card immediately
+  // instead of leaving it stuck showing a spot whose pin is already gone.
+  // Reads off `filtered`, which is itself derived from the shared `spots`
+  // prop plus the shared filter state — no separate refetch.
+  useEffect(() => {
+    if (selected && !filtered.some(s => s.id === selected.id)) {
+      setSelected(null)
+    }
+  }, [filtered, selected])
+
   const geojson = useMemo(() => ({
     type: 'FeatureCollection',
     features: filtered
