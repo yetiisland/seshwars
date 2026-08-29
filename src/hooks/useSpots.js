@@ -25,6 +25,16 @@ export function mergeSpotIntoCache(updatedSpot) {
   _lastFingerprint = spotsFingerprint(_cachedSpots)
 }
 
+// Same idea as mergeSpotIntoCache, for a confirmed-successful delete: removes
+// the spot from the module-level cache so the next mount of App.jsx (e.g.
+// navigating back after deleting) reads its absence immediately, without
+// waiting on the 30s staleness gate in fetchSpots().
+export function removeSpotFromCache(spotId) {
+  if (!spotId) return
+  _cachedSpots = _cachedSpots.filter(s => s.id !== spotId)
+  _lastFingerprint = spotsFingerprint(_cachedSpots)
+}
+
 export function useSpots() {
   const [spots, setSpots] = useState(_cachedSpots)
   const [loading, setLoading] = useState(!_spotsReady)

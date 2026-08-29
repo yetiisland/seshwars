@@ -17,7 +17,7 @@ import { transformImageUrl } from '../utils/imageUrl'
 import TermsOfService from './TermsOfService'
 import { isAdminUser } from '../lib/admin'
 import { SPOT_FIELDS } from '../lib/spotFields'
-import { mergeSpotIntoCache } from '../hooks/useSpots'
+import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024
@@ -504,9 +504,17 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       setDeleteError("Couldn't delete this spot — you may not have permission.")
       return
     }
+    // Deleting always navigates away (onEditSuccess is called with no
+    // argument below), remounting App.jsx fresh. Mutate the shared
+    // module-level cache now so that remount reads the spot's absence
+    // immediately — same mechanism handleEditSave already uses via
+    // mergeSpotIntoCache, just the removal counterpart. No refetch needed:
+    // the old seshwars:spots-changed dispatch never actually reached a
+    // listener here anyway, since App.jsx (the only listener) is unmounted
+    // for the entire time the user is on this route.
+    removeSpotFromCache(spot.id)
     setShowDeleteConfirm(false)
     setShowEditForm(false)
-    window.dispatchEvent(new Event('seshwars:spots-changed'))
     onEditSuccess?.()
   }
 
