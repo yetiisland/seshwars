@@ -544,7 +544,7 @@ export default function App() {
 
           {/* Content area — map is full-width exception; everything else constrained to 1200px */}
           <div className={`desktop-content${isMapActive ? '' : ' desktop-content-constrained'}`}>
-            {effectiveTab === 'spots' && spotsView === 'list' && (
+            <div style={{ display: effectiveTab === 'spots' && spotsView === 'list' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <ListView
                 spots={filteredByDistance}
                 loading={loading}
@@ -564,7 +564,7 @@ export default function App() {
                 sortMode={sortMode}
                 onSortModeChange={handleSortModeChange}
               />
-            )}
+            </div>
             {mapEverOpened && (
               <div style={{ display: isMapActive ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
                 <MapView
@@ -667,7 +667,7 @@ export default function App() {
           <SafeAreaTop />
           {!showAdd && (
             <>
-              {effectiveTab === 'spots' && spotsView === 'list' && (
+              <div style={{ display: effectiveTab === 'spots' && spotsView === 'list' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <ListView
                   spots={filteredByDistance}
                   loading={loading}
@@ -686,7 +686,7 @@ export default function App() {
                   sortMode={sortMode}
                   onSortModeChange={handleSortModeChange}
                 />
-              )}
+              </div>
               {effectiveTab === 'saved' && (
                 <SavedView
                   spots={visibleSpots}

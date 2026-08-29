@@ -23,6 +23,18 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
     }
   }, [])
 
+  // ListView now stays mounted across the map<->list toggle (App.jsx just
+  // hides it via display:none), so scroll position survives that for free —
+  // no restore logic needed there. But a filter/sort/search change is a new
+  // result set, and should land the user at the top of it rather than
+  // wherever they happened to be scrolled to in the old one. Skip the very
+  // first run so this doesn't fight the mount-restore effect above.
+  const isFirstFilterRun = useRef(true)
+  useEffect(() => {
+    if (isFirstFilterRun.current) { isFirstFilterRun.current = false; return }
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+  }, [filters, sortMode, searchLocation])
+
   // Desktop: on wide viewports the list column is centered with empty margin
   // on either side, and that margin isn't itself scrollable — the wheel does
   // nothing unless the cursor is directly over the narrow list. Forward wheel
