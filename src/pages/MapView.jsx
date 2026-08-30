@@ -138,38 +138,33 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     if (!searchLocation?.isRegion || !mapReady) return
     // Only auto-fit once per unique region name. Manual zoom/pan after that is permanent.
     if (regionFitRef.current === searchLocation.name) return
-    // Prefer the geocoder's own region bbox (the actual state/place boundary)
-    // over spot coordinates — spots only ever cover part of a region, so a
-    // box derived from them is always tighter than the real region, and can
-    // be drastically tighter if the spots happen to cluster in one area of
-    // it. Fall back to spot coordinates only when no bbox came back.
-    let bounds = searchLocation.bbox
-      ? [[searchLocation.bbox[0], searchLocation.bbox[1]], [searchLocation.bbox[2], searchLocation.bbox[3]]]
-      : null
-    if (!bounds) {
-      const coords = spots.filter(s => s.latitude && s.longitude)
-      if (coords.length === 0) return
-      const lngs = coords.map(s => s.longitude)
-      const lats = coords.map(s => s.latitude)
-      bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]]
-    }
     const map = mapRef.current?.getMap()
-    if (map) {
-      // Bottom padding is taller than the other sides — the LIST/MAP toggle
-      // pill + bottom nav together cover ~162px on desktop (measured live
-      // via getBoundingClientRect: toggle top sits 162.5px above the
-      // viewport bottom) and a comparable ~141-151px on mobile (toggle
-      // bottom offset 84px + pill height ~33px + safe-area-or-24px). Without
-      // this, a region whose spots skew toward its southern edge — which
-      // gets more likely simply by having more spots, e.g. California's LA
-      // cluster or Michigan's — gets fit correctly by the math but ends up
-      // visually buried behind that chrome.
-      map.fitBounds(bounds, { padding: { top: 60, bottom: 170, left: 60, right: 60 }, maxZoom: 13, duration: 600 })
+    // Fit to the geocoder's own region bbox — the actual state/province/
+    // country boundary — and nothing else. No spot coordinates, no rendered
+    // or clustered map features, no results cap: the number of spots in the
+    // region has zero effect on this. Only fall back to centering on the
+    // result's own coordinates when a region result has no bbox at all
+    // (uncommon, but some place types don't carry one).
+    if (searchLocation.bbox) {
+      const bounds = [[searchLocation.bbox[0], searchLocation.bbox[1]], [searchLocation.bbox[2], searchLocation.bbox[3]]]
+      if (map) {
+        // Bottom padding is taller than the other sides — the LIST/MAP
+        // toggle pill + bottom nav together cover ~162px on desktop
+        // (measured live via getBoundingClientRect: toggle top sits 162.5px
+        // above the viewport bottom) and a comparable ~141-151px on mobile
+        // (toggle bottom offset 84px + pill height ~33px +
+        // safe-area-or-24px). Without this, a region whose bbox extends
+        // close to that chrome on its southern edge is fit correctly by the
+        // math but ends up visually buried behind it.
+        map.fitBounds(bounds, { padding: { top: 40, bottom: 170, left: 40, right: 40 }, duration: 600 })
+      } else {
+        setViewState(v => ({ ...v, longitude: (bounds[0][0] + bounds[1][0]) / 2, latitude: (bounds[0][1] + bounds[1][1]) / 2, zoom: 6 }))
+      }
     } else {
-      setViewState(v => ({ ...v, longitude: (bounds[0][0] + bounds[1][0]) / 2, latitude: (bounds[0][1] + bounds[1][1]) / 2, zoom: 9 }))
+      setViewState(v => ({ ...v, longitude: searchLocation.longitude, latitude: searchLocation.latitude, zoom: 10 }))
     }
     regionFitRef.current = searchLocation.name
-  }, [searchLocation?.isRegion, searchLocation?.name, mapReady, spots])
+  }, [searchLocation?.isRegion, searchLocation?.name, mapReady])
 
   useEffect(() => {
     // Clear the fitted-region guard whenever searchLocation changes so a new
