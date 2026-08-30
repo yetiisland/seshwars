@@ -17,6 +17,13 @@ let _savedCollectionScrollTop = 0
 let _cachedLists = []
 let _cachedListSpotIds = {}
 let _listsUserId = null
+// Bumped by fetchLists() (start) and by any local write to _cachedLists
+// (create/delete). fetchLists() checks this after its awaits and bails out
+// if it's changed — otherwise a fetch that was already in flight when a list
+// was created would resolve afterward with a pre-create snapshot and silently
+// overwrite the just-created list from both the cache and component state,
+// which is why it didn't show up until a hard refresh re-fetched from scratch.
+let _listsFetchSeq = 0
 
 export function invalidateListsCache() {
   _listsUserId = null
@@ -64,6 +71,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
     setDeleting(true)
     await supabase.from('saved_spots').delete().eq('list_id', listId)
     await supabase.from('spot_lists').delete().eq('id', listId)
+    _listsFetchSeq++ // invalidate any in-flight fetchLists() — see comment at the declaration
     _cachedLists = _cachedLists.filter(l => l.id !== listId)
     const { [listId]: _removed, ...rest } = _cachedListSpotIds
     _cachedListSpotIds = rest
@@ -259,7 +267,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
   )
 }
 
-export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, showNav = true, user }) {
+export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user }) {
   const [lists, setLists] = useState(() => _listsUserId === user?.id ? _cachedLists : [])
   const [listSpotIds, setListSpotIds] = useState(() => _listsUserId === user?.id ? _cachedListSpotIds : {})
   const [openCollection, setOpenCollection] = useState(_savedOpenCollection)
@@ -282,6 +290,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
 
   const fetchLists = async () => {
     if (!user?.id) return
+    const seq = ++_listsFetchSeq
     const { data: listsData } = await supabase
       .from('spot_lists').select('*').eq('user_id', user.id).order('created_at')
     const map = {}
@@ -296,6 +305,9 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         map[item.list_id].add(item.spot_id)
       }
     }
+    // A create/delete (or a newer fetch) landed while this one was in
+    // flight — applying this now would silently revert that newer change.
+    if (seq !== _listsFetchSeq) return
     _cachedLists = listsData || []
     _cachedListSpotIds = map
     _listsUserId = user.id
@@ -313,9 +325,15 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   const handleCreateList = async () => {
     if (!newListName.trim() || !user?.id) return
     setCreating(true)
-    const { data } = await supabase.from('spot_lists').insert({ user_id: user.id, name: newListName.trim() }).select().single()
-    if (data) {
-      _cachedLists = [..._cachedLists, data]
+    // A blocked RLS write returns { data: [], error: null } and would look
+    // like success if we only checked `error` — chain .select() (no
+    // .single(), which would itself error on zero rows but there's no
+    // reason to rely on that) and require a non-empty result before
+    // touching cache/state, matching hideSpot/unhideSpot in useSpots.js.
+    const { data, error } = await supabase.from('spot_lists').insert({ user_id: user.id, name: newListName.trim() }).select()
+    if (!error && data && data.length > 0) {
+      _listsFetchSeq++ // invalidate any in-flight fetchLists() — see comment at the declaration
+      _cachedLists = [..._cachedLists, data[0]]
       setLists(_cachedLists)
     }
     setNewListName('')
@@ -391,6 +409,8 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   return (
     <>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
+      {searchOverlay || (
+      <>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid #E8DDD0', textAlign: 'center', flexShrink: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
           Your Saved Spots
@@ -493,6 +513,8 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
 
         <div style={{ height: BOTTOM_PAD }} />
       </div>
+      </>
+      )}
     </>
   )
 }

@@ -37,7 +37,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -325,6 +325,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     return (
       <>
         {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
+        {searchOverlay || (
         <div className="scroll-area">
           <div style={{ padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 480, margin: '0 auto', width: '100%' }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
@@ -362,6 +363,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           </div>
           <div style={{ height: BOTTOM_PAD }} />
         </div>
+        )}
       </>
     )
   }
@@ -376,6 +378,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     <>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      {searchOverlay || (
+      <>
       <div className="scroll-area">
         <div style={{ padding: '24px 14px 0', maxWidth: 480, margin: '0 auto', width: '100%' }}>
 
@@ -816,6 +820,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           {onTabChange && <TabBar active="profile" onChange={t => { sessionStorage.removeItem('mySpots:open'); setShowMySpots(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
         </div>,
         document.body
+      )}
+      </>
       )}
       </div>{/* end content wrapper */}
 

@@ -92,7 +92,7 @@ const unclusteredPointLayer = {
   paint: { 'circle-radius': 0, 'circle-opacity': 0 },
 }
 
-export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, sortMode, onSortModeChange, searchLocation, onClearSearch, highlightedSpotId, onSearch, fitOnMount = false, onHidePress, isActive = true }) {
+export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, sortMode, onSortModeChange, searchLocation, onClearSearch, highlightedSpotId, onSearch, searchOverlay, fitOnMount = false, onHidePress, isActive = true }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
   const [viewState, setViewState] = useState(_savedViewState ?? FALLBACK)
@@ -318,6 +318,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', paddingBottom: isDesktop ? 0 : 'calc(max(env(safe-area-inset-bottom), 24px) + 72px)' }}>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
 
+      {searchOverlay || (
       <div style={{ flex: 1, position: 'relative' }}>
         <Map
           ref={mapRef}
@@ -426,6 +427,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           )
         )}
       </div>
+      )}
     </div>
   )
 }

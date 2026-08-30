@@ -10,7 +10,7 @@ let _savedScrollTop = 0
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
-export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress, sortMode, onSortModeChange }) {
+export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress, sortMode, onSortModeChange }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const filters = propFilters ?? localFilters
   const handleFiltersChange = onFiltersChange ?? setLocalFilters
@@ -102,24 +102,28 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
   return (
     <>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
-      <FiltersModal active={filters} onChange={handleFiltersChange} distance={distance} onDistanceChange={onDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} searchLocation={searchLocation} onClearSearch={onClearSearch} />
-      <div className="scroll-area" ref={scrollRef}>
-        <div style={{ padding: '0 0 2px', fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', paddingLeft: 16, marginBottom: 8 }}>
-          {loading ? 'Loading...' : `${sorted.length} spot${sorted.length !== 1 ? 's' : ''}`}
-        </div>
-        {loading ? (
-          <div className="loading">Loading spots...</div>
-        ) : sorted.length === 0 ? (
-          <div className="loading">No spots found</div>
-        ) : (
-          <div className="spots-list-grid">
-            {sorted.map(spot => (
-              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} onHidePress={onHidePress} />
-            ))}
+      {searchOverlay || (
+        <>
+          <FiltersModal active={filters} onChange={handleFiltersChange} distance={distance} onDistanceChange={onDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} searchLocation={searchLocation} onClearSearch={onClearSearch} />
+          <div className="scroll-area" ref={scrollRef}>
+            <div style={{ padding: '0 0 2px', fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', paddingLeft: 16, marginBottom: 8 }}>
+              {loading ? 'Loading...' : `${sorted.length} spot${sorted.length !== 1 ? 's' : ''}`}
+            </div>
+            {loading ? (
+              <div className="loading">Loading spots...</div>
+            ) : sorted.length === 0 ? (
+              <div className="loading">No spots found</div>
+            ) : (
+              <div className="spots-list-grid">
+                {sorted.map(spot => (
+                  <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} onHidePress={onHidePress} />
+                ))}
+              </div>
+            )}
+            <div style={{ height: BOTTOM_PAD }} />
           </div>
-        )}
-        <div style={{ height: BOTTOM_PAD }} />
-      </div>
+        </>
+      )}
     </>
   )
 }

@@ -490,6 +490,11 @@ export default function App() {
 
   const effectiveTab = user ? tab : (tab === 'saved' || tab === 'profile' ? 'spots' : tab)
   const isMapActive = effectiveTab === 'spots' && spotsView === 'map'
+  // Single SearchPage instance, handed to whichever mobile page is active via
+  // the searchOverlay prop so it renders in that page's own normal document
+  // flow (below its Navbar) instead of as a page-covering absolute overlay —
+  // see the comment in SearchPage.jsx for why the overlay approach was unreliable.
+  const searchOverlay = showSearch ? <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} /> : null
 
   const hideConfirmModal = (showHideConfirm || hideConfirmClosing) ? createPortal(
     <div className="modal-overlay" onClick={closeHideConfirm}>
@@ -676,6 +681,7 @@ export default function App() {
                   onSpotClick={handleSpotClick}
                   onAddSpot={openAdd}
                   onSearch={openSearch}
+                  searchOverlay={searchOverlay}
                   searchLocation={searchLocation}
                   onClearSearch={handleClearSearch}
                   filters={filters}
@@ -695,6 +701,7 @@ export default function App() {
                   onSpotClick={handleSpotClick}
                   onAddSpot={openAdd}
                   onSearch={openSearch}
+                  searchOverlay={searchOverlay}
                   user={user}
                 />
               )}
@@ -704,6 +711,7 @@ export default function App() {
                   spots={spots}
                   onAddSpot={openAdd}
                   onSearch={openSearch}
+                  searchOverlay={searchOverlay}
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}
@@ -742,6 +750,7 @@ export default function App() {
                 searchLocation={searchLocation}
                 onClearSearch={handleClearSearch}
                 onSearch={openSearch}
+                searchOverlay={searchOverlay}
                 filters={filters}
                 onFiltersChange={handleFiltersChange}
                 distance={distanceRadius}
@@ -771,7 +780,6 @@ export default function App() {
             </div>
           )}
 
-          {showSearch && <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} />}
           {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
         </>
       )}

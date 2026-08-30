@@ -71,11 +71,21 @@ export default function SearchPage({ spots, onSelect, onClose }) {
   const items = showSuggestions ? suggestions : recentSearches
 
   return (
-    <div className="desktop-page-root" style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 500, display: 'flex', flexDirection: 'column' }}>
+    // Normal-flow flex child (not position:absolute;inset:0) so it renders
+    // below whichever page's Navbar is already on screen, in document flow —
+    // this is what the old comment below meant by "the Navbar above provides
+    // separation," but relying on z-index (500) to stack above pages' content
+    // while staying under Navbar's z-index (1000) only worked reliably when
+    // Navbar and this shared the same stacking context (List/Map); on
+    // Saved/Profile something put them in different contexts and the
+    // z-index comparison never happened, so Navbar didn't reliably win.
+    // Sitting in normal flow after Navbar removes the z-index dependency
+    // entirely — it can't cover what comes before it in the layout.
+    <div className="desktop-page-root" style={{ width: '100%', flex: 1, minHeight: 0, background: '#FDF8F0', display: 'flex', flexDirection: 'column' }}>
       {/* Header — no borderBottom since the Navbar above provides separation */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
+        padding: '10px 16px 12px',
         background: '#FDF8F0', flexShrink: 0,
       }}>
         <div onClick={onClose} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
