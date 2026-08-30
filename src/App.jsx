@@ -422,7 +422,11 @@ export default function App() {
 
   const openSearch = () => setShowSearch(s => !s)
   const closeSearch = () => setShowSearch(false)
-  const handleSelectLocation = (entry) => { setSearchLocation(entry); closeSearch() }
+  // Always land on the Spots tab after a search — searching from Saved/Profile
+  // previously left the user stranded there while results loaded into the
+  // (unseen) Spots view. handleTabChange('spots') also closes search and is a
+  // no-op if already on Spots, and leaves spotsView (list/map) untouched.
+  const handleSelectLocation = (entry) => { setSearchLocation(entry); handleTabChange('spots') }
   const handleClearSearch = () => setSearchLocation(null)
   const handleSavePress = (spot) => { if (!user) { setShowAuth(true); return } setSaveModalSpot(spot) }
   const handleAddSuccess = () => { setShowAdd(false); refetch() }

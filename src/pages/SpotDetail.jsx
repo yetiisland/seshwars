@@ -1155,7 +1155,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               <div className="modal-sheet" onClick={e => e.stopPropagation()}>
                 <div className="modal-handle" />
                 <div className="modal-title" style={{ padding: '0 16px' }}>Delete Spot</div>
-                <div style={{ padding: '0 20px 8px', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
+                <div style={{ padding: '0 16px 8px', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'left', lineHeight: 1.6 }}>
                   Are you sure you want to delete this spot? This cannot be undone.
                 </div>
                 {deleteError && (

@@ -144,23 +144,30 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
   return (
     <div className="desktop-page-root" style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
       <div style={{
-        display: 'flex', alignItems: 'center',
+        display: 'grid',
+        // Both side columns reserved at the same width — 2 buttons (36px
+        // each) + 8px gap = 80px, the widest side this header ever shows
+        // (trash + share) — so the title's center column is always truly
+        // centered on the full header width, regardless of whether the
+        // right side renders one button, two, or the plain 36px spacer.
+        gridTemplateColumns: '80px 1fr 80px',
+        alignItems: 'center',
         padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
         background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
       }}>
         <div
           onClick={onBack}
-          style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+          style={{ justifySelf: 'start', width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+        <div style={{ minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase', overflowWrap: 'break-word' }}>
           {title}
         </div>
         {(isList || isFavorites) ? (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
             {isList && (
               <div
                 onClick={() => setShowDeleteConfirm(true)}
@@ -179,7 +186,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
             </div>
           </div>
         ) : (
-          <div style={{ width: 36 }} />
+          <div style={{ justifySelf: 'end', width: 36 }} />
         )}
       </div>
 
