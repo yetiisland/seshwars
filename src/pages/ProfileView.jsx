@@ -634,11 +634,11 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   <div className="divider" style={{ margin: '8px 0 0' }} />
                   <div
                     onClick={() => setShowDeleteConfirm(true)}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 0', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}
                   >
                     Delete Account
                     <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
-                      <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M1 1L7 7L1 13" stroke="#6a6c7a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                   <div
