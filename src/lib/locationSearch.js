@@ -44,6 +44,13 @@ export async function fetchLocationSuggestions(query, spots) {
       stateName: getState(f.context),
       longitude: f.geometry.coordinates[0],
       latitude: f.geometry.coordinates[1],
+      // [minLng, minLat, maxLng, maxLat] — Mapbox includes this on region
+      // (and some place) features. When present it's the actual state/place
+      // boundary, which MapView's region auto-fit prefers over a box derived
+      // from spot coordinates (spots only ever cover part of a state, so a
+      // spot-derived box is always tighter than the real region, sometimes
+      // drastically so if spots happen to cluster in one area of it).
+      bbox: f.bbox || null,
       isRegion,
       spotCount: isRegion
         ? countSpotsInState(spots, f.text)
@@ -63,5 +70,6 @@ export function toSearchLocationEntry(item) {
     latitude: item.latitude,
     spotCount: item.spotCount ?? 0,
     isRegion: item.isRegion || false,
+    bbox: item.bbox || null,
   }
 }

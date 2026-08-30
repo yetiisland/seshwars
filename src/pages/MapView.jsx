@@ -138,11 +138,21 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     if (!searchLocation?.isRegion || !mapReady) return
     // Only auto-fit once per unique region name. Manual zoom/pan after that is permanent.
     if (regionFitRef.current === searchLocation.name) return
-    const coords = spots.filter(s => s.latitude && s.longitude)
-    if (coords.length === 0) return
-    const lngs = coords.map(s => s.longitude)
-    const lats = coords.map(s => s.latitude)
-    const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]]
+    // Prefer the geocoder's own region bbox (the actual state/place boundary)
+    // over spot coordinates — spots only ever cover part of a region, so a
+    // box derived from them is always tighter than the real region, and can
+    // be drastically tighter if the spots happen to cluster in one area of
+    // it. Fall back to spot coordinates only when no bbox came back.
+    let bounds = searchLocation.bbox
+      ? [[searchLocation.bbox[0], searchLocation.bbox[1]], [searchLocation.bbox[2], searchLocation.bbox[3]]]
+      : null
+    if (!bounds) {
+      const coords = spots.filter(s => s.latitude && s.longitude)
+      if (coords.length === 0) return
+      const lngs = coords.map(s => s.longitude)
+      const lats = coords.map(s => s.latitude)
+      bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]]
+    }
     const map = mapRef.current?.getMap()
     if (map) {
       map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 600 })
