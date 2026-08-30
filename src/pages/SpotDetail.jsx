@@ -962,7 +962,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         <div className="modal-overlay" onClick={() => setShowMapsModal(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
-            <div className="modal-title">Open with</div>
+            <div className="modal-title" style={{ padding: '0 16px' }}>Open with</div>
             <div className="modal-row" onClick={() => openMaps('google')}>
               <div style={{ width: 34, height: 34, borderRadius: 8, background: '#1a73e8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect width="20" height="20" rx="4" fill="#1a73e8" /><path d="M10 3C7.2 3 5 5.2 5 8C5 11.5 10 17 10 17s5-5.5 5-9c0-2.8-2.2-5-5-5z" fill="#fff" /><circle cx="10" cy="8" r="2" fill="#1a73e8" /></svg>
@@ -994,7 +994,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         <div className="modal-overlay" onClick={() => { setShowEditAuth(false); setEditPassword(''); setAuthError('') }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
-            <div className="modal-title">Edit Spot</div>
+            <div className="modal-title" style={{ padding: '0 16px' }}>Edit Spot</div>
             <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <input className="form-input" type="password" placeholder="Enter password to edit" value={editPassword}
                 onChange={e => { setEditPassword(e.target.value); setAuthError('') }}
@@ -1154,7 +1154,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             <div className="modal-overlay" onClick={() => { if (!deleting) { setShowDeleteConfirm(false); setDeleteError('') } }}>
               <div className="modal-sheet" onClick={e => e.stopPropagation()}>
                 <div className="modal-handle" />
-                <div className="modal-title">Delete Spot</div>
+                <div className="modal-title" style={{ padding: '0 16px' }}>Delete Spot</div>
                 <div style={{ padding: '0 20px 8px', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
                   Are you sure you want to delete this spot? This cannot be undone.
                 </div>
@@ -1168,8 +1168,11 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                     style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: deleting ? 0.7 : 1 }}>
                     {deleting ? 'Deleting...' : 'Delete'}
                   </button>
+                  <button onClick={() => { if (!deleting) { setShowDeleteConfirm(false); setDeleteError('') } }} disabled={deleting}
+                    style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                    Cancel
+                  </button>
                 </div>
-                <div className="modal-cancel" onClick={() => { if (!deleting) { setShowDeleteConfirm(false); setDeleteError('') } }}>Cancel</div>
               </div>
             </div>
           )}

@@ -503,12 +503,12 @@ textarea.form-input {
 }
 
 .modal-title {
-  font-size: 10px;
-  color: var(--text-muted);
-  font-weight: 700;
-  letter-spacing: 1.5px;
+  font-size: 18px;
+  color: var(--text-primary);
+  font-weight: 900;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-  text-align: center;
+  text-align: left;
   margin-bottom: 12px;
 }
 

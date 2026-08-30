@@ -115,7 +115,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-sheet" onClick={e => e.stopPropagation()}>
           <div className="modal-handle" />
-          <div className="modal-title">Save to List</div>
+          <div className="modal-title" style={{ padding: '0 16px' }}>Save to List</div>
           <div style={{ padding: '0 20px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
               Sign in to save spots to your lists.
@@ -133,7 +133,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()}>
         <div className="modal-handle" />
-        <div className="modal-title">Save to</div>
+        <div className="modal-title" style={{ padding: '0 16px' }}>Save to</div>
 
         {/* Saved Spots (was Favorites) */}
         <div className="modal-row" onClick={toggleFavorites}>

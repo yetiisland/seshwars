@@ -340,7 +340,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={modalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
-            <div className="modal-title">Post a Clip</div>
+            <div className="modal-title" style={{ padding: '0 16px' }}>Post a Clip</div>
             <div style={{ padding: '0 16px 28px' }}>
               {/* YouTube */}
               {(() => {
