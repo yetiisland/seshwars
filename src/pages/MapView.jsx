@@ -155,7 +155,16 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     }
     const map = mapRef.current?.getMap()
     if (map) {
-      map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 600 })
+      // Bottom padding is taller than the other sides — the LIST/MAP toggle
+      // pill + bottom nav together cover ~162px on desktop (measured live
+      // via getBoundingClientRect: toggle top sits 162.5px above the
+      // viewport bottom) and a comparable ~141-151px on mobile (toggle
+      // bottom offset 84px + pill height ~33px + safe-area-or-24px). Without
+      // this, a region whose spots skew toward its southern edge — which
+      // gets more likely simply by having more spots, e.g. California's LA
+      // cluster or Michigan's — gets fit correctly by the math but ends up
+      // visually buried behind that chrome.
+      map.fitBounds(bounds, { padding: { top: 60, bottom: 170, left: 60, right: 60 }, maxZoom: 13, duration: 600 })
     } else {
       setViewState(v => ({ ...v, longitude: (bounds[0][0] + bounds[1][0]) / 2, latitude: (bounds[0][1] + bounds[1][1]) / 2, zoom: 9 }))
     }
