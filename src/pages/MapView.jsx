@@ -143,48 +143,82 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
   }, [searchLocation])
 
   useEffect(() => {
-    if (!searchLocation?.isRegion || !mapReady) return
+    if (!searchLocation?.isRegion) return
     // Only auto-fit once per unique region name. Manual zoom/pan after that is permanent.
     if (regionFitRef.current === searchLocation.name) return
-    const map = mapRef.current?.getMap()
+    regionFitRef.current = searchLocation.name
     // A new region search must never be re-centered from a stale saved
     // camera — discard it now so an unmount/remount racing the fit below
     // can't restore the pre-search view instead of the region.
     _savedViewState = null
-    // Fit to the geocoder's own region bbox — the actual state/province/
-    // country boundary — and nothing else. No spot coordinates, no rendered
-    // or clustered map features, no results cap: the number of spots in the
-    // region has zero effect on this. Only fall back to centering on the
-    // result's own coordinates when a region result has no bbox at all
-    // (uncommon, but some place types don't carry one).
-    if (searchLocation.bbox) {
-      const bounds = [[searchLocation.bbox[0], searchLocation.bbox[1]], [searchLocation.bbox[2], searchLocation.bbox[3]]]
-      if (map) {
-        // No peek card is open during a region search, so top/left/right
-        // padding is a plain 40. Bottom stays larger — measured live via
-        // getBoundingClientRect, the LIST/MAP toggle pill sits ~162.5px
-        // above the viewport bottom on desktop (a comparable ~141-151px on
-        // mobile) regardless of the peek card, and it's an overlay that
-        // doesn't shrink the map's own container. A flat 40 bottom was
-        // verified (via map.project on the fitted bbox) to place a tall
-        // region's southern edge behind that toggle/nav chrome — e.g.
-        // Florida's south tip landed under the bottom nav bar entirely.
-        // Resize first (the location chip above may have just changed the
-        // container's rendered size) — resize() re-measures synchronously,
-        // so fitBounds right after it already sees the current container.
-        // (Deferring fitBounds to requestAnimationFrame was tried and
-        // dropped: rAF callbacks don't reliably fire here, which made the
-        // fit silently never happen on some searches.)
-        map.resize()
-        map.fitBounds(bounds, { padding: { top: 40, bottom: 170, left: 40, right: 40 }, duration: 600 })
-      } else {
-        setViewState(v => ({ ...v, longitude: (bounds[0][0] + bounds[1][0]) / 2, latitude: (bounds[0][1] + bounds[1][1]) / 2, zoom: 6 }))
+
+    let cancelled = false
+    let timeoutId
+    let attempts = 0
+
+    function applyFit() {
+      if (cancelled) return
+      const map = mapRef.current?.getMap()
+      // On mobile, search runs through a full-screen overlay that unmounts
+      // the <Map> entirely (searchOverlay replaces it in MapView's JSX), so
+      // every mobile region search remounts a brand-new mapboxgl.Map and
+      // mapRef.current briefly doesn't exist yet. The container can also be
+      // 0x0 for a beat right after mount, before the overlay has fully
+      // closed and layout has settled. Retry on a short timeout (not rAF —
+      // rAF callbacks don't reliably fire in this runtime) until both are
+      // ready, instead of fitting against a zero-size container or falling
+      // straight to the no-map fallback.
+      const containerReady = map && map.getContainer().clientWidth > 0 && map.getContainer().clientHeight > 0
+      if (!containerReady && attempts < 20) {
+        attempts++
+        timeoutId = setTimeout(applyFit, 50)
+        return
       }
-    } else {
-      setViewState(v => ({ ...v, longitude: searchLocation.longitude, latitude: searchLocation.latitude, zoom: 10 }))
+      // Fit to the geocoder's own region bbox — the actual state/province/
+      // country boundary — and nothing else. No spot coordinates, no rendered
+      // or clustered map features, no results cap: the number of spots in the
+      // region has zero effect on this. Only fall back to centering on the
+      // result's own coordinates when a region result has no bbox at all
+      // (uncommon, but some place types don't carry one).
+      if (searchLocation.bbox) {
+        const bounds = [[searchLocation.bbox[0], searchLocation.bbox[1]], [searchLocation.bbox[2], searchLocation.bbox[3]]]
+        if (map) {
+          // No peek card is open during a region search, so top/left/right
+          // padding is a plain 40. Bottom stays larger — measured live via
+          // getBoundingClientRect, the LIST/MAP toggle pill sits ~162.5px
+          // above the viewport bottom on desktop (a comparable ~141-151px on
+          // mobile) regardless of the peek card, and it's an overlay that
+          // doesn't shrink the map's own container. A flat 40 bottom was
+          // verified (via map.project on the fitted bbox) to place a tall
+          // region's southern edge behind that toggle/nav chrome — e.g.
+          // Florida's south tip landed under the bottom nav bar entirely.
+          // Resize first (the location chip above may have just changed the
+          // container's rendered size, or this may be a freshly remounted
+          // mobile map that has never been measured) — resize()
+          // re-measures synchronously, so fitBounds right after it already
+          // sees the current container. This deliberately does NOT wait for
+          // mapReady: fitBounds only needs a measured transform, not a
+          // fully loaded style — verified live, fitBounds moves the camera
+          // correctly even while map.loaded() is still false. mapReady
+          // requires the entire base style + all its tiles to finish
+          // loading, which on a freshly remounted mobile map can take a
+          // long time (or stall) and would block the fit the whole while.
+          // (Deferring fitBounds to requestAnimationFrame was tried and
+          // dropped: rAF callbacks don't reliably fire here, which made the
+          // fit silently never happen on some searches.)
+          map.resize()
+          map.fitBounds(bounds, { padding: { top: 40, bottom: 170, left: 40, right: 40 }, duration: 600 })
+        } else {
+          setViewState(v => ({ ...v, longitude: (bounds[0][0] + bounds[1][0]) / 2, latitude: (bounds[0][1] + bounds[1][1]) / 2, zoom: 6 }))
+        }
+      } else {
+        setViewState(v => ({ ...v, longitude: searchLocation.longitude, latitude: searchLocation.latitude, zoom: 10 }))
+      }
     }
-    regionFitRef.current = searchLocation.name
-  }, [searchLocation?.isRegion, searchLocation?.name, mapReady])
+
+    applyFit()
+    return () => { cancelled = true; clearTimeout(timeoutId) }
+  }, [searchLocation?.isRegion, searchLocation?.name])
 
   useEffect(() => {
     // Clear the fitted-region guard whenever searchLocation changes so a new
