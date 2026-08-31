@@ -128,6 +128,14 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     return () => clearTimeout(t)
   }, [isActive])
 
+  // The location chip appearing/disappearing can change the map container's
+  // rendered size. Mapbox caches container dimensions and won't notice on
+  // its own, so force a re-measure whenever chip visibility changes.
+  const hasLocationChip = showFilterChips && !!searchLocation
+  useEffect(() => {
+    mapRef.current?.getMap()?.resize()
+  }, [hasLocationChip])
+
   useEffect(() => {
     if (!searchLocation) return
     if (searchLocation.isRegion) return // handled by fitBounds effect below
@@ -139,6 +147,10 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     // Only auto-fit once per unique region name. Manual zoom/pan after that is permanent.
     if (regionFitRef.current === searchLocation.name) return
     const map = mapRef.current?.getMap()
+    // A new region search must never be re-centered from a stale saved
+    // camera — discard it now so an unmount/remount racing the fit below
+    // can't restore the pre-search view instead of the region.
+    _savedViewState = null
     // Fit to the geocoder's own region bbox — the actual state/province/
     // country boundary — and nothing else. No spot coordinates, no rendered
     // or clustered map features, no results cap: the number of spots in the
@@ -148,14 +160,22 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     if (searchLocation.bbox) {
       const bounds = [[searchLocation.bbox[0], searchLocation.bbox[1]], [searchLocation.bbox[2], searchLocation.bbox[3]]]
       if (map) {
-        // Bottom padding is taller than the other sides — the LIST/MAP
-        // toggle pill + bottom nav together cover ~162px on desktop
-        // (measured live via getBoundingClientRect: toggle top sits 162.5px
-        // above the viewport bottom) and a comparable ~141-151px on mobile
-        // (toggle bottom offset 84px + pill height ~33px +
-        // safe-area-or-24px). Without this, a region whose bbox extends
-        // close to that chrome on its southern edge is fit correctly by the
-        // math but ends up visually buried behind it.
+        // No peek card is open during a region search, so top/left/right
+        // padding is a plain 40. Bottom stays larger — measured live via
+        // getBoundingClientRect, the LIST/MAP toggle pill sits ~162.5px
+        // above the viewport bottom on desktop (a comparable ~141-151px on
+        // mobile) regardless of the peek card, and it's an overlay that
+        // doesn't shrink the map's own container. A flat 40 bottom was
+        // verified (via map.project on the fitted bbox) to place a tall
+        // region's southern edge behind that toggle/nav chrome — e.g.
+        // Florida's south tip landed under the bottom nav bar entirely.
+        // Resize first (the location chip above may have just changed the
+        // container's rendered size) — resize() re-measures synchronously,
+        // so fitBounds right after it already sees the current container.
+        // (Deferring fitBounds to requestAnimationFrame was tried and
+        // dropped: rAF callbacks don't reliably fire here, which made the
+        // fit silently never happen on some searches.)
+        map.resize()
         map.fitBounds(bounds, { padding: { top: 40, bottom: 170, left: 40, right: 40 }, duration: 600 })
       } else {
         setViewState(v => ({ ...v, longitude: (bounds[0][0] + bounds[1][0]) / 2, latitude: (bounds[0][1] + bounds[1][1]) / 2, zoom: 6 }))
