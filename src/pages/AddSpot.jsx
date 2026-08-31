@@ -336,7 +336,16 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
             <Map
               {...mapCenter}
               onMove={e => setMapCenter(e.viewState)}
-              onLoad={e => e.target.scrollZoom.disable()}
+              onLoad={e => {
+                e.target.scrollZoom.disable()
+                // Mapbox GL JS v3+ defaults to 'globe' and auto-switches by
+                // zoom level — force mercator permanently, and re-apply on
+                // any future style reload (a style's own projection can
+                // override the constructor option).
+                e.target.setProjection('mercator')
+                e.target.on('style.load', () => e.target.setProjection('mercator'))
+              }}
+              projection="mercator"
               mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
               mapboxAccessToken={MAPBOX_TOKEN}
               style={{ width: '100%', height: '100%' }}

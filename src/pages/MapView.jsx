@@ -312,6 +312,20 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
     setMapReady(true)
   }, [])
 
+  // Mapbox GL JS v3+ defaults to the 'globe' projection and auto-switches
+  // between globe/mercator by zoom level — force mercator permanently. The
+  // constructor's projection option only sets the initial value; a style's
+  // own projection (or any later setStyle/style reload — satellite toggle,
+  // the onError fallback below) can override it, so re-apply on every
+  // 'style.load' too. Attached inside onLoad (not a ref-polling effect) so
+  // there's no race with when mapRef.current becomes available.
+  const handleMapLoad = useCallback((e) => {
+    const map = e.target
+    map.setProjection('mercator')
+    map.on('style.load', () => map.setProjection('mercator'))
+    updateUnclusteredIds()
+  }, [updateUnclusteredIds])
+
   const handlePinClick = useCallback((spot) => {
     if (!showPeekCard) {
       onSpotClick(spot)
@@ -396,7 +410,8 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
           onMouseEnter={handleClusterMouseEnter}
           onMouseLeave={handleClusterMouseLeave}
           onIdle={updateUnclusteredIds}
-          onLoad={updateUnclusteredIds}
+          onLoad={handleMapLoad}
+          projection="mercator"
           mapStyle={mapStyle}
           mapboxAccessToken={MAPBOX_TOKEN}
           style={{ width: '100%', height: '100%' }}

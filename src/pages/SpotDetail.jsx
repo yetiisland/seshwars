@@ -837,6 +837,14 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               <>
                 <Map
                   initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: 15 }}
+                  onLoad={e => {
+                    // Mapbox GL JS v3+ defaults to 'globe' and auto-switches
+                    // by zoom level — force mercator permanently, and
+                    // re-apply on any future style reload.
+                    e.target.setProjection('mercator')
+                    e.target.on('style.load', () => e.target.setProjection('mercator'))
+                  }}
+                  projection="mercator"
                   mapStyle="mapbox://styles/mapbox/streets-v12"
                   mapboxAccessToken={MAPBOX_TOKEN}
                   style={{ width: '100%', height: '100%' }}
@@ -916,6 +924,15 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: '#000' }}>
           <Map
             initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: 15 }}
+            onLoad={e => {
+              // Mapbox GL JS v3+ defaults to 'globe' and auto-switches by
+              // zoom level — force mercator permanently, and re-apply on
+              // every style reload (this map's satellite/street toggle
+              // switches styles, which can otherwise revert it).
+              e.target.setProjection('mercator')
+              e.target.on('style.load', () => e.target.setProjection('mercator'))
+            }}
+            projection="mercator"
             mapStyle={fsMapSatellite ? 'mapbox://styles/mapbox/satellite-streets-v12' : 'mapbox://styles/mapbox/streets-v12'}
             mapboxAccessToken={MAPBOX_TOKEN}
             style={{ width: '100%', height: '100%' }}
@@ -1065,7 +1082,15 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <Map
                   {...editMapCenter}
                   onMove={e => setEditMapCenter(e.viewState)}
-                  onLoad={e => e.target.scrollZoom.disable()}
+                  onLoad={e => {
+                    e.target.scrollZoom.disable()
+                    // Mapbox GL JS v3+ defaults to 'globe' and auto-switches
+                    // by zoom level — force mercator permanently, and
+                    // re-apply on any future style reload.
+                    e.target.setProjection('mercator')
+                    e.target.on('style.load', () => e.target.setProjection('mercator'))
+                  }}
+                  projection="mercator"
                   mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
                   mapboxAccessToken={MAPBOX_TOKEN}
                   style={{ width: '100%', height: '100%' }}
