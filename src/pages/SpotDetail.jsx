@@ -16,6 +16,7 @@ import { checkImageModeration } from '../utils/moderation'
 import { transformImageUrl } from '../utils/imageUrl'
 import TermsOfService from './TermsOfService'
 import { isAdminUser } from '../lib/admin'
+import AddFriendButton from '../components/AddFriendButton'
 import { SPOT_FIELDS } from '../lib/spotFields'
 import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
 
@@ -88,6 +89,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [publisherAvatar, setPublisherAvatar] = useState(null)
   const [publisherInitial, setPublisherInitial] = useState('')
   const [publisherUsername, setPublisherUsername] = useState('')
+  const [publisherFriendship, setPublisherFriendship] = useState(null)
 
   // ── Edit state ────────────────────────────────────────────────
   const [showMapsModal, setShowMapsModal] = useState(false)
@@ -177,6 +179,28 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       })
     }
   }, [spot.id, user?.id])
+
+  // ── Friendship status for the publisher (for AddFriendButton) ──
+  useEffect(() => {
+    setPublisherFriendship(null)
+    if (!user?.id || !spot.added_by || spot.added_by === user.id) return
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(spot.added_by)
+    if (!isUUID) return
+    // Single query covering both directions of the pair (viewer/publisher
+    // could be either requester or addressee) instead of two round trips.
+    supabase
+      .from('friendships')
+      .select('id, status, requester_id')
+      .or(`and(requester_id.eq.${user.id},addressee_id.eq.${spot.added_by}),and(requester_id.eq.${spot.added_by},addressee_id.eq.${user.id})`)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPublisherFriendship({
+          status: data?.status ?? null,
+          isRequester: data ? data.requester_id === user.id : false,
+          friendshipId: data?.id ?? null,
+        })
+      })
+  }, [spot.id, spot.added_by, user?.id])
 
 
   // ── Edit geocode ──────────────────────────────────────────────
@@ -772,12 +796,21 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   <span style={{ fontSize: 12, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial || '?'}</span>
                 )}
               </div>
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3 }}>Added by</div>
                 <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
                   {spot.added_by === null ? 'Anonymous' : publisherUsername ? `@${publisherUsername}` : ''}
                 </div>
               </div>
+              {publisherFriendship && (
+                <AddFriendButton
+                  targetUserId={spot.added_by}
+                  friendshipStatus={publisherFriendship.status}
+                  isRequester={publisherFriendship.isRequester}
+                  friendshipId={publisherFriendship.friendshipId}
+                  onChange={(status, row) => setPublisherFriendship(prev => ({ ...prev, status, friendshipId: row?.id ?? prev.friendshipId }))}
+                />
+              )}
             </div>
           )}
 

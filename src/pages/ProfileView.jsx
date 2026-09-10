@@ -11,6 +11,8 @@ import PrivacyPolicy from './PrivacyPolicy'
 import SupportPage from './SupportPage'
 import DeleteAccountPage from './DeleteAccountPage'
 import ImageCropModal from '../components/ImageCropModal'
+import FriendsView from '../components/FriendsView'
+import AddFriendButton from '../components/AddFriendButton'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -47,6 +49,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [showMySpots, setShowMySpots] = useState(() => sessionStorage.getItem('mySpots:open') === '1')
+  const [friendsTab, setFriendsTab] = useState('spots')
+  const [friendReqState, setFriendReqState] = useState({})
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifsFetched, setNotifsFetched] = useState(false)
   // Update password modal state
@@ -280,6 +284,56 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     onSpotClick?.(fullSpot)
   }
 
+  // 'friend_request' notification cards resolve a pending friendships row
+  // by (requester_id = actor, addressee_id = me, status = 'pending') on
+  // demand — the notification row itself carries no friendship_id.
+  const findPendingFriendshipForNotif = async (n) => {
+    const { data, error } = await supabase
+      .from('friendships')
+      .select('id')
+      .eq('requester_id', n.actor_id)
+      .eq('addressee_id', user.id)
+      .eq('status', 'pending')
+      .maybeSingle()
+    if (error || !data) return null
+    return data.id
+  }
+
+  const handleAcceptFriendRequestNotif = async (n) => {
+    setFriendReqState(s => ({ ...s, [n.id]: { ...s[n.id], loading: true, error: '' } }))
+    const rowId = await findPendingFriendshipForNotif(n)
+    if (!rowId) {
+      setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: null, error: 'Could not accept request' } }))
+      return
+    }
+    const { data, error } = await supabase
+      .from('friendships')
+      .update({ status: 'accepted', responded_at: new Date().toISOString() })
+      .eq('id', rowId)
+      .select()
+      .single()
+    if (error || !data) {
+      setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: null, error: 'Could not accept request' } }))
+      return
+    }
+    setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: 'accepted', error: '' } }))
+  }
+
+  const handleIgnoreFriendRequestNotif = async (n) => {
+    setFriendReqState(s => ({ ...s, [n.id]: { ...s[n.id], loading: true, error: '' } }))
+    const rowId = await findPendingFriendshipForNotif(n)
+    if (!rowId) {
+      setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: null, error: 'Could not ignore request' } }))
+      return
+    }
+    const { error } = await supabase.from('friendships').delete().eq('id', rowId)
+    if (error) {
+      setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: null, error: 'Could not ignore request' } }))
+      return
+    }
+    setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: 'ignored', error: '' } }))
+  }
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
   }
@@ -383,6 +437,21 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       <div className="scroll-area">
         <div style={{ padding: '24px 14px 0', maxWidth: 480, margin: '0 auto', width: '100%' }}>
 
+          {/* Friends segmented control — inline-style markup copied from the
+              LIST/MAP toggle (App.jsx / SavedView.jsx / SharedListPage.jsx),
+              same hex/fontSize/fontWeight/letterSpacing/borderRadius/padding
+              values, adapted from 2 to 3 equal-width segments. */}
+          <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', marginBottom: 16 }}>
+            <div onClick={() => setFriendsTab('tricks')} style={{ flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, background: friendsTab === 'tricks' ? '#fff' : 'transparent', color: friendsTab === 'tricks' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>TRICKS</div>
+            <div onClick={() => setFriendsTab('friends')} style={{ flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, background: friendsTab === 'friends' ? '#fff' : 'transparent', color: friendsTab === 'friends' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>FRIENDS</div>
+            <div onClick={() => setFriendsTab('spots')} style={{ flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, background: friendsTab === 'spots' ? '#fff' : 'transparent', color: friendsTab === 'spots' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>SPOTS</div>
+          </div>
+
+          {friendsTab === 'tricks' && <div />}
+          {friendsTab === 'friends' && <FriendsView user={user} />}
+
+          {friendsTab === 'spots' && (
+          <>
           {/* Avatar + name */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -710,6 +779,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>,
             document.body
           )}
+          </>
+          )}
         </div>
       </div>
 
@@ -1000,7 +1071,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             ) : (
               <>
                 {notifications.map(n => {
-                  const actionText = n.type === 'admin_update' ? 'Updated Your Spot'
+                  const actionText = n.type === 'friend_request' ? `${n.actorUsername || 'Someone'} wants to be friends`
+                    : n.type === 'friend_accepted' ? `${n.actorUsername || 'Someone'} accepted your friend request`
+                    : n.type === 'admin_update' ? 'Updated Your Spot'
                     : n.type === 'rating' ? 'Rated Your Spot'
                     : n.type === 'comment' ? 'Commented On Your Spot'
                     : n.type === 'report' ? 'Reported Your Spot'
@@ -1045,8 +1118,36 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                         )}
                       </div>
 
-                      {/* View button */}
-                      {(n.spotSlug || n.spot_id) && (
+                      {/* Friend request controls, or the existing View button */}
+                      {n.type === 'friend_request' ? (
+                        friendReqState[n.id]?.resolved ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#4a9a5a', letterSpacing: 0.5, textTransform: 'uppercase', flexShrink: 0 }}>
+                            {friendReqState[n.id].resolved === 'accepted' ? 'Accepted' : 'Ignored'}
+                          </span>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {friendReqState[n.id]?.error && (
+                              <span style={{ fontSize: 11, color: '#e07070', fontWeight: 700 }}>{friendReqState[n.id].error}</span>
+                            )}
+                            <div
+                              onClick={() => !friendReqState[n.id]?.loading && handleAcceptFriendRequestNotif(n)}
+                              style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: friendReqState[n.id]?.loading ? 0.6 : 1 }}
+                            >
+                              <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }}>Accept</span>
+                            </div>
+                            <div
+                              onClick={() => !friendReqState[n.id]?.loading && handleIgnoreFriendRequestNotif(n)}
+                              style={{ marginLeft: 2, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                <circle cx="6" cy="6" r="5" fill="rgba(212,120,90,0.15)" />
+                                <line x1="4" y1="4" x2="8" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
+                                <line x1="8" y1="4" x2="4" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
+                              </svg>
+                            </div>
+                          </div>
+                        )
+                      ) : (n.spotSlug || n.spot_id) && (
                         <div
                           onClick={() => handleNotifTap(n)}
                           style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
