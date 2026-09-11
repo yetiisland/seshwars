@@ -123,7 +123,7 @@ export default function SpotPage() {
     )
   }
 
-  const isOwner = !!user && (user.id === spot.added_by || user.email?.split('@')[0] === spot.added_by)
+  const isOwner = !!user && user.id === spot.added_by
   const isAdmin = isAdminUser(user)
 
   if (spot.visibility === 'private' && !isOwner && !isAdmin) {

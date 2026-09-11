@@ -125,8 +125,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [cropFile, setCropFile] = useState(null)
   const avatarRef = useRef()
 
-  const identifier = user?.email?.split('@')[0] || ''
-  const mySpots = spots.filter(s => s.added_by === user?.id || (identifier && s.added_by === identifier))
+  const mySpots = spots.filter(s => s.added_by === user?.id)
   const hiddenSpots = spots.filter(s => hiddenIds.has(s.id))
 
   const confirmUnhide = async () => {

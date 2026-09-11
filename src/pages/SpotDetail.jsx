@@ -142,22 +142,16 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   }, [lightboxOpen, lightboxIndex, photos.length])
 
   const isAdmin = isAdminUser(user)
-  const isOwner = !!user && (
-    user.id === spot.added_by ||
-    user.email?.split('@')[0] === spot.added_by
-  )
+  const isOwner = !!user && user.id === spot.added_by
   const hasCoords = spot.latitude && spot.longitude
 
   // ── Data fetching ─────────────────────────────────────────────
   useEffect(() => {
     if (!spot.id) return
 
-    // Publisher profile — added_by may be a UUID (new spots) or username (legacy)
+    // Publisher profile
     if (spot.added_by) {
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(spot.added_by)
-      const query = isUUID
-        ? supabase.from('profiles').select('avatar_url, first_name, username').eq('id', spot.added_by).maybeSingle()
-        : supabase.from('profiles').select('avatar_url, first_name, username').eq('username', spot.added_by).maybeSingle()
+      const query = supabase.from('profiles').select('avatar_url, first_name, username').eq('id', spot.added_by).maybeSingle()
       query.then(({ data }) => {
         if (data) {
           if (data.avatar_url) setPublisherAvatar(data.avatar_url)
