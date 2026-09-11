@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import AddFriendButton from './AddFriendButton'
 
@@ -41,7 +41,7 @@ function Avatar({ avatarUrl, username }) {
   )
 }
 
-export default function FriendsView({ user }) {
+export default function FriendsView({ user, userLocation }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -50,6 +50,24 @@ export default function FriendsView({ user }) {
   const [friends, setFriends] = useState([])
   const [requestsError, setRequestsError] = useState('')
   const [friendsError, setFriendsError] = useState('')
+  const [nearbySkaters, setNearbySkaters] = useState([])
+  const nearbyFetchedRef = useRef(false)
+
+  // Reuses the location the spots list already gets from useGeolocation()
+  // (passed down via App.jsx -> ProfileView -> here) — no separate geolocation
+  // request/permission prompt. Fetched once, not re-run on every GPS update.
+  useEffect(() => {
+    if (!userLocation || nearbyFetchedRef.current) return
+    nearbyFetchedRef.current = true
+    supabase.rpc('get_nearby_skaters', {
+      p_lat: userLocation.latitude,
+      p_lng: userLocation.longitude,
+      p_radius_km: 40,
+    }).then(({ data, error }) => {
+      if (error || !data) return
+      setNearbySkaters(data)
+    })
+  }, [userLocation])
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -103,13 +121,45 @@ export default function FriendsView({ user }) {
 
   return (
     <div>
-      <input
-        className="form-input"
-        placeholder="Search by username..."
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        style={{ marginBottom: 12 }}
-      />
+      {nearbySkaters.length > 0 && query.trim().length < 2 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <div className="section-label" style={{ marginBottom: 0 }}>Skaters Near You</div>
+            <div style={countBadgeStyle}>
+              <span style={countBadgeTextStyle}>{nearbySkaters.length}</span>
+            </div>
+          </div>
+          {nearbySkaters.map(s => (
+            <div key={s.id} style={rowStyle}>
+              <Avatar avatarUrl={s.avatar_url} username={s.username} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={usernameStyle}>@{s.username}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{s.spot_count} spots nearby</div>
+              </div>
+              <AddFriendButton
+                targetUserId={s.id}
+                friendshipStatus={s.friendship_status}
+                isRequester={s.is_requester}
+                friendshipId={null}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Persistent "@" prefix — a separate absolutely-positioned element, not
+          part of the input's value, so it can't be edited or deleted. Any
+          leading "@" typed/pasted into the input is stripped in onChange. */}
+      <div style={{ position: 'relative', marginBottom: 12 }}>
+        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-primary)', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
+        <input
+          className="form-input"
+          placeholder="Search by username..."
+          value={query}
+          onChange={e => setQuery(e.target.value.replace(/^@+/, ''))}
+          style={{ paddingLeft: 24 }}
+        />
+      </div>
 
       {query.trim().length >= 2 && (
         <div style={{ marginBottom: 20 }}>

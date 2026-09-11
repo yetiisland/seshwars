@@ -39,7 +39,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -462,29 +462,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       <div className="scroll-area">
         <div style={{ padding: '24px 14px 0', maxWidth: 480, margin: '0 auto', width: '100%' }}>
 
-          {/* Friends segmented control — inline-style markup copied from the
-              LIST/MAP toggle (App.jsx / SavedView.jsx / SharedListPage.jsx),
-              same fontSize/fontWeight/letterSpacing/borderRadius/padding/gap
-              values, adapted from 2 to 3 equal-width segments. Track color is
-              the skate-shop-badge dark gray (SHOP_STYLE.bg / #3D4454) instead
-              of salmon; a measured, transform-only thumb slides behind the
-              active segment instead of each segment toggling its own bg. */}
-          <div ref={friendsTabTrackRef} style={{ position: 'relative', display: 'flex', background: '#3D4454', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', marginBottom: 16 }}>
-            <div
-              ref={friendsTabThumbRef}
-              style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }}
-            />
-            <div ref={el => { friendsTabSegmentRefs.current.spots = el }} onClick={() => setFriendsTab('spots')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'spots' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>SPOTS</div>
-            <div ref={el => { friendsTabSegmentRefs.current.tricks = el }} onClick={() => setFriendsTab('tricks')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'tricks' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>TRICKS</div>
-            <div ref={el => { friendsTabSegmentRefs.current.friends = el }} onClick={() => setFriendsTab('friends')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'friends' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>FRIENDS</div>
-          </div>
-
-          {friendsTab === 'tricks' && <div />}
-          {friendsTab === 'friends' && <FriendsView user={user} />}
-
-          {friendsTab === 'spots' && (
-          <>
-          {/* Avatar + name */}
+          {/* Avatar + name — always rendered (all 3 tabs), so the segmented
+              control below it stays usable for tab-switching regardless of
+              which tab is active. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <div
@@ -568,6 +548,30 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
           </div>
 
+          {/* Friends segmented control — inline-style markup copied from the
+              LIST/MAP toggle (App.jsx / SavedView.jsx / SharedListPage.jsx),
+              same fontSize/fontWeight/letterSpacing/borderRadius/padding/gap
+              values, adapted from 2 to 3 equal-width segments. Track color is
+              the skate-shop-badge dark gray (SHOP_STYLE.bg / #3D4454) instead
+              of salmon; a measured, transform-only thumb slides behind the
+              active segment instead of each segment toggling its own bg. No
+              box-shadow (Section: remove drop shadow) — the LIST/MAP toggle's
+              shadow is untouched. */}
+          <div ref={friendsTabTrackRef} style={{ position: 'relative', display: 'flex', background: '#3D4454', borderRadius: 50, padding: '4px 5px', gap: 3, marginBottom: 16 }}>
+            <div
+              ref={friendsTabThumbRef}
+              style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }}
+            />
+            <div ref={el => { friendsTabSegmentRefs.current.spots = el }} onClick={() => setFriendsTab('spots')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'spots' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>SPOTS</div>
+            <div ref={el => { friendsTabSegmentRefs.current.tricks = el }} onClick={() => setFriendsTab('tricks')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'tricks' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>TRICKS</div>
+            <div ref={el => { friendsTabSegmentRefs.current.friends = el }} onClick={() => setFriendsTab('friends')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'friends' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>FRIENDS</div>
+          </div>
+
+          {friendsTab === 'tricks' && <div />}
+          {friendsTab === 'friends' && <FriendsView user={user} userLocation={userLocation} />}
+
+          {friendsTab === 'spots' && (
+          <>
           {/* Stats */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
             <div
@@ -608,9 +612,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               </svg>
             </div>
           </div>
+          </>
+          )}
 
           {/* Feedback bottom sheet — portalled above bottom nav; opened from
-              the Settings sheet's Send Feedback row now (Section E) */}
+              the Settings sheet's Send Feedback row now (Section E). Lives
+              outside the spots-tab fragment (along with Settings/ToS/
+              Privacy/Support/Delete-account below) so they stay reachable
+              regardless of which tab is active, since the header that
+              triggers them is now rendered for all 3 tabs. */}
           {showFeedbackSheet && createPortal(
             <div
               className="modal-overlay"
@@ -832,8 +842,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               </div>
             </div>,
             document.body
-          )}
-          </>
           )}
         </div>
       </div>

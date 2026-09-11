@@ -10,7 +10,7 @@ import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
 import { useNotifications } from './hooks/useNotifications'
 import TabBar from './components/TabBar'
 import Logo from './components/Logo'
-import { PlusIcon } from './components/Icons'
+import { PlusIcon, ListIcon, MapPinIcon } from './components/Icons'
 import { NAV_TABS } from './lib/navTabs'
 import { fetchLocationSuggestions, toSearchLocationEntry } from './lib/locationSearch'
 import SaveToListModal from './components/SaveToListModal'
@@ -633,6 +633,7 @@ export default function App() {
                   onAddSpot={openAdd}
                   onSearch={openSearch}
                   showNav={false}
+                  userLocation={userLocation}
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}
@@ -656,8 +657,14 @@ export default function App() {
             <div style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
                 <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
-                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
+                  <ListIcon color={spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} />
+                  LIST
+                </div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
+                  <MapPinIcon color={spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} />
+                  MAP
+                </div>
               </div>
             </div>
           )}
@@ -735,6 +742,7 @@ export default function App() {
                   onAddSpot={openAdd}
                   onSearch={openSearch}
                   searchOverlay={searchOverlay}
+                  userLocation={userLocation}
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}
@@ -790,8 +798,14 @@ export default function App() {
             <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 1001, pointerEvents: 'none' }}>
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
                 <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
-                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
+                  <ListIcon color={spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} />
+                  LIST
+                </div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
+                  <MapPinIcon color={spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} />
+                  MAP
+                </div>
               </div>
             </div>
           )}
