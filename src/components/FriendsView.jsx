@@ -41,10 +41,14 @@ function Avatar({ avatarUrl, username }) {
   )
 }
 
+const SEARCH_PAGE_SIZE = 20
+
 export default function FriendsView({ user, userLocation }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
   const [searching, setSearching] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [requests, setRequests] = useState([])
   const [friends, setFriends] = useState([])
@@ -69,26 +73,42 @@ export default function FriendsView({ user, userLocation }) {
     })
   }, [userLocation])
 
+  // search_profiles(q, p_limit, p_offset) returns rows carrying a
+  // total_count column identical on every row — read it from the first.
+  const fetchResultsPage = async (q, offset, append) => {
+    if (append) setLoadingMore(true)
+    else setSearching(true)
+    const { data, error } = await supabase.rpc('search_profiles', { q, p_limit: SEARCH_PAGE_SIZE, p_offset: offset })
+    if (append) setLoadingMore(false)
+    else setSearching(false)
+    if (error) {
+      setSearchError('Search failed')
+      if (!append) { setResults([]); setTotalCount(0) }
+      return
+    }
+    setSearchError('')
+    const rows = data || []
+    setTotalCount(rows[0]?.total_count ?? 0)
+    setResults(prev => append ? [...prev, ...rows] : rows)
+  }
+
   useEffect(() => {
+    // Reset to offset 0 whenever the query text changes.
     if (query.trim().length < 2) {
       setResults([])
+      setTotalCount(0)
       setSearchError('')
       return
     }
-    setSearching(true)
-    const t = setTimeout(async () => {
-      const { data, error } = await supabase.rpc('search_profiles', { q: query.trim() })
-      setSearching(false)
-      if (error) {
-        setSearchError('Search failed')
-        setResults([])
-        return
-      }
-      setSearchError('')
-      setResults(data || [])
+    const t = setTimeout(() => {
+      fetchResultsPage(query.trim(), 0, false)
     }, 300)
     return () => clearTimeout(t)
   }, [query])
+
+  const handleLoadMoreResults = () => {
+    fetchResultsPage(query.trim(), results.length, true)
+  }
 
   const loadRequests = async () => {
     const { data, error } = await supabase.rpc('get_friend_requests')
@@ -163,6 +183,14 @@ export default function FriendsView({ user, userLocation }) {
 
       {query.trim().length >= 2 && (
         <div style={{ marginBottom: 20 }}>
+          {!searching && !searchError && results.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <div className="section-label" style={{ marginBottom: 0 }}>Results</div>
+              <div style={countBadgeStyle}>
+                <span style={countBadgeTextStyle}>{totalCount}</span>
+              </div>
+            </div>
+          )}
           {searchError && <div style={errorTextStyle}>{searchError}</div>}
           {!searching && !searchError && results.length === 0 && (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, padding: '4px 0' }}>No users found</div>
@@ -181,6 +209,14 @@ export default function FriendsView({ user, userLocation }) {
               />
             </div>
           ))}
+          {!searching && results.length < totalCount && (
+            <div
+              onClick={() => !loadingMore && handleLoadMoreResults()}
+              style={{ padding: 16, textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#d4785a', cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase', opacity: loadingMore ? 0.6 : 1 }}
+            >
+              {loadingMore ? 'Loading...' : 'Load More'}
+            </div>
+          )}
         </div>
       )}
 

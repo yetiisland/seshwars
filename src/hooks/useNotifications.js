@@ -97,17 +97,15 @@ export function useNotifications(userId) {
     return true
   }, [userId])
 
+  // Called as soon as the notifications panel opens. Marks everything read
+  // server-side and clears the badge count immediately, but deliberately
+  // does not touch the loaded `notifications` array — cards keep their
+  // unread styling for the rest of this viewing session so the user can
+  // still see what was new.
   const markAllRead = useCallback(async () => {
     if (!userId) return false
-    const now = new Date().toISOString()
-    const { data, error } = await supabase
-      .from('notifications')
-      .update({ read_at: now })
-      .eq('recipient_id', userId)
-      .is('read_at', null)
-      .select()
-    if (error || !data?.length) return false
-    setNotifications(prev => prev.map(n => n.read_at ? n : { ...n, read_at: now }))
+    const { error } = await supabase.rpc('mark_notifications_read')
+    if (error) return false
     setUnreadCount(0)
     return true
   }, [userId])

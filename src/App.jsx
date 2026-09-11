@@ -658,11 +658,11 @@ export default function App() {
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
                 <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
                 <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-                  <ListIcon color={spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} />
+                  <ListIcon color={spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
                   LIST
                 </div>
                 <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-                  <MapPinIcon color={spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} />
+                  <MapPinIcon color={spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
                   MAP
                 </div>
               </div>
@@ -799,11 +799,11 @@ export default function App() {
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
                 <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
                 <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-                  <ListIcon color={spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} />
+                  <ListIcon color={spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
                   LIST
                 </div>
                 <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-                  <MapPinIcon color={spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} />
+                  <MapPinIcon color={spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
                   MAP
                 </div>
               </div>

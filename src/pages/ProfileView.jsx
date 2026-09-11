@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../utils/compressImage'
@@ -13,6 +13,7 @@ import DeleteAccountPage from './DeleteAccountPage'
 import ImageCropModal from '../components/ImageCropModal'
 import FriendsView from '../components/FriendsView'
 import AddFriendButton from '../components/AddFriendButton'
+import { ListIcon, ProfileIcon } from '../components/Icons'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -49,16 +50,14 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [showMySpots, setShowMySpots] = useState(() => sessionStorage.getItem('mySpots:open') === '1')
-  const [friendsTab, setFriendsTab] = useState('spots')
-  const friendsTabTrackRef = useRef(null)
-  const friendsTabSegmentRefs = useRef({})
-  const friendsTabThumbRef = useRef(null)
+  const [showFriendsScreen, setShowFriendsScreen] = useState(false)
+  const [showTrickList, setShowTrickList] = useState(false)
+  const [friendCount, setFriendCount] = useState(0)
   const [friendReqState, setFriendReqState] = useState({})
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifsFetched, setNotifsFetched] = useState(false)
   // Update password modal state
   const [showEditSheet, setShowEditSheet] = useState(false)
-  const [editSheetClosing, setEditSheetClosing] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [pwModalClosing, setPwModalClosing] = useState(false)
   const [pwCurrent, setPwCurrent] = useState('')
@@ -84,7 +83,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showDeleteAccountPage, setShowDeleteAccountPage] = useState(false)
   const [showSettingsSheet, setShowSettingsSheet] = useState(false)
-  const [settingsSheetClosing, setSettingsSheetClosing] = useState(false)
   const [showHiddenSpots, setShowHiddenSpots] = useState(false)
   const [unhideTarget, setUnhideTarget] = useState(null)
   const [showUnhideConfirm, setShowUnhideConfirm] = useState(false)
@@ -97,27 +95,14 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     return () => window.removeEventListener('resize', handler)
   }, [])
 
-  // Positions the sliding thumb behind the active segment. transform-only,
-  // measured from the DOM so it works regardless of segment width/order.
-  const positionFriendsTabThumb = () => {
-    const track = friendsTabTrackRef.current
-    const thumb = friendsTabThumbRef.current
-    const activeEl = friendsTabSegmentRefs.current[friendsTab]
-    if (!track || !thumb || !activeEl) return
-    const trackRect = track.getBoundingClientRect()
-    const elRect = activeEl.getBoundingClientRect()
-    thumb.style.width = `${elRect.width}px`
-    thumb.style.transform = `translateX(${elRect.left - trackRect.left}px)`
-  }
-
-  useLayoutEffect(() => {
-    positionFriendsTabThumb()
-  }, [friendsTab])
-
   useEffect(() => {
-    window.addEventListener('resize', positionFriendsTabThumb)
-    return () => window.removeEventListener('resize', positionFriendsTabThumb)
-  }, [friendsTab])
+    if (!user?.id) return
+    supabase.rpc('get_friend_count').then(({ data, error }) => {
+      if (error) return
+      const count = typeof data === 'number' ? data : (data?.[0]?.count ?? data?.count ?? 0)
+      setFriendCount(count)
+    })
+  }, [user?.id])
 
   const storeProfile = useProfileStore()
   const [editDraft, setEditDraft] = useState(null)
@@ -261,15 +246,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     setShowEditSheet(true)
   }
   const closeEditSheet = () => {
-    setEditSheetClosing(true)
-    setTimeout(() => { setEditSheetClosing(false); setShowEditSheet(false); setEditDraft(null) }, 180)
+    setShowEditSheet(false)
+    setEditDraft(null)
   }
 
   const openSettingsSheet = () => setShowSettingsSheet(true)
-  const closeSettingsSheet = () => {
-    setSettingsSheetClosing(true)
-    setTimeout(() => { setSettingsSheetClosing(false); setShowSettingsSheet(false) }, 180)
-  }
+  const closeSettingsSheet = () => setShowSettingsSheet(false)
 
   const openPasswordModal = () => {
     setPwCurrent(''); setPwNew(''); setPwConfirm(''); setPwError(''); setPwSuccess(false)
@@ -295,6 +277,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
   const openNotifications = () => {
     setShowNotifications(true)
+    onMarkAllNotificationsRead?.()
     if (!notifsFetched) {
       onFetchNotifications?.(true)
       setNotifsFetched(true)
@@ -547,35 +530,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
           </div>
 
-          {/* Friends segmented control — inline-style markup copied from the
-              LIST/MAP toggle (App.jsx / SavedView.jsx / SharedListPage.jsx),
-              same fontSize/fontWeight/letterSpacing/borderRadius/padding/gap
-              values, adapted from 2 to 3 equal-width segments. Track color is
-              the skate-shop-badge dark gray (SHOP_STYLE.bg / #3D4454) instead
-              of salmon; a measured, transform-only thumb slides behind the
-              active segment instead of each segment toggling its own bg. No
-              box-shadow (Section: remove drop shadow) — the LIST/MAP toggle's
-              shadow is untouched. */}
-          <div ref={friendsTabTrackRef} style={{ position: 'relative', display: 'flex', background: '#3D4454', borderRadius: 50, padding: '4px 5px', gap: 3, marginBottom: 16 }}>
-            <div
-              ref={friendsTabThumbRef}
-              style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }}
-            />
-            <div ref={el => { friendsTabSegmentRefs.current.spots = el }} onClick={() => setFriendsTab('spots')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'spots' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>SPOTS</div>
-            <div ref={el => { friendsTabSegmentRefs.current.tricks = el }} onClick={() => setFriendsTab('tricks')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'tricks' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>TRICKS</div>
-            <div ref={el => { friendsTabSegmentRefs.current.friends = el }} onClick={() => setFriendsTab('friends')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'friends' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>FRIENDS</div>
-          </div>
-
-          {friendsTab === 'tricks' && <div />}
-          {friendsTab === 'friends' && <FriendsView user={user} userLocation={userLocation} />}
-
-          {friendsTab === 'spots' && (
-          <>
-          {/* Stats */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+          {/* Stat cards — 2x2 grid, same card style/gap as the original
+              Spots Added / Spots Hidden pair (#FFFFFF bg, #EAD8C8 border,
+              radius 6, padding 12px 14px, gap 12). Row 2 (Trick List,
+              Friends) routes to their own full-screen pages instead of the
+              removed Spots/Tricks/Friends segmented control. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
             <div
               onClick={() => { sessionStorage.setItem('mySpots:open', '1'); setShowMySpots(true) }}
-              style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+              style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <svg width="18" height="22" viewBox="0 0 20 24" fill="none">
@@ -593,7 +556,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
             <div
               onClick={() => setShowHiddenSpots(true)}
-              style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+              style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -610,9 +573,37 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
+            <div
+              onClick={() => setShowTrickList(true)}
+              style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <ListIcon color="#d4785a" size={18} filled />
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>0</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Trick List</div>
+                </div>
+              </div>
+              <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div
+              onClick={() => setShowFriendsScreen(true)}
+              style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <ProfileIcon color="#d4785a" size={18} filled />
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{friendCount}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Friends</div>
+                </div>
+              </div>
+              <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
           </div>
-          </>
-          )}
 
           {/* Feedback bottom sheet — portalled above bottom nav; opened from
               the Settings sheet's Send Feedback row now (Section E). Lives
@@ -621,52 +612,46 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               regardless of which tab is active, since the header that
               triggers them is now rendered for all 3 tabs. */}
           {showFeedbackSheet && createPortal(
-            <div
-              className="modal-overlay"
-              onClick={() => setShowFeedbackSheet(false)}
-              style={{ position: 'fixed', zIndex: 100000 }}
-            >
-              <div
-                className="modal-sheet"
-                onClick={e => e.stopPropagation()}
-                style={{ paddingLeft: 20, paddingRight: 20, paddingBottom: 'calc(env(safe-area-inset-bottom) + 28px)' }}
-              >
-                <div className="modal-handle" />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <div className="modal-title">Send Feedback</div>
-                  <div
-                    onClick={() => setShowFeedbackSheet(false)}
-                    style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                      <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                  </div>
+            <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center',
+                padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+                background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
+              }}>
+                <div onClick={() => setShowFeedbackSheet(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </div>
-                {feedbackSent ? (
-                  <div style={{ fontSize: 13, color: '#4a9a5a', fontWeight: 700, textAlign: 'center', padding: '20px 0' }}>
-                    Thanks! Your feedback was sent.
-                  </div>
-                ) : (
-                  <>
-                    <textarea
-                      className="form-input"
-                      placeholder="Share your feedback, ideas, or report a bug..."
-                      value={feedbackText}
-                      onChange={e => setFeedbackText(e.target.value)}
-                      style={{ marginBottom: 12, minHeight: 100, resize: 'none' }}
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleSendFeedback}
-                      disabled={feedbackSending || !feedbackText.trim()}
-                      style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: (!feedbackText.trim() || feedbackSending) ? 0.5 : 1 }}
-                    >
-                      {feedbackSending ? 'Sending...' : 'Send'}
-                    </button>
-                  </>
-                )}
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Send Feedback</div>
+                <div style={{ width: 36 }} />
+              </div>
+              <div className="scroll-area">
+                <div style={{ padding: '16px 16px 28px', maxWidth: 480, margin: '0 auto', width: '100%' }}>
+                  {feedbackSent ? (
+                    <div style={{ fontSize: 13, color: '#4a9a5a', fontWeight: 700, textAlign: 'center', padding: '20px 0' }}>
+                      Thanks! Your feedback was sent.
+                    </div>
+                  ) : (
+                    <>
+                      <textarea
+                        className="form-input"
+                        placeholder="Share your feedback, ideas, or report a bug..."
+                        value={feedbackText}
+                        onChange={e => setFeedbackText(e.target.value)}
+                        style={{ marginBottom: 12, minHeight: 100, resize: 'none' }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSendFeedback}
+                        disabled={feedbackSending || !feedbackText.trim()}
+                        style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: (!feedbackText.trim() || feedbackSending) ? 0.5 : 1 }}
+                      >
+                        {feedbackSending ? 'Sending...' : 'Send'}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>,
             document.body
@@ -675,21 +660,26 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           <div style={{ height: BOTTOM_PAD }} />
           {cropFile && <ImageCropModal imageFile={cropFile} onConfirm={handleCropConfirm} onCancel={() => setCropFile(null)} />}
 
-          {/* Settings bottom sheet — same sheet component/animation as Edit Profile */}
-          {(showSettingsSheet || settingsSheetClosing) && createPortal(
-            <div className="modal-overlay" onClick={closeSettingsSheet}>
-              <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto', ...(settingsSheetClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : {}) }}>
-                <div className="modal-handle" />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px 16px' }}>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Settings</div>
-                  <div onClick={closeSettingsSheet} style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                      <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                  </div>
+          {/* Settings — full page (Section E), reached from the gear icon.
+              Rows below navigate to their own pages without closing this
+              one, so the back arrow on each destination returns here. */}
+          {showSettingsSheet && createPortal(
+            <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center',
+                padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+                background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
+              }}>
+                <div onClick={closeSettingsSheet} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </div>
-                <div style={{ padding: '0 16px 28px' }}>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Settings</div>
+                <div style={{ width: 36 }} />
+              </div>
+              <div className="scroll-area">
+                <div style={{ padding: '16px 16px 28px', maxWidth: 480, margin: '0 auto', width: '100%' }}>
                   {/* ACCOUNT — card/list-row style copied from the stat tiles
                       and notification cards (#FFFFFF bg, #EAD8C8 border,
                       borderRadius 10, same chevron svg) */}
@@ -845,9 +835,11 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         </div>
       </div>
 
-      {/* Hidden Spots overlay — full screen */}
+      {/* Hidden Spots overlay — full screen. z-index matches the settings-
+          reachable tier (Edit Profile / Feedback / ToS / Privacy) since this
+          is also opened from a Settings row now, not just the stat card. */}
       {showHiddenSpots && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '14px 14px 10px', paddingTop: 'calc(env(safe-area-inset-top) + 14px)',
@@ -953,25 +945,82 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         </div>,
         document.body
       )}
+
+      {/* Friends screen — full page (Section A), reached from the Friends
+          stat card. Same shell as My Spots; FriendsView supplies the body. */}
+      {showFriendsScreen && createPortal(
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+            background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
+          }}>
+            <div onClick={() => setShowFriendsScreen(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+              Friends
+            </div>
+            <div style={{ width: 36 }} />
+          </div>
+          <div className="scroll-area">
+            <div style={{ padding: '14px 14px 0', maxWidth: 480, margin: '0 auto', width: '100%' }}>
+              <FriendsView user={user} userLocation={userLocation} />
+            </div>
+            <div style={{ height: BOTTOM_PAD }} />
+          </div>
+          {onTabChange && <TabBar active="profile" onChange={t => { setShowFriendsScreen(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
+        </div>,
+        document.body
+      )}
+
+      {/* Trick List placeholder screen (Section B) — tricks aren't built
+          yet, so this is a back arrow and nothing else. */}
+      {showTrickList && createPortal(
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+            background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
+          }}>
+            <div onClick={() => setShowTrickList(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+              Trick List
+            </div>
+            <div style={{ width: 36 }} />
+          </div>
+          {onTabChange && <TabBar active="profile" onChange={t => { setShowTrickList(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
+        </div>,
+        document.body
+      )}
       </>
       )}
       </div>{/* end content wrapper */}
 
-      {/* Edit Profile sheet */}
-      {(showEditSheet || editSheetClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeEditSheet}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto', ...(editSheetClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : {}) }}>
-            <div className="modal-handle" />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px 16px' }}>
-              <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Edit Profile</div>
-              <div onClick={closeEditSheet} style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                  <line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-              </div>
+      {/* Edit Profile — full page (Section E), reached from Settings */}
+      {showEditSheet && createPortal(
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+            background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
+          }}>
+            <div onClick={closeEditSheet} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
-            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Edit Profile</div>
+            <div style={{ width: 36 }} />
+          </div>
+          <div className="scroll-area">
+            <div style={{ padding: '16px 16px 28px', maxWidth: 480, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
               {/* Avatar */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
                 <div style={{ position: 'relative', width: 72, height: 72 }}>
@@ -1100,9 +1149,11 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         document.body
       )}
 
-      {/* Notifications overlay — full screen */}
+      {/* Notifications overlay — full screen. Same z-index tier as the
+          other settings-reachable pages (also opened from the bell icon
+          directly, which works fine at this tier too). */}
       {showNotifications && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center',
             padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
@@ -1116,13 +1167,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
               Notifications
             </div>
-            {unreadCount > 0 ? (
-              <div onClick={() => onMarkAllNotificationsRead?.()} style={{ fontSize: 11, fontWeight: 700, color: '#d4785a', cursor: 'pointer', flexShrink: 0 }}>
-                Mark all read
-              </div>
-            ) : (
-              <div style={{ width: 36 }} />
-            )}
+            <div style={{ width: 36 }} />
           </div>
           <div className="scroll-area">
             {notifLoading && notifications.length === 0 ? (
@@ -1198,13 +1243,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                             </div>
                             <div
                               onClick={() => !friendReqState[n.id]?.loading && handleIgnoreFriendRequestNotif(n)}
-                              style={{ marginLeft: 2, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              style={{ flexShrink: 0, border: '1px solid rgba(212,120,90,0.5)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: friendReqState[n.id]?.loading ? 0.6 : 1 }}
                             >
-                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                <circle cx="6" cy="6" r="5" fill="rgba(212,120,90,0.15)" />
-                                <line x1="4" y1="4" x2="8" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
-                                <line x1="8" y1="4" x2="4" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
-                              </svg>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--salmon)', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }}>Deny</span>
                             </div>
                           </div>
                         )
