@@ -95,13 +95,17 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     return () => window.removeEventListener('resize', handler)
   }, [])
 
-  useEffect(() => {
+  const fetchFriendCount = () => {
     if (!user?.id) return
     supabase.rpc('get_friend_count').then(({ data, error }) => {
       if (error) return
       const count = typeof data === 'number' ? data : (data?.[0]?.count ?? data?.count ?? 0)
       setFriendCount(count)
     })
+  }
+
+  useEffect(() => {
+    fetchFriendCount()
   }, [user?.id])
 
   const storeProfile = useProfileStore()
@@ -324,6 +328,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       return
     }
     setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: 'accepted', error: '' } }))
+    fetchFriendCount()
   }
 
   const handleIgnoreFriendRequestNotif = async (n) => {
@@ -967,7 +972,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           </div>
           <div className="scroll-area">
             <div style={{ padding: '14px 14px 0', maxWidth: 480, margin: '0 auto', width: '100%' }}>
-              <FriendsView user={user} userLocation={userLocation} />
+              <FriendsView user={user} userLocation={userLocation} onFriendsChanged={fetchFriendCount} />
             </div>
             <div style={{ height: BOTTOM_PAD }} />
           </div>

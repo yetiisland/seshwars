@@ -43,7 +43,7 @@ function Avatar({ avatarUrl, username }) {
 
 const SEARCH_PAGE_SIZE = 20
 
-export default function FriendsView({ user, userLocation }) {
+export default function FriendsView({ user, userLocation, onFriendsChanged }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [totalCount, setTotalCount] = useState(0)
@@ -137,6 +137,7 @@ export default function FriendsView({ user, userLocation }) {
   const handleRequestAccepted = () => {
     loadRequests()
     loadFriends()
+    onFriendsChanged?.()
   }
 
   return (
