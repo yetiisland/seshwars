@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../utils/compressImage'
@@ -50,6 +50,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [message, setMessage] = useState('')
   const [showMySpots, setShowMySpots] = useState(() => sessionStorage.getItem('mySpots:open') === '1')
   const [friendsTab, setFriendsTab] = useState('spots')
+  const friendsTabTrackRef = useRef(null)
+  const friendsTabSegmentRefs = useRef({})
+  const friendsTabThumbRef = useRef(null)
   const [friendReqState, setFriendReqState] = useState({})
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifsFetched, setNotifsFetched] = useState(false)
@@ -93,6 +96,28 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
+
+  // Positions the sliding thumb behind the active segment. transform-only,
+  // measured from the DOM so it works regardless of segment width/order.
+  const positionFriendsTabThumb = () => {
+    const track = friendsTabTrackRef.current
+    const thumb = friendsTabThumbRef.current
+    const activeEl = friendsTabSegmentRefs.current[friendsTab]
+    if (!track || !thumb || !activeEl) return
+    const trackRect = track.getBoundingClientRect()
+    const elRect = activeEl.getBoundingClientRect()
+    thumb.style.width = `${elRect.width}px`
+    thumb.style.transform = `translateX(${elRect.left - trackRect.left}px)`
+  }
+
+  useLayoutEffect(() => {
+    positionFriendsTabThumb()
+  }, [friendsTab])
+
+  useEffect(() => {
+    window.addEventListener('resize', positionFriendsTabThumb)
+    return () => window.removeEventListener('resize', positionFriendsTabThumb)
+  }, [friendsTab])
 
   const storeProfile = useProfileStore()
   const [editDraft, setEditDraft] = useState(null)
@@ -439,12 +464,19 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
           {/* Friends segmented control — inline-style markup copied from the
               LIST/MAP toggle (App.jsx / SavedView.jsx / SharedListPage.jsx),
-              same hex/fontSize/fontWeight/letterSpacing/borderRadius/padding
-              values, adapted from 2 to 3 equal-width segments. */}
-          <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', marginBottom: 16 }}>
-            <div onClick={() => setFriendsTab('tricks')} style={{ flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, background: friendsTab === 'tricks' ? '#fff' : 'transparent', color: friendsTab === 'tricks' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>TRICKS</div>
-            <div onClick={() => setFriendsTab('friends')} style={{ flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, background: friendsTab === 'friends' ? '#fff' : 'transparent', color: friendsTab === 'friends' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>FRIENDS</div>
-            <div onClick={() => setFriendsTab('spots')} style={{ flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, background: friendsTab === 'spots' ? '#fff' : 'transparent', color: friendsTab === 'spots' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>SPOTS</div>
+              same fontSize/fontWeight/letterSpacing/borderRadius/padding/gap
+              values, adapted from 2 to 3 equal-width segments. Track color is
+              the skate-shop-badge dark gray (SHOP_STYLE.bg / #3D4454) instead
+              of salmon; a measured, transform-only thumb slides behind the
+              active segment instead of each segment toggling its own bg. */}
+          <div ref={friendsTabTrackRef} style={{ position: 'relative', display: 'flex', background: '#3D4454', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', marginBottom: 16 }}>
+            <div
+              ref={friendsTabThumbRef}
+              style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }}
+            />
+            <div ref={el => { friendsTabSegmentRefs.current.spots = el }} onClick={() => setFriendsTab('spots')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'spots' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>SPOTS</div>
+            <div ref={el => { friendsTabSegmentRefs.current.tricks = el }} onClick={() => setFriendsTab('tricks')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'tricks' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>TRICKS</div>
+            <div ref={el => { friendsTabSegmentRefs.current.friends = el }} onClick={() => setFriendsTab('friends')} style={{ position: 'relative', zIndex: 1, flex: 1, textAlign: 'center', padding: '6px 18px', borderRadius: 50, color: friendsTab === 'friends' ? '#3D4454' : 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>FRIENDS</div>
           </div>
 
           {friendsTab === 'tricks' && <div />}
@@ -536,26 +568,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
           </div>
 
-          {/* Edit button below name */}
-          <div style={{ marginBottom: 20 }}>
-            <div
-              onClick={openEditSheet}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                border: '1px solid rgba(212,120,90,0.5)', borderRadius: 6,
-                padding: '5px 12px', cursor: 'pointer',
-              }}
-            >
-              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                <path d="M9.5 2L12 4.5L5 11.5H2.5V9L9.5 2Z" stroke="#d4785a" strokeWidth="1.3" strokeLinejoin="round" />
-              </svg>
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--salmon)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                Edit Profile
-              </span>
-            </div>
-          </div>
-
-
           {/* Stats */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
             <div
@@ -597,19 +609,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
           </div>
 
-          <div className="divider" />
-
-          {/* Support section */}
-          <div style={{ marginBottom: 16 }}>
-            <button
-              onClick={() => setShowFeedbackSheet(true)}
-              style={{ width: '100%', padding: '13px 16px', borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
-            >
-              Send Feedback
-            </button>
-          </div>
-
-          {/* Feedback bottom sheet — portalled above bottom nav */}
+          {/* Feedback bottom sheet — portalled above bottom nav; opened from
+              the Settings sheet's Send Feedback row now (Section E) */}
           {showFeedbackSheet && createPortal(
             <div
               className="modal-overlay"
@@ -680,27 +681,73 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   </div>
                 </div>
                 <div style={{ padding: '0 16px 28px' }}>
-                  <button
-                    onClick={handleSignOut}
-                    style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', marginBottom: 12 }}
+                  {/* ACCOUNT — card/list-row style copied from the stat tiles
+                      and notification cards (#FFFFFF bg, #EAD8C8 border,
+                      borderRadius 10, same chevron svg) */}
+                  <div className="section-label">Account</div>
+                  <div
+                    onClick={openEditSheet}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
                   >
-                    Sign Out
-                  </button>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Edit Profile</span>
+                    <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                      <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div
+                    onClick={openNotifications}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Notifications</span>
+                    <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                      <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div
+                    onClick={() => setShowHiddenSpots(true)}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Hidden Spots</span>
+                    <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                      <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+
+                  {/* SUPPORT — "Terms and privacy" is Terms of Service +
+                      Privacy Policy as two rows (they're separate existing
+                      pages with no combined view to route a single row to) */}
+                  <div className="section-label">Support</div>
+                  <div
+                    onClick={() => setShowFeedbackSheet(true)}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Send Feedback</span>
+                    <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                      <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
                   <div
                     onClick={() => setShowTos(true)}
-                    style={{ padding: '12px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
                   >
-                    Terms of Service
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Terms of Service</span>
+                    <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                      <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </div>
                   <div
                     onClick={() => setShowPrivacy(true)}
-                    style={{ padding: '4px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
                   >
-                    Privacy Policy
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Privacy Policy</span>
+                    <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                      <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </div>
+
                   <div
                     onClick={() => setShowSupport(true)}
-                    style={{ padding: '4px 0 8px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ padding: '4px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
                   >
                     Support
                   </div>
@@ -720,6 +767,13 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   >
                     Account Deletion Info
                   </div>
+                  <div className="divider" style={{ margin: '16px 0' }} />
+                  <button
+                    onClick={handleSignOut}
+                    style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+                  >
+                    Sign Out
+                  </button>
                 </div>
               </div>
             </div>,

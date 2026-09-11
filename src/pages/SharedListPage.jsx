@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { createPortal } from 'react-dom'
@@ -17,6 +17,26 @@ export default function SharedListPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [viewMode, setViewMode] = useState('list')
+  const viewToggleTrackRef = useRef(null)
+  const viewToggleThumbRef = useRef(null)
+  const viewToggleSegmentRefs = useRef({})
+  const positionViewToggleThumb = () => {
+    const track = viewToggleTrackRef.current
+    const thumb = viewToggleThumbRef.current
+    const activeEl = viewToggleSegmentRefs.current[viewMode]
+    if (!track || !thumb || !activeEl) return
+    const trackRect = track.getBoundingClientRect()
+    const elRect = activeEl.getBoundingClientRect()
+    thumb.style.width = `${elRect.width}px`
+    thumb.style.transform = `translateX(${elRect.left - trackRect.left}px)`
+  }
+  useLayoutEffect(() => {
+    positionViewToggleThumb()
+  })
+  useEffect(() => {
+    window.addEventListener('resize', positionViewToggleThumb)
+    return () => window.removeEventListener('resize', positionViewToggleThumb)
+  }, [viewMode])
   const [user, setUser] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -193,9 +213,10 @@ export default function SharedListPage() {
 
       {/* LIST/MAP toggle pill — above TabBar */}
       {createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
-          <div onClick={() => setViewMode('list')} style={{ padding: '6px 18px', borderRadius: 50, background: viewMode === 'list' ? '#fff' : 'transparent', color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-          <div onClick={() => setViewMode('map')} style={{ padding: '6px 18px', borderRadius: 50, background: viewMode === 'map' ? '#fff' : 'transparent', color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+        <div ref={viewToggleTrackRef} style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
+          <div ref={viewToggleThumbRef} style={{ position: 'absolute', top: 3, bottom: 3, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
+          <div ref={el => { viewToggleSegmentRefs.current.list = el }} onClick={() => setViewMode('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+          <div ref={el => { viewToggleSegmentRefs.current.map = el }} onClick={() => setViewMode('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
         </div>,
         document.body
       )}

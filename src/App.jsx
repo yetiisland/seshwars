@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
@@ -241,6 +241,28 @@ export default function App() {
   const navigate = useNavigate()
   const [tab, setTab] = useState(() => normalizeTab(sessionStorage.getItem('activeTab') || 'spots'))
   const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')
+  // Shared by both the desktop and mobile spots-view toggle pills below —
+  // only one of the two is ever mounted at a time (isDesktop branch).
+  const spotsToggleTrackRef = useRef(null)
+  const spotsToggleThumbRef = useRef(null)
+  const spotsToggleSegmentRefs = useRef({})
+  const positionSpotsToggleThumb = () => {
+    const track = spotsToggleTrackRef.current
+    const thumb = spotsToggleThumbRef.current
+    const activeEl = spotsToggleSegmentRefs.current[spotsView]
+    if (!track || !thumb || !activeEl) return
+    const trackRect = track.getBoundingClientRect()
+    const elRect = activeEl.getBoundingClientRect()
+    thumb.style.width = `${elRect.width}px`
+    thumb.style.transform = `translateX(${elRect.left - trackRect.left}px)`
+  }
+  useLayoutEffect(() => {
+    positionSpotsToggleThumb()
+  })
+  useEffect(() => {
+    window.addEventListener('resize', positionSpotsToggleThumb)
+    return () => window.removeEventListener('resize', positionSpotsToggleThumb)
+  }, [spotsView])
   // Flip true on first map visit and never back — prevents Mapbox loading for list-only users
   const [mapEverOpened, setMapEverOpened] = useState(() => sessionStorage.getItem('spotsView') === 'map')
   const [user, setUser] = useState(_cachedUser)
@@ -632,9 +654,10 @@ export default function App() {
           {/* Spots view toggle pill for desktop */}
           {effectiveTab === 'spots' && (
             <div style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
-              <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
-                <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-                <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+              <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
+                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
               </div>
             </div>
           )}
@@ -765,9 +788,10 @@ export default function App() {
           {/* Spots view toggle pill — above tab bar, only when on spots tab */}
           {effectiveTab === 'spots' && !showAdd && (
             <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 1001, pointerEvents: 'none' }}>
-              <div style={{ display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
-                <div onClick={() => handleSpotsViewChange('list')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'list' ? '#fff' : 'transparent', color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-                <div onClick={() => handleSpotsViewChange('map')} style={{ padding: '6px 18px', borderRadius: 50, background: spotsView === 'map' ? '#fff' : 'transparent', color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+              <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
+                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
               </div>
             </div>
           )}
