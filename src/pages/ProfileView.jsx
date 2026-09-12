@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../utils/compressImage'
 import { useProfileStore, setProfileDirect, reloadProfile } from '../lib/profileStore'
@@ -106,6 +108,41 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
   useEffect(() => {
     fetchFriendCount()
+  }, [user?.id])
+
+  // Any AddFriendButton anywhere (search results, Skaters Near You, a spot's
+  // "Added by" row) can accept a request without knowing this screen exists,
+  // so instead of threading onChange through every call site, refetch on the
+  // two events that reliably bracket "the user might have done that
+  // elsewhere": coming back from the Friends screen, and the app regaining
+  // focus (same visibilitychange/appStateChange signal useNotifications.js
+  // uses for the unread badge). The notification-card accept and the
+  // FriendsView Requests-section accept still call fetchFriendCount directly
+  // too, so those two update live instead of waiting for one of these.
+  const prevShowFriendsScreenRef = useRef(false)
+  useEffect(() => {
+    if (prevShowFriendsScreenRef.current && !showFriendsScreen) {
+      fetchFriendCount()
+    }
+    prevShowFriendsScreenRef.current = showFriendsScreen
+  }, [showFriendsScreen])
+
+  useEffect(() => {
+    if (!user?.id) return
+    const handleVisibility = () => {
+      if (!document.hidden) fetchFriendCount()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    let capSub
+    if (Capacitor.isNativePlatform()) {
+      CapApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) fetchFriendCount()
+      }).then(s => { capSub = s }).catch(() => {})
+    }
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      capSub?.remove()
+    }
   }, [user?.id])
 
   const storeProfile = useProfileStore()
