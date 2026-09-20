@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Download Sesh Wars</title>
+  <meta name="description" content="Find, rate, and share the best skate spots near you. Free on iOS and Android.">
+
+  <meta property="og:title" content="Download Sesh Wars">
+  <meta property="og:description" content="Find, rate, and share the best skate spots near you. Free on iOS and Android.">
+  <meta property="og:image" content="https://seshwars.com/sesh-wars_logo_stacked_salmon.png">
+  <meta property="og:url" content="https://seshwars.com/download">
+  <meta property="og:type" content="website">
+
+  <link rel="icon" type="image/png" href="/sw-favicon.png" />
+
+  <style>
+    /* Same font-loading mechanism as src/index.css line 1 */
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,400;0,700;0,900;1,400&display=swap');
+
+    /* Values copied verbatim from src/index.css :root */
+    :root {
+      --bg-primary: #FDF8F0;
+      --text-primary: #2a1e14;
+      --text-secondary: #9a8878;
+      --text-muted: #6a6c7a;
+      --salmon: #d4785a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      background: var(--bg-primary);
+      font-family: 'Barlow', sans-serif;
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 48px 24px;
+    }
+
+    .logo {
+      width: 140px;
+      height: auto;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .subhead {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 32px;
+    }
+
+    .badges {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .badges a {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .badges img {
+      display: block;
+    }
+
+    /* Apple's badge has no built-in padding; Google Play's does, so it's
+       rendered ~20% taller to make the two badges' visual cap heights match. */
+    .app-store-badge {
+      height: 44px;
+      width: auto;
+    }
+
+    .google-play-badge {
+      height: 52.8px;
+      width: auto;
+    }
+
+    @media (min-width: 480px) {
+      .badges {
+        flex-direction: row;
+        gap: 20px;
+      }
+    }
+
+    .web-link {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <img class="logo" src="sesh-wars_logo_stacked_salmon.svg" alt="Sesh Wars logo">
+
+  <h1>Sesh Wars</h1>
+  <p class="subhead">Find &amp; Add Local Skate Spots</p>
+
+  <div class="badges">
+    <a href="https://apps.apple.com/us/app/sesh-wars/id6779744364">
+      <img class="app-store-badge" src="app-store-badge.svg" alt="Download on the App Store">
+    </a>
+    <a href="https://play.google.com/store/apps/details?id=com.seshwars.app">
+      <img class="google-play-badge" src="google-play-badge.png" alt="Get it on Google Play">
+    </a>
+  </div>
+
+  <a class="web-link" href="https://seshwars.com">Open the web app</a>
+</body>
+</html>
