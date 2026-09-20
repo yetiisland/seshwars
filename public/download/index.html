@@ -25,23 +25,20 @@
       padding: 0;
     }
 
-    html, body {
-      height: 100%;
-    }
-
     body {
       background: #FF9B63;
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: center;
+      align-items: center;
+      padding: 24px 28px;
       font-family: 'Barlow', sans-serif;
     }
 
     .content {
       width: 100%;
       max-width: 360px;
-      padding: 0 28px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -51,6 +48,7 @@
       width: 100%;
       max-width: 260px;
       height: auto;
+      margin-top: 0;
       margin-bottom: 28px;
     }
 
@@ -125,7 +123,7 @@
   <div class="content">
     <img class="logo" src="/download/sesh-wars_logo_stacked_white.svg" alt="Sesh Wars">
 
-    <p class="tagline">Find &amp; add skate spots.</p>
+    <p class="tagline">Find &amp; add skate spots near you.</p>
 
     <a class="btn app-store-btn" href="https://apps.apple.com/us/app/sesh-wars/id6779744364">
       <svg class="icon" width="22" height="22" viewBox="0 0 384 512" xmlns="http://www.w3.org/2000/svg">
