@@ -16,6 +16,7 @@
     "@capacitor/core": "^8.4.0",
     "@capacitor/ios": "^8.4.0",
     "@supabase/supabase-js": "^2.105.3",
+    "@vercel/analytics": "^2.0.1",
     "lucide-react": "^1.14.0",
     "mapbox-gl": "^3.23.1",
     "react": "^19.2.5",
