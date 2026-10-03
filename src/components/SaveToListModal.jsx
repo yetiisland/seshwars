@@ -42,6 +42,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
   const [creatingList, setCreatingList] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     if (!user || !spot) return
@@ -64,18 +65,26 @@ export default function SaveToListModal({ spot, user, onClose }) {
   const notifyListsChanged = () => window.dispatchEvent(new Event('seshwars:lists-changed'))
 
   const toggleFavorites = async () => {
+    setSaveError('')
     if (isFav) {
       await supabase.from('saved_spots')
         .delete().eq('user_id', user.id).eq('spot_id', spot.id).is('list_id', null)
       setIsFav(false)
     } else {
-      await supabase.from('saved_spots')
+      const { data, error } = await supabase.from('saved_spots')
         .insert({ user_id: user.id, spot_id: spot.id })
+        .select().single()
+      if (error || !data) {
+        console.error('[SaveToListModal] toggleFavorites insert failed:', error)
+        setSaveError('Could not save this spot. Try again.')
+        return
+      }
       setIsFav(true)
     }
   }
 
   const toggleList = async (listId) => {
+    setSaveError('')
     if (listItems.has(listId)) {
       await supabase.from('saved_spots')
         .delete()
@@ -84,8 +93,14 @@ export default function SaveToListModal({ spot, user, onClose }) {
         .eq('list_id', listId)
       setListItems(prev => { const s = new Set(prev); s.delete(listId); return s })
     } else {
-      await supabase.from('saved_spots')
+      const { data, error } = await supabase.from('saved_spots')
         .insert({ user_id: user.id, spot_id: spot.id, list_id: listId })
+        .select().single()
+      if (error || !data) {
+        console.error('[SaveToListModal] toggleList insert failed:', error)
+        setSaveError('Could not add this spot to the list. Try again.')
+        return
+      }
       setListItems(prev => new Set([...prev, listId]))
     }
     notifyListsChanged()
@@ -93,17 +108,24 @@ export default function SaveToListModal({ spot, user, onClose }) {
 
   const createList = async () => {
     if (!newListName.trim()) return
+    setSaveError('')
     setCreating(true)
     const { data } = await supabase
       .from('spot_lists')
       .insert({ user_id: user.id, name: newListName.trim() })
       .select().single()
     if (data) {
-      await supabase.from('saved_spots')
-        .insert({ user_id: user.id, spot_id: spot.id, list_id: data.id })
       setLists(prev => [...prev, data])
-      setListItems(prev => new Set([...prev, data.id]))
       notifyListsChanged()
+      const { data: savedSpotRow, error: savedSpotError } = await supabase.from('saved_spots')
+        .insert({ user_id: user.id, spot_id: spot.id, list_id: data.id })
+        .select().single()
+      if (savedSpotError || !savedSpotRow) {
+        console.error('[SaveToListModal] createList saved_spots insert failed:', savedSpotError)
+        setSaveError('List created, but the spot could not be added to it. Try again.')
+      } else {
+        setListItems(prev => new Set([...prev, data.id]))
+      }
     }
     setNewListName('')
     setCreatingList(false)
@@ -191,6 +213,10 @@ export default function SaveToListModal({ spot, user, onClose }) {
             </div>
             <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Create New List</div>
           </div>
+        )}
+
+        {saveError && (
+          <div style={{ padding: '8px 20px 0', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{saveError}</div>
         )}
 
         {/* Save Spot button */}

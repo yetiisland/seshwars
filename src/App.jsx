@@ -290,7 +290,14 @@ export default function App() {
   const [showHideConfirm, setShowHideConfirm] = useState(false)
   const [hideConfirmClosing, setHideConfirmClosing] = useState(false)
   const [saveModalSpot, setSaveModalSpot] = useState(null)
-  const userLocation = useGeolocation()
+  const { location: userLocation, permissionState: locationPermission, requestLocation } = useGeolocation()
+  // Map is the one place that needs location to do its core job (centering
+  // on you); opening it is the "explicit action" that requests location
+  // when permission is still in the 'prompt' state. Also covers the case
+  // where spotsView was restored to 'map' from a previous session on mount.
+  useEffect(() => {
+    if (spotsView === 'map') requestLocation()
+  }, [spotsView, requestLocation])
   const isAdmin = isAdminUser(user)
   const { notifications, unreadCount, loading: notifLoading, hasMore: notifHasMore, fetchNotifications, markRead, markAllRead } = useNotifications(user?.id)
 
@@ -596,6 +603,7 @@ export default function App() {
                 onHidePress={handleHidePress}
                 sortMode={sortMode}
                 onSortModeChange={handleSortModeChange}
+                locationPermission={locationPermission}
               />
             </div>
             {mapEverOpened && (
@@ -646,6 +654,8 @@ export default function App() {
                   onSearch={openSearch}
                   showNav={false}
                   userLocation={userLocation}
+                  locationPermission={locationPermission}
+                  requestLocation={requestLocation}
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}
@@ -734,6 +744,7 @@ export default function App() {
                   onHidePress={handleHidePress}
                   sortMode={sortMode}
                   onSortModeChange={handleSortModeChange}
+                  locationPermission={locationPermission}
                 />
               </div>
               {effectiveTab === 'saved' && (
@@ -758,6 +769,8 @@ export default function App() {
                   onSearch={openSearch}
                   searchOverlay={searchOverlay}
                   userLocation={userLocation}
+                  locationPermission={locationPermission}
+                  requestLocation={requestLocation}
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}

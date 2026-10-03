@@ -42,7 +42,7 @@ function Avatar({ avatarUrl, username }) {
 
 const SEARCH_PAGE_SIZE = 20
 
-export default function FriendsView({ user, userLocation, onFriendsChanged }) {
+export default function FriendsView({ user, userLocation, locationPermission, requestLocation, onFriendsChanged }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [totalCount, setTotalCount] = useState(0)
@@ -221,11 +221,17 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
           placeholder="Search for skaters..."
           value={query}
           onChange={e => setQuery(e.target.value.replace(/^@+/, ''))}
-          onFocus={() => setInputFocused(true)}
+          onFocus={() => { setInputFocused(true); requestLocation?.() }}
           onBlur={() => setTimeout(() => setInputFocused(false), 150)}
           style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
         />
       </div>
+
+      {inputFocused && query.trim().length === 0 && locationPermission === 'denied' && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 20, lineHeight: 1.5 }}>
+          Location is blocked, so skaters near you can't be shown. Re-enable location for this app in your browser or device settings.
+        </div>
+      )}
 
       {inputFocused && nearbySkaters.length > 0 && query.trim().length === 0 && (
         <div style={{ marginBottom: 20 }}>

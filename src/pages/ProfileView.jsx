@@ -47,7 +47,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, saved, onSavePress, onSpotClick, onListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -1012,7 +1012,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           </div>
           <div className="scroll-area">
             <div style={{ padding: '14px 14px 0', maxWidth: 480, margin: '0 auto', width: '100%' }}>
-              <FriendsView user={user} userLocation={userLocation} onFriendsChanged={fetchFriendCount} />
+              <FriendsView user={user} userLocation={userLocation} locationPermission={locationPermission} requestLocation={requestLocation} onFriendsChanged={fetchFriendCount} />
             </div>
             <div style={{ height: BOTTOM_PAD }} />
           </div>

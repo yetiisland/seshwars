@@ -57,6 +57,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const skipGeoRef = useRef(false)
 
   const [mapCenter, setMapCenter] = useState({ longitude: -104.9903, latitude: 39.7392, zoom: 13 })
+  const [geoPermissionDenied, setGeoPermissionDenied] = useState(false)
   const fileRef = useRef()
   const draftTimer = useRef(null)
   const draftRestoredRef = useRef(false)
@@ -78,21 +79,40 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     } catch {}
   }, [])
 
-  // Auto-locate on mount — skipped if draft already has coordinates
+  // Auto-locate on mount — skipped if draft already has coordinates. Opening
+  // this screen is itself the deliberate user action that needs location
+  // (picking where to drop a pin), so it's fine to request immediately here
+  // rather than waiting for a further explicit control — but only when
+  // permission isn't already known to be denied, and only after checking
+  // because repeating a known-denied request is pointless and can't prompt
+  // again anyway.
   useEffect(() => {
     if (!navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      if (draftRestoredRef.current) return
-      const { latitude: lat, longitude: lng } = pos.coords
-      setForm(p => ({ ...p, latitude: lat, longitude: lng }))
-      setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
-      const address = await reverseGeocode(lng, lat)
-      if (address) {
-        skipGeoRef.current = true
-        setGeoQuery(address)
-        setForm(p => ({ ...p, address }))
-      }
-    }, null, { enableHighAccuracy: true })
+    const doLocate = () => {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        if (draftRestoredRef.current) return
+        const { latitude: lat, longitude: lng } = pos.coords
+        setForm(p => ({ ...p, latitude: lat, longitude: lng }))
+        setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
+        const address = await reverseGeocode(lng, lat)
+        if (address) {
+          skipGeoRef.current = true
+          setGeoQuery(address)
+          setForm(p => ({ ...p, address }))
+        }
+      }, err => {
+        console.error('[AddSpot] getCurrentPosition error:', err.code, err.message)
+        if (err.code === err.PERMISSION_DENIED) setGeoPermissionDenied(true)
+      }, { enableHighAccuracy: true })
+    }
+    if (!navigator.permissions?.query) { doLocate(); return }
+    let cancelled = false
+    navigator.permissions.query({ name: 'geolocation' }).then(status => {
+      if (cancelled) return
+      if (status.state === 'denied') { setGeoPermissionDenied(true); return }
+      doLocate()
+    }).catch(doLocate)
+    return () => { cancelled = true }
   }, [])
 
   // Geocoding search debounce
@@ -313,6 +333,11 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
         <div style={{ marginBottom: 14 }}>
           <div className="section-label">Location</div>
+          {geoPermissionDenied && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, lineHeight: 1.5, marginBottom: 8 }}>
+              Location is blocked, so this can't be auto-filled. Search for the address below, or re-enable location for this app in your browser or device settings.
+            </div>
+          )}
           <div style={{ position: 'relative', marginBottom: 8 }}>
             <input
               className="form-input"

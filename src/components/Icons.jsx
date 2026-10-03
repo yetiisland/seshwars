@@ -204,9 +204,10 @@ export function PersonPlusIcon({ color = '#d4785a', size = 18 }) {
 // icon and every standalone plus/X next to a username, across every
 // feature that follows this spec. Border width/pattern copied verbatim
 // from the "Create New List" plus-icon box in SaveToListModal.jsx.
-export function IconBox({ onClick, size = 34, children }) {
+export function IconBox({ onClick, size = 34, children, ...rest }) {
   return (
     <div
+      {...rest}
       onClick={onClick}
       style={{ width: size, height: size, borderRadius: 6, border: '1.5px solid #d4785a', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: onClick ? 'pointer' : 'default', flexShrink: 0 }}
     >

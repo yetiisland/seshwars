@@ -10,7 +10,7 @@ let _savedScrollTop = 0
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
-export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress, sortMode, onSortModeChange }) {
+export default function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress, sortMode, onSortModeChange, locationPermission }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const filters = propFilters ?? localFilters
   const handleFiltersChange = onFiltersChange ?? setLocalFilters
@@ -109,6 +109,11 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
             <div style={{ padding: '0 0 2px', fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', paddingLeft: 16, marginBottom: 8 }}>
               {loading ? 'Loading...' : `${sorted.length} spot${sorted.length !== 1 ? 's' : ''}`}
             </div>
+            {locationPermission === 'denied' && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, lineHeight: 1.5, padding: '0 16px 10px' }}>
+                Location is blocked, so distance can't be shown. Re-enable location for this app in your browser or device settings.
+              </div>
+            )}
             {loading ? (
               <div className="loading">Loading spots...</div>
             ) : sorted.length === 0 ? (
