@@ -241,6 +241,7 @@ export default function App() {
   const navigate = useNavigate()
   const [tab, setTab] = useState(() => normalizeTab(sessionStorage.getItem('activeTab') || 'spots'))
   const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')
+  const [openListId, setOpenListId] = useState(null)
   // Shared by both the desktop and mobile spots-view toggle pills below —
   // only one of the two is ever mounted at a time (isDesktop branch).
   const spotsToggleTrackRef = useRef(null)
@@ -483,6 +484,15 @@ export default function App() {
     navigate(`/spots/${id}`, { state: { spot, prevTab: tab, ...extra } })
   }
 
+  // list_invite notification tap — opens the Saved tab with that list's
+  // collection pre-opened, same in-app destination a member or owner
+  // would reach from the Saved tab's own list browser.
+  const handleListClick = (listId) => {
+    setTab('saved')
+    sessionStorage.setItem('activeTab', 'saved')
+    setOpenListId(listId)
+  }
+
   const handleTabChange = (t) => {
     const normalized = normalizeTab(t)
     if (!user && (normalized === 'saved' || normalized === 'profile')) {
@@ -622,6 +632,8 @@ export default function App() {
                   onSearch={openSearch}
                   showNav={false}
                   user={user}
+                  openListId={openListId}
+                  onOpenListIdHandled={() => setOpenListId(null)}
                 />
               </div>
             )}
@@ -637,6 +649,7 @@ export default function App() {
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}
+                  onListClick={handleListClick}
                   notifications={notifications}
                   unreadCount={unreadCount}
                   notifLoading={notifLoading}
@@ -733,6 +746,8 @@ export default function App() {
                   onSearch={openSearch}
                   searchOverlay={searchOverlay}
                   user={user}
+                  openListId={openListId}
+                  onOpenListIdHandled={() => setOpenListId(null)}
                 />
               )}
               {effectiveTab === 'profile' && (
@@ -746,6 +761,7 @@ export default function App() {
                   saved={saved}
                   onSavePress={handleSavePress}
                   onSpotClick={handleSpotClick}
+                  onListClick={handleListClick}
                   notifications={notifications}
                   unreadCount={unreadCount}
                   notifLoading={notifLoading}

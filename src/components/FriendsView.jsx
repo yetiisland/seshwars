@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import AddFriendButton from './AddFriendButton'
-import { PersonPlusIcon, CloseIcon } from './Icons'
+import { PersonPlusIcon, CloseIcon, IconBox } from './Icons'
 
 // Row container + avatar — copied verbatim from the notification card
 // markup in ProfileView.jsx (~line 1009-1035).
@@ -27,21 +27,6 @@ const statCardLabelStyle = { fontSize: 9, color: 'var(--text-muted)', fontWeight
 // notification card's Deny button in ProfileView.jsx (~line 1299-1303).
 const denyBtnStyle = { flexShrink: 0, border: '1px solid rgba(212,120,90,0.5)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }
 const denyBtnTextStyle = { fontSize: 10, fontWeight: 700, color: 'var(--salmon)', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }
-
-// Shared icon container (shared icon spec): rounded box, radius 6, salmon
-// stroke, transparent fill, salmon icon inside. Used for the add-person
-// icon and every X next to a username. Border width/pattern copied
-// verbatim from the "Create New List" plus-icon box in SaveToListModal.jsx.
-function IconBox({ onClick, size = 34, children }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{ width: size, height: size, borderRadius: 6, border: '1.5px solid #d4785a', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: onClick ? 'pointer' : 'default', flexShrink: 0 }}
-    >
-      {children}
-    </div>
-  )
-}
 
 function Avatar({ avatarUrl, username }) {
   return (

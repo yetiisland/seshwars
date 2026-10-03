@@ -4,8 +4,26 @@ import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
 import SpotCard from '../components/SpotCard'
 import Navbar from '../components/Navbar'
-import { ArrowIcon, ShareIcon, ListIcon, MapPinIcon } from '../components/Icons'
+import { ArrowIcon, ShareIcon, ListIcon, MapPinIcon, PersonPlusIcon, PlusIcon, CloseIcon, IconBox } from '../components/Icons'
+import InitialsAvatar from '../components/InitialsAvatar'
 import MapView from './MapView'
+
+// Inline suggestion dropdown — copied verbatim from the geocoder address
+// dropdown in AddSpot.jsx (same pattern CommentsSection.jsx's @mention
+// dropdown already reuses).
+const memberDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden', maxHeight: 240, overflowY: 'auto' }
+
+function MemberAvatar({ profile, size = 32, border }) {
+  const style = { width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, ...(border ? { border } : {}) }
+  if (profile?.avatar_url) {
+    return <img src={profile.avatar_url} alt="" style={{ ...style, objectFit: 'cover' }} />
+  }
+  return (
+    <div style={style}>
+      <InitialsAvatar profile={profile} size={size} />
+    </div>
+  )
+}
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -38,7 +56,7 @@ function generateShareToken() {
   return Array.from(arr).map(n => chars[n % chars.length]).join('')
 }
 
-function CollectionView({ title, isList, isFavorites, userId, listId, shareToken, onTokenGenerated, spots, saved, onSavePress, onSpotClick, onBack, onListDeleted, initialScrollTop, onSaveScrollTop }) {
+function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, shareToken, onTokenGenerated, spots, saved, onSavePress, onSpotClick, onBack, onListDeleted, initialScrollTop, onSaveScrollTop }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteClosing, setDeleteClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -67,6 +85,61 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
   const [copied, setCopied] = useState(false)
   const scrollRef = useRef(null)
   const scrollRestoredRef = useRef(false)
+
+  // ── List members (Section A/B/C) ──────────────────────────────
+  const [members, setMembers] = useState([])
+  const [memberQuery, setMemberQuery] = useState('')
+  const [memberSuggestions, setMemberSuggestions] = useState([])
+  const [memberSearchResults, setMemberSearchResults] = useState([])
+  const [memberInputFocused, setMemberInputFocused] = useState(false)
+  const [showMembersSheet, setShowMembersSheet] = useState(false)
+  const memberInputRef = useRef(null)
+
+  const fetchMembers = async () => {
+    if (!listId) return
+    const { data } = await supabase.rpc('get_list_members', { p_list_id: listId })
+    setMembers(data || [])
+  }
+
+  const fetchMemberSuggestions = async () => {
+    if (!listId) return
+    const { data } = await supabase.rpc('suggest_friends_for_list', { p_list_id: listId })
+    setMemberSuggestions(data || [])
+  }
+
+  useEffect(() => {
+    if (!isList || !listId) return
+    fetchMembers()
+    if (isOwner) fetchMemberSuggestions()
+  }, [isList, listId, isOwner])
+
+  // Switches from suggest_friends_for_list to search_profiles once the
+  // owner starts typing — same debounce as FriendsView's own search.
+  useEffect(() => {
+    if (!isOwner) return
+    const q = memberQuery.trim()
+    if (!q) return
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc('search_profiles', { q, p_limit: 10, p_offset: 0 })
+      setMemberSearchResults(data || [])
+    }, 300)
+    return () => clearTimeout(t)
+  }, [memberQuery, isOwner])
+
+  const handleAddMember = async (profile) => {
+    await supabase.from('list_members').insert({ list_id: listId, user_id: profile.id, added_by: userId })
+    setMembers(prev => prev.some(m => m.id === profile.id) ? prev : [...prev, profile])
+    setMemberSuggestions(prev => prev.filter(p => p.id !== profile.id))
+    setMemberSearchResults(prev => prev.filter(p => p.id !== profile.id))
+  }
+
+  const handleRemoveMember = async (memberId) => {
+    setMembers(prev => prev.filter(m => m.id !== memberId))
+    await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', memberId)
+    fetchMemberSuggestions()
+  }
+
+  const memberResults = memberQuery.trim() ? memberSearchResults : memberSuggestions
 
   // Restore scroll once spots content is actually rendered (listSpotIds loads async)
   useEffect(() => {
@@ -196,7 +269,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
         </div>
         {(isList || isFavorites) ? (
           <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
-            {isList && (
+            {isList && isOwner && (
               <div
                 onClick={() => setShowDeleteConfirm(true)}
                 style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
@@ -255,6 +328,35 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
         </div>,
         document.body
       )}
+
+      {/* C) Members sheet — every member as a full-width row. X controls
+          (remove) only render for the list owner. */}
+      {showMembersSheet && createPortal(
+        <div className="modal-overlay" onClick={() => setShowMembersSheet(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <div className="modal-title" style={{ padding: '0 20px' }}>Members</div>
+            {members.map(m => (
+              <div key={m.id} className="modal-row">
+                <MemberAvatar profile={m} size={38} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {[m.first_name, m.last_name].filter(Boolean).join(' ') || m.username}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>@{m.username}</div>
+                </div>
+                {isOwner && (
+                  <IconBox onClick={() => handleRemoveMember(m.id)}>
+                    <CloseIcon color="#d4785a" />
+                  </IconBox>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Fixed bottom toggle */}
       {createPortal(
         <div ref={viewToggleTrackRef} style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
@@ -280,6 +382,71 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
         </div>
       ) : (
         <div className="scroll-area" ref={scrollRef} style={{ paddingTop: 14 }}>
+          {isList && (
+            <div style={{ padding: '0 16px 14px' }}>
+              {isOwner && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <IconBox size={42} onClick={() => memberInputRef.current?.focus()}>
+                    <PersonPlusIcon color="#d4785a" size={18} />
+                  </IconBox>
+                  {/* Persistent "@" prefix — same pattern as FriendsView's search input */}
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-primary)', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
+                    <input
+                      ref={memberInputRef}
+                      className="form-input"
+                      placeholder="Add skaters to this list..."
+                      value={memberQuery}
+                      onChange={e => setMemberQuery(e.target.value.replace(/^@+/, ''))}
+                      onFocus={() => setMemberInputFocused(true)}
+                      onBlur={() => setTimeout(() => setMemberInputFocused(false), 150)}
+                      style={{ paddingLeft: 24 }}
+                    />
+                    {memberInputFocused && (
+                      <div style={memberDropdownStyle}>
+                        {memberResults.length === 0 ? (
+                          <div style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>
+                            {memberQuery.trim() ? 'No users found' : 'No friends to suggest'}
+                          </div>
+                        ) : memberResults.map(p => {
+                          const already = members.some(m => m.id === p.id)
+                          return (
+                            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid #ECEDF2' }}>
+                              <MemberAvatar profile={p} size={28} />
+                              <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.username}</span>
+                              {!already && p.id !== userId && (
+                                <IconBox size={28} onMouseDown={() => handleAddMember(p)}>
+                                  <PlusIcon color="#d4785a" />
+                                </IconBox>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* B) Shared-with summary — overlapping avatars + count,
+                  tappable by anyone who can see the list (owner or member) */}
+              {members.length > 0 && (
+                <div onClick={() => setShowMembersSheet(true)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                  <div style={{ display: 'flex' }}>
+                    {members.map((m, i) => (
+                      <div key={m.id} style={{ marginLeft: i === 0 ? 0 : -12, zIndex: members.length - i }}>
+                        <MemberAvatar profile={m} size={32} border="2px solid #FDF8F0" />
+                      </div>
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
+                    Shared with {members.length} skater{members.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {spots.length === 0 ? (
             <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No spots saved here yet</div>
           ) : (
@@ -294,7 +461,7 @@ function CollectionView({ title, isList, isFavorites, userId, listId, shareToken
   )
 }
 
-export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user }) {
+export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user, openListId, onOpenListIdHandled }) {
   const [lists, setLists] = useState(() => _listsUserId === user?.id ? _cachedLists : [])
   const [listSpotIds, setListSpotIds] = useState(() => _listsUserId === user?.id ? _cachedListSpotIds : {})
   const [openCollection, setOpenCollection] = useState(_savedOpenCollection)
@@ -314,6 +481,33 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     window.addEventListener('seshwars:lists-changed', handler)
     return () => window.removeEventListener('seshwars:lists-changed', handler)
   }, [user?.id])
+
+  // Open a specific list by id (list_invite notification tap). Looks for
+  // it among the user's own lists first; otherwise fetches it directly —
+  // list_members-based RLS is assumed to grant a member read access to a
+  // list/its spots they don't own, the same way get_shared_list already
+  // does for public share-token links.
+  useEffect(() => {
+    if (!openListId || !user?.id) return
+    let cancelled = false
+    ;(async () => {
+      const ownList = lists.find(l => l.id === openListId)
+      if (ownList) {
+        setOpenCollection({ type: 'list', id: ownList.id, name: ownList.name, shareToken: ownList.share_token, isOwner: true })
+        onOpenListIdHandled?.()
+        return
+      }
+      const { data: listRow } = await supabase.from('spot_lists').select('*').eq('id', openListId).maybeSingle()
+      if (cancelled) return
+      if (!listRow) { onOpenListIdHandled?.(); return }
+      const { data: items } = await supabase.from('saved_spots').select('spot_id').eq('list_id', openListId)
+      if (cancelled) return
+      setListSpotIds(prev => ({ ...prev, [openListId]: new Set((items || []).map(i => i.spot_id)) }))
+      setOpenCollection({ type: 'list', id: listRow.id, name: listRow.name, shareToken: listRow.share_token, isOwner: listRow.user_id === user.id })
+      onOpenListIdHandled?.()
+    })()
+    return () => { cancelled = true }
+  }, [openListId, user?.id, lists])
 
   const fetchLists = async () => {
     if (!user?.id) return
@@ -411,6 +605,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
           title={openCollection.name}
           isList={openCollection.type === 'list'}
           isFavorites={openCollection.type === 'favorites'}
+          isOwner={openCollection.isOwner ?? true}
           userId={user?.id}
           listId={openCollection.type === 'list' ? openCollection.id : favoritesListEntry?.id}
           shareToken={favShareToken}
@@ -471,7 +666,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
           return (
             <div
               key={list.id}
-              onClick={() => setOpenCollection({ type: 'list', id: list.id, name: list.name, shareToken: list.share_token })}
+              onClick={() => setOpenCollection({ type: 'list', id: list.id, name: list.name, shareToken: list.share_token, isOwner: true })}
               style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
             >
               <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

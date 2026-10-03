@@ -47,7 +47,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, saved, onSavePress, onSpotClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, saved, onSavePress, onSpotClick, onListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -331,6 +331,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   }
 
   const handleNotifTap = async (notif) => {
+    if (notif.type === 'list_invite') {
+      if (!notif.list_id) return
+      await onMarkNotificationRead?.(notif.id)
+      onListClick?.(notif.list_id)
+      return
+    }
     if (!notif.spotSlug && !notif.spot_id) return
     await onMarkNotificationRead?.(notif.id)
     const fullSpot = spots.find(s => s.id === notif.spot_id) || { slug: notif.spotSlug, id: notif.spot_id }
@@ -1231,6 +1237,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                     : n.type === 'friend_accepted' ? `${n.actorUsername || 'Someone'} accepted your friend request`
                     : n.type === 'comment_mention' ? `${n.actorUsername || 'Someone'} tagged you in a comment`
                     : n.type === 'comment_reply' ? `${n.actorUsername || 'Someone'} replied to your comment`
+                    : n.type === 'list_invite' ? `${n.actorUsername || 'Someone'} added you to a list`
                     : n.type === 'admin_update' ? 'Updated Your Spot'
                     : n.type === 'rating' ? 'Rated Your Spot'
                     : n.type === 'comment' ? 'Commented On Your Spot'
@@ -1308,7 +1315,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                             </div>
                           </div>
                         )
-                      ) : (n.spotSlug || n.spot_id) && (
+                      ) : (n.spotSlug || n.spot_id || n.list_id) && (
                         <div
                           onClick={() => handleNotifTap(n)}
                           style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}

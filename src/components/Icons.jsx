@@ -179,6 +179,22 @@ export function PersonPlusIcon({ color = '#d4785a', size = 18 }) {
   )
 }
 
+// Shared icon container (shared icon spec): rounded box, radius 6, salmon
+// stroke, transparent fill, salmon icon inside. Used for the add-person
+// icon and every standalone plus/X next to a username, across every
+// feature that follows this spec. Border width/pattern copied verbatim
+// from the "Create New List" plus-icon box in SaveToListModal.jsx.
+export function IconBox({ onClick, size = 34, children }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{ width: size, height: size, borderRadius: 6, border: '1.5px solid #d4785a', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: onClick ? 'pointer' : 'default', flexShrink: 0 }}
+    >
+      {children}
+    </div>
+  )
+}
+
 export function SearchIcon({ color = '#d4785a', size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
