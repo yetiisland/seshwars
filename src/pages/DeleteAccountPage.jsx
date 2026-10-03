@@ -1,12 +1,11 @@
-export default function DeleteAccountPage({ onClose }) {
+export default function DeleteAccountPage({ onClose, onDeleteClick }) {
   const sections = [
     {
       title: 'HOW TO DELETE IN THE APP',
       steps: [
         'Open Sesh Wars and tap the Profile tab (bottom right).',
-        'Scroll to the bottom of the screen.',
-        'Tap "Delete Account".',
-        'Tap "Confirm" in the confirmation dialog.',
+        'Open Settings and tap "Delete Account" under Account.',
+        'Tap "Delete Account" below, then "Confirm" in the confirmation dialog.',
       ],
     },
     {
@@ -100,6 +99,12 @@ export default function DeleteAccountPage({ onClose }) {
               )}
             </div>
           ))}
+
+          {onDeleteClick && (
+            <button className="btn-salmon" onClick={onDeleteClick} style={{ marginTop: 4 }}>
+              Delete Account
+            </button>
+          )}
         </div>
       </div>
     </div>

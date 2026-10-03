@@ -63,6 +63,7 @@ function StarMini({ rating }) {
 export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange }) {
   const [reviews, setReviews] = useState([])
   const [myRating, setMyRating] = useState(0)
+  const [myComment, setMyComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [myReviewId, setMyReviewId] = useState(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -87,7 +88,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
 
     if (user?.id) {
       const own = withProfiles.find(r => r.user_id === user.id)
-      if (own) { setMyReviewId(own.id); setMyRating(own.rating) }
+      if (own) { setMyReviewId(own.id); setMyRating(own.rating); setMyComment(own.comment || '') }
       else { setMyReviewId(null) }
     }
 
@@ -111,7 +112,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
     const profileMap = await fetchProfiles([cu.id])
     const { data, error } = await supabase
       .from('spot_reviews')
-      .upsert({ spot_id: spotId, user_id: cu.id, rating: myRating, comment: null }, { onConflict: 'spot_id,user_id' })
+      .upsert({ spot_id: spotId, user_id: cu.id, rating: myRating, comment: myComment.trim() || null }, { onConflict: 'spot_id,user_id' })
       .select().single()
     setSubmitting(false)
     if (!error && data) {
@@ -154,6 +155,20 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
             <StarRow value={myRating} onChange={setMyRating} size={28} />
           </div>
           {myRating > 0 && (
+            <textarea
+              value={myComment}
+              onChange={e => setMyComment(e.target.value)}
+              placeholder="Add a written review (optional)…"
+              rows={2}
+              style={{
+                width: '100%', resize: 'none', border: '1px solid #EAD8C8', borderRadius: 6,
+                padding: '8px 10px', fontSize: 12, fontFamily: 'Barlow, sans-serif',
+                color: 'var(--text-primary)', background: '#FFFFFF', outline: 'none',
+                lineHeight: 1.5, boxSizing: 'border-box', marginBottom: 10,
+              }}
+            />
+          )}
+          {myRating > 0 && (
             <button
               onClick={handleSubmit}
               disabled={submitting}
@@ -171,12 +186,15 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
             const name = review.profile?.username || review.profile?.first_name || 'Anonymous'
             const isOwn = user?.id === review.user_id
             return (
-              <div key={review.id} style={{ flexShrink: 0, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 160, maxWidth: 220 }}>
+              <div key={review.id} style={{ flexShrink: 0, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 160, maxWidth: 220 }}>
                 <Avatar profile={review.profile} size={36} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <StarMini rating={review.rating} />
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#2a1e14', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'Barlow, sans-serif' }}>@{name}</div>
                   <div style={{ fontSize: 9, color: '#b0a090', marginTop: 2, fontWeight: 600 }}>{relativeTime(review.created_at)}</div>
+                  {review.comment && (
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 5, lineHeight: 1.4, overflowWrap: 'break-word' }}>{review.comment}</div>
+                  )}
                 </div>
                 {isOwn && (
                   <span onClick={() => { setPendingDeleteId(review.id); setShowDeleteModal(true) }} style={{ fontSize: 13, color: '#C8CAD4', fontWeight: 700, cursor: 'pointer', flexShrink: 0, alignSelf: 'flex-start' }}>

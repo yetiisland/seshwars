@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import AddFriendButton from './AddFriendButton'
-import { PersonPlusIcon, CloseIcon, IconBox } from './Icons'
+import { CloseIcon, IconBox } from './Icons'
 
 // Row container + avatar — copied verbatim from the notification card
 // markup in ProfileView.jsx (~line 1009-1035).
@@ -56,7 +56,10 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
   const [friendsError, setFriendsError] = useState('')
   const [sentPendingError, setSentPendingError] = useState('')
   const [activeSheet, setActiveSheet] = useState(null) // null | 'friends' | 'requests' | 'pending'
+  const [pendingRemoveFriend, setPendingRemoveFriend] = useState(null) // { friendshipId, username }
+  const [pendingCancelPending, setPendingCancelPending] = useState(null) // { friendshipId, username }
   const [nearbySkaters, setNearbySkaters] = useState([])
+  const [inputFocused, setInputFocused] = useState(false)
   const nearbyFetchedRef = useRef(false)
   const searchInputRef = useRef(null)
 
@@ -97,7 +100,7 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
 
   useEffect(() => {
     // Reset to offset 0 whenever the query text changes.
-    if (query.trim().length < 2) {
+    if (query.trim().length < 1) {
       setResults([])
       setTotalCount(0)
       setSearchError('')
@@ -172,13 +175,19 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
     onFriendsChanged?.()
   }
 
-  const handleRemoveFriend = async (friendshipId) => {
+  const confirmRemoveFriend = async () => {
+    if (!pendingRemoveFriend) return
+    const { friendshipId } = pendingRemoveFriend
+    setPendingRemoveFriend(null)
     setFriends(prev => prev.filter(f => f.friendship_id !== friendshipId))
     await supabase.from('friendships').delete().eq('id', friendshipId)
     onFriendsChanged?.()
   }
 
-  const handleCancelPending = async (friendshipId) => {
+  const confirmCancelPending = async () => {
+    if (!pendingCancelPending) return
+    const { friendshipId } = pendingCancelPending
+    setPendingCancelPending(null)
     setSentPending(prev => prev.filter(r => r.friendship_id !== friendshipId))
     await supabase.from('friendships').delete().eq('id', friendshipId)
   }
@@ -201,29 +210,24 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
         </div>
       </div>
 
-      {/* Add-person icon sits outside the search input, to its left, per
-          the shared icon spec. Tapping it focuses the search field. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <IconBox size={42} onClick={() => searchInputRef.current?.focus()}>
-          <PersonPlusIcon color="#d4785a" size={18} />
-        </IconBox>
-        {/* Persistent "@" prefix — a separate absolutely-positioned element, not
-            part of the input's value, so it can't be edited or deleted. Any
-            leading "@" typed/pasted into the input is stripped in onChange. */}
-        <div style={{ position: 'relative', flex: 1 }}>
-          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-primary)', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
-          <input
-            ref={searchInputRef}
-            className="form-input"
-            placeholder="Search for skaters..."
-            value={query}
-            onChange={e => setQuery(e.target.value.replace(/^@+/, ''))}
-            style={{ paddingLeft: 24 }}
-          />
-        </div>
+      {/* Persistent "@" prefix — a separate absolutely-positioned element, not
+          part of the input's value, so it can't be edited or deleted. Any
+          leading "@" typed/pasted into the input is stripped in onChange. */}
+      <div style={{ position: 'relative', marginBottom: 12 }}>
+        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#d4785a', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
+        <input
+          ref={searchInputRef}
+          className="form-input"
+          placeholder="Search for skaters..."
+          value={query}
+          onChange={e => setQuery(e.target.value.replace(/^@+/, ''))}
+          onFocus={() => setInputFocused(true)}
+          onBlur={() => setTimeout(() => setInputFocused(false), 150)}
+          style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
+        />
       </div>
 
-      {nearbySkaters.length > 0 && query.trim().length < 2 && (
+      {inputFocused && nearbySkaters.length > 0 && query.trim().length === 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <div className="section-label" style={{ marginBottom: 0 }}>Skaters Near You</div>
@@ -249,7 +253,7 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
         </div>
       )}
 
-      {query.trim().length >= 2 && (
+      {query.trim().length >= 1 && (
         <div style={{ marginBottom: 20 }}>
           {!searching && !searchError && results.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -303,7 +307,7 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={usernameStyle}>@{f.username}</div>
                 </div>
-                <IconBox onClick={() => handleRemoveFriend(f.friendship_id)}>
+                <IconBox onClick={() => setPendingRemoveFriend({ friendshipId: f.friendship_id, username: f.username })}>
                   <CloseIcon color="#d4785a" />
                 </IconBox>
               </div>
@@ -362,11 +366,45 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={usernameStyle}>@{r.username}</div>
                 </div>
-                <IconBox onClick={() => handleCancelPending(r.friendship_id)}>
+                <IconBox onClick={() => setPendingCancelPending({ friendshipId: r.friendship_id, username: r.username })}>
                   <CloseIcon color="#d4785a" />
                 </IconBox>
               </div>
             ))}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Remove-friend confirmation — existing confirm-dialog pattern
+          (modal-overlay/modal-sheet, solid-salmon action + outline cancel)
+          copied verbatim from ReviewsSection.jsx's "Delete Rating" modal. */}
+      {pendingRemoveFriend && createPortal(
+        <div className="modal-overlay" onClick={() => setPendingRemoveFriend(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Friend</div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Remove @{pendingRemoveFriend.username} from your friends?</div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={confirmRemoveFriend} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Remove</button>
+              <button onClick={() => setPendingRemoveFriend(null)} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Cancel-pending-request confirmation — same pattern as above */}
+      {pendingCancelPending && createPortal(
+        <div className="modal-overlay" onClick={() => setPendingCancelPending(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cancel Request</div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Cancel your friend request to @{pendingCancelPending.username}?</div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={confirmCancelPending} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel Request</button>
+              <button onClick={() => setPendingCancelPending(null)} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Never Mind</button>
+            </div>
           </div>
         </div>,
         document.body

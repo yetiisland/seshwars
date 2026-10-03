@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
 import SpotCard from '../components/SpotCard'
 import Navbar from '../components/Navbar'
-import { ArrowIcon, ShareIcon, ListIcon, MapPinIcon, PersonPlusIcon, PlusIcon, CloseIcon, IconBox } from '../components/Icons'
+import { ArrowIcon, ShareIcon, ListIcon, MapPinIcon, PlusIcon, CloseIcon, IconBox } from '../components/Icons'
 import InitialsAvatar from '../components/InitialsAvatar'
 import MapView from './MapView'
 
@@ -93,6 +93,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const [memberSearchResults, setMemberSearchResults] = useState([])
   const [memberInputFocused, setMemberInputFocused] = useState(false)
   const [showMembersSheet, setShowMembersSheet] = useState(false)
+  const [pendingRemoveMember, setPendingRemoveMember] = useState(null) // { id, username }
   const memberInputRef = useRef(null)
 
   const fetchMembers = async () => {
@@ -133,7 +134,10 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
     setMemberSearchResults(prev => prev.filter(p => p.id !== profile.id))
   }
 
-  const handleRemoveMember = async (memberId) => {
+  const confirmRemoveMember = async () => {
+    if (!pendingRemoveMember) return
+    const memberId = pendingRemoveMember.id
+    setPendingRemoveMember(null)
     setMembers(prev => prev.filter(m => m.id !== memberId))
     await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', memberId)
     fetchMemberSuggestions()
@@ -346,12 +350,30 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>@{m.username}</div>
                 </div>
                 {isOwner && (
-                  <IconBox onClick={() => handleRemoveMember(m.id)}>
+                  <IconBox onClick={() => setPendingRemoveMember({ id: m.id, username: m.username })}>
                     <CloseIcon color="#d4785a" />
                   </IconBox>
                 )}
               </div>
             ))}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Remove-member confirmation — existing confirm-dialog pattern
+          (modal-overlay/modal-sheet, solid-salmon action + outline cancel)
+          copied verbatim from ReviewsSection.jsx's "Delete Rating" modal. */}
+      {pendingRemoveMember && createPortal(
+        <div className="modal-overlay" onClick={() => setPendingRemoveMember(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Member</div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Remove @{pendingRemoveMember.username} from this list?</div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={confirmRemoveMember} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Remove</button>
+              <button onClick={() => setPendingRemoveMember(null)} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+            </div>
           </div>
         </div>,
         document.body
@@ -385,13 +407,10 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           {isList && (
             <div style={{ padding: '0 16px 14px' }}>
               {isOwner && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <IconBox size={42} onClick={() => memberInputRef.current?.focus()}>
-                    <PersonPlusIcon color="#d4785a" size={18} />
-                  </IconBox>
+                <div style={{ marginBottom: 10 }}>
                   {/* Persistent "@" prefix — same pattern as FriendsView's search input */}
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-primary)', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#d4785a', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
                     <input
                       ref={memberInputRef}
                       className="form-input"
@@ -400,7 +419,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                       onChange={e => setMemberQuery(e.target.value.replace(/^@+/, ''))}
                       onFocus={() => setMemberInputFocused(true)}
                       onBlur={() => setTimeout(() => setMemberInputFocused(false), 150)}
-                      style={{ paddingLeft: 24 }}
+                      style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
                     />
                     {memberInputFocused && (
                       <div style={memberDropdownStyle}>
@@ -633,14 +652,6 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
       {searchOverlay || (
       <>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid #E8DDD0', textAlign: 'center', flexShrink: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-          Your Saved Spots
-        </div>
-        <div style={{ fontSize: 11, color: '#9a8878', fontWeight: 600, marginTop: 4 }}>
-          Create and share lists to help plan a future skate sesh.
-        </div>
-      </div>
       <div className="scroll-area">
         <div style={{ padding: '8px 16px 0' }}>
         {/* Saved Spots (was Favorites) */}

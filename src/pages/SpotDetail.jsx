@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
-import { ShareIcon, BookmarkIcon, PencilIcon } from '../components/Icons'
+import { ShareIcon, BookmarkIcon, PencilIcon, HiddenEyeIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import SpotFormFields from '../components/SpotFormFields'
 import ClipsSection from '../components/ClipsSection'
@@ -639,19 +639,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <img src={transformImageUrl(photo, 1000)} alt={spot.title} width="800" height="600" loading="eager" fetchpriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
               </div>
             ))
-          ) : (
-            // Rectangle treatment matching the spot list preview: one large
-            // rectangle on the left, two stacked smaller rectangles on the
-            // right, all in the placeholder background color with a gap
-            // between each — replaces the old single "mountain icon" block.
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 6, padding: 6, background: '#F0E8DE' }}>
-              <div style={{ flex: '1 1 0', background: '#e8d8c8', borderRadius: 6 }} />
-              <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ flex: '1 1 0', background: '#e0cebc', borderRadius: 6 }} />
-                <div style={{ flex: '1 1 0', background: '#ddd0bc', borderRadius: 6 }} />
-              </div>
-            </div>
-          )}
+          ) : null /* No icon, no rectangle grid — same placeholder treatment
+                       as SpotCard's no-photo state: just the background
+                       color already set on this hero container above. */}
 
           {/* Gradient overlay */}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.28) 0%, transparent 40%, rgba(20,28,20,0.85) 100%)', pointerEvents: 'none' }} />
@@ -685,11 +675,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 onTouchStart={e => e.stopPropagation()}
                 style={{ width: 34, height: 34, borderRadius: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="#d4785a" strokeWidth="1.8" strokeLinejoin="round" />
-                  <circle cx="12" cy="12" r="3" stroke="#d4785a" strokeWidth="1.8" />
-                  <line x1="3" y1="3" x2="21" y2="21" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                <HiddenEyeIcon color="#d4785a" size={16} />
               </div>
             )}
             <div

@@ -210,10 +210,14 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
 
   const handleReplyClick = (comment) => {
     const p = profiles[comment.user_id]
-    setReplyingTo({ id: comment.id, username: p?.username || p?.first_name || 'user' })
+    const username = p?.username || p?.first_name || 'user'
+    setReplyingTo({ id: comment.id, username })
+    const prefill = `@${username} `
+    setText(prefill)
     requestAnimationFrame(() => {
       textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(prefill.length, prefill.length)
     })
   }
 
@@ -304,9 +308,10 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
       <div className="divider" />
       <div className="section-label">Comments ({comments.length})</div>
 
-      {/* Input row — white card, same border as comment cards below */}
+      {/* Input row — exactly one rounded box (the textarea itself carries
+          the white fill + border now); the wrapper below is layout-only */}
       {user ? (
-        <div style={{ marginBottom: 16, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: 10 }}>
+        <div style={{ marginBottom: 24 }}>
           {replyingTo && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>
               Replying to @{replyingTo.username}
@@ -321,9 +326,9 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
               placeholder="Add a comment…"
               rows={2}
               style={{
-                width: '100%', resize: 'none', border: '1px solid #E8DDD0', borderRadius: 6,
+                width: '100%', resize: 'none', border: '1px solid #EAD8C8', borderRadius: 6,
                 padding: '8px 10px', fontSize: 12, fontFamily: 'Barlow, sans-serif',
-                color: 'var(--text-primary)', background: '#FAF5EE', outline: 'none',
+                color: 'var(--text-primary)', background: '#FFFFFF', outline: 'none',
                 lineHeight: 1.5, boxSizing: 'border-box',
               }}
               onBlur={() => { mentionBlurTimer.current = setTimeout(() => setMentionQuery(null), 150) }}

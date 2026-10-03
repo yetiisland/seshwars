@@ -32,6 +32,26 @@ export function EyeIcon({ color = '#333', size = 17, filled = false }) {
   )
 }
 
+// Solid-filled hidden-spot eye. No solid-filled variant of this shape (the
+// one actually used by the hide/Hidden-Spots icons — distinct from the
+// EyeIcon geometry above, which nothing currently renders) existed in
+// Icons.jsx, so this is a new component rather than an edit to an existing
+// one. Pupil is a negative-space cutout (same fillRule="evenodd" punched-hole
+// technique MapPinIcon's filled variant already uses); when slashed, a
+// second diagonal cutout is punched through too, deliberately stopped short
+// of the eye's right side so the filled shape stays one connected region
+// instead of splitting into two disconnected pieces.
+export function HiddenEyeIcon({ color = '#d4785a', size = 18, slashed = true }) {
+  const eyePath = 'M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z'
+  const pupilPath = 'M12 15A3 3 0 1 0 12 9A3 3 0 1 0 12 15Z'
+  const slashPath = 'M2.3 5.84L3.7 4.16L15.7 14.16L14.3 15.84Z'
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path fillRule="evenodd" d={`${eyePath} ${pupilPath}${slashed ? ' ' + slashPath : ''}`} fill={color} />
+    </svg>
+  )
+}
+
 export function ListIcon({ color = '#ffffff', size = 22, filled = false }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none">

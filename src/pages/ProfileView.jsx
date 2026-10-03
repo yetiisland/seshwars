@@ -15,7 +15,7 @@ import DeleteAccountPage from './DeleteAccountPage'
 import ImageCropModal from '../components/ImageCropModal'
 import FriendsView from '../components/FriendsView'
 import AddFriendButton from '../components/AddFriendButton'
-import { ListIcon, ProfileIcon } from '../components/Icons'
+import { ListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -613,11 +613,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="#d4785a" strokeWidth="1.8" strokeLinejoin="round" />
-                  <circle cx="12" cy="12" r="3" stroke="#d4785a" strokeWidth="1.8" />
-                  <line x1="3" y1="3" x2="21" y2="21" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                <HiddenEyeIcon color="#d4785a" size={16} />
                 <div>
                   <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{hiddenSpots.length}</div>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Spots Hidden</div>
@@ -758,9 +754,18 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   </div>
                   <div
                     onClick={() => setShowHiddenSpots(true)}
-                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
                   >
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Hidden Spots</span>
+                    <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                      <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div
+                    onClick={() => setShowDeleteAccountPage(true)}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Delete Account</span>
                     <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
                       <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -806,22 +811,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                       <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
-                  <div className="divider" style={{ margin: '8px 0 0' }} />
-                  <div
-                    onClick={() => setShowDeleteConfirm(true)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 0', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer' }}
-                  >
-                    Delete Account
-                    <svg width="4.6" height="8" viewBox="0 0 8 14" fill="none">
-                      <path d="M1 1L7 7L1 13" stroke="#6a6c7a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                  <div
-                    onClick={() => setShowDeleteAccountPage(true)}
-                    style={{ padding: '2px 0 8px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
-                  >
-                    Account Deletion Info
-                  </div>
                   <div className="divider" style={{ margin: '16px 0' }} />
                   <button
                     className="btn-salmon"
@@ -837,12 +826,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
           {showPrivacy && createPortal(<PrivacyPolicy onClose={() => setShowPrivacy(false)} />, document.body)}
           {showSupport && createPortal(<SupportPage onClose={() => setShowSupport(false)} />, document.body)}
-          {showDeleteAccountPage && createPortal(<DeleteAccountPage onClose={() => setShowDeleteAccountPage(false)} />, document.body)}
+          {showDeleteAccountPage && createPortal(<DeleteAccountPage onClose={() => setShowDeleteAccountPage(false)} onDeleteClick={() => setShowDeleteConfirm(true)} />, document.body)}
           {showDeleteConfirm && createPortal(
             <div
               className="modal-overlay"
               onClick={() => !deleteLoading && setShowDeleteConfirm(false)}
-              style={{ position: 'fixed', zIndex: 100000 }}
+              style={{ position: 'fixed', zIndex: 1000000 }}
             >
               <div
                 className="modal-sheet"
