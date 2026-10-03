@@ -334,7 +334,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     if (!notif.spotSlug && !notif.spot_id) return
     await onMarkNotificationRead?.(notif.id)
     const fullSpot = spots.find(s => s.id === notif.spot_id) || { slug: notif.spotSlug, id: notif.spot_id }
-    onSpotClick?.(fullSpot)
+    const isCommentNotif = notif.type === 'comment_mention' || notif.type === 'comment_reply'
+    onSpotClick?.(fullSpot, isCommentNotif && notif.comment_id ? { scrollToCommentId: notif.comment_id } : {})
   }
 
   // 'friend_request' notification cards resolve a pending friendships row
@@ -1228,6 +1229,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 {(() => { const firstReadIdx = notifications.findIndex(n => !!n.read_at); return notifications.map((n, i) => {
                   const actionText = n.type === 'friend_request' ? `${n.actorUsername || 'Someone'} wants to be friends`
                     : n.type === 'friend_accepted' ? `${n.actorUsername || 'Someone'} accepted your friend request`
+                    : n.type === 'comment_mention' ? `${n.actorUsername || 'Someone'} tagged you in a comment`
+                    : n.type === 'comment_reply' ? `${n.actorUsername || 'Someone'} replied to your comment`
                     : n.type === 'admin_update' ? 'Updated Your Spot'
                     : n.type === 'rating' ? 'Rated Your Spot'
                     : n.type === 'comment' ? 'Commented On Your Spot'

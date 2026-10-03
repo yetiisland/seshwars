@@ -476,11 +476,11 @@ export default function App() {
     closeHideConfirm()
   }
 
-  const handleSpotClick = (spot) => {
+  const handleSpotClick = (spot, extra = {}) => {
     const id = spot.slug || spot.id
     sessionStorage.setItem('activeTab', tab)
     sessionStorage.setItem('spotsView', spotsView)
-    navigate(`/spots/${id}`, { state: { spot, prevTab: tab } })
+    navigate(`/spots/${id}`, { state: { spot, prevTab: tab, ...extra } })
   }
 
   const handleTabChange = (t) => {

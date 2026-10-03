@@ -202,6 +202,7 @@ export default function SpotPage() {
           onHidePress={() => { if (!user) { setShowAuth(true); return } }}
           onUnhidePress={handleUnhide}
           sheetPad={sheetPad}
+          scrollToCommentId={location.state?.scrollToCommentId}
         />
       </div>
 
