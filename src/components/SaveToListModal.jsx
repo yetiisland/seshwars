@@ -14,6 +14,14 @@ function BookmarkSVG({ filled }) {
   )
 }
 
+// Postgres unique_violation (23505) on saved_spots means this spot is
+// already saved to that exact list/favorites slot — a specific, expected
+// case worth its own message rather than a generic failure.
+function saveErrorMessage(error, fallback) {
+  if (error?.code === '23505') return 'This spot is already in that list.'
+  return fallback
+}
+
 function SquareToggle({ selected }) {
   if (selected) {
     return (
@@ -76,7 +84,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
         .select().single()
       if (error || !data) {
         console.error('[SaveToListModal] toggleFavorites insert failed:', error)
-        setSaveError('Could not save this spot. Try again.')
+        setSaveError(saveErrorMessage(error, 'Could not save this spot. Try again.'))
         return
       }
       setIsFav(true)
@@ -98,7 +106,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
         .select().single()
       if (error || !data) {
         console.error('[SaveToListModal] toggleList insert failed:', error)
-        setSaveError('Could not add this spot to the list. Try again.')
+        setSaveError(saveErrorMessage(error, 'Could not add this spot to the list. Try again.'))
         return
       }
       setListItems(prev => new Set([...prev, listId]))
@@ -122,7 +130,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
         .select().single()
       if (savedSpotError || !savedSpotRow) {
         console.error('[SaveToListModal] createList saved_spots insert failed:', savedSpotError)
-        setSaveError('List created, but the spot could not be added to it. Try again.')
+        setSaveError(saveErrorMessage(savedSpotError, 'List created, but the spot could not be added to it. Try again.'))
       } else {
         setListItems(prev => new Set([...prev, data.id]))
       }
