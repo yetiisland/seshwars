@@ -43,17 +43,12 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
       }}
       onClick={() => onClick(spot)}
     >
-      <div className="spot-card-img">
-        {spot.photos?.[0] ? (
+      <div
+        className="spot-card-img"
+        style={spot.photos?.[0] ? undefined : { aspectRatio: 'auto', height: 84, background: isShop ? '#2e3344' : '#F0E8DE' }}
+      >
+        {spot.photos?.[0] && (
           <img src={transformImageUrl(spot.photos[0], 400)} alt={spot.title} width="800" height="450" loading="lazy" decoding="async" />
-        ) : (
-          <div style={{ width: '100%', height: '100%', background: isShop ? '#2e3344' : '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="60" height="34" viewBox="0 0 60 34" fill="none">
-              <rect x="2" y="22" width="56" height="8" rx="1.5" fill={isShop ? '#3a3d50' : '#ddd0bc'} />
-              <rect x="6" y="12" width="48" height="8" rx="1.5" fill={isShop ? '#434658' : '#e0cebc'} />
-              <rect x="10" y="4" width="40" height="7" rx="1.5" fill={isShop ? '#4c5060' : '#e8d8c8'} />
-            </svg>
-          </div>
         )}
         <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <div className="spot-badge">{displayType}</div>

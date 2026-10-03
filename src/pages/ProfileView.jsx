@@ -24,13 +24,18 @@ let _mySpotsScrollTop = 0
 function relativeTime(iso) {
   const diff = Date.now() - new Date(iso).getTime()
   const m = Math.floor(diff / 60000)
-  if (m < 1) return 'Just now'
+  if (m < 1) return 'just now'
   if (m < 60) return `${m}m ago`
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}h ago`
   const d = Math.floor(h / 24)
   if (d < 7) return `${d}d ago`
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const w = Math.floor(d / 7)
+  if (w < 4) return `${w}w ago`
+  const mo = Math.floor(d / 30.44)
+  if (mo < 12) return `${mo}mo ago`
+  const y = Math.floor(d / 365.25)
+  return `${y}y ago`
 }
 
 function notifMessage(n) {
@@ -778,19 +783,21 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   </div>
                   <div
                     onClick={() => setShowPrivacy(true)}
-                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
                   >
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Privacy Policy</span>
                     <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
                       <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
-
                   <div
                     onClick={() => setShowSupport(true)}
-                    style={{ padding: '4px 0 4px', fontSize: 11, fontWeight: 700, color: '#d4785a', textTransform: 'uppercase', letterSpacing: 1, cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
                   >
-                    Support
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Support</span>
+                    <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+                      <path d="M1 1L7 7L1 13" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </div>
                   <div className="divider" style={{ margin: '8px 0 0' }} />
                   <div
@@ -810,8 +817,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   </div>
                   <div className="divider" style={{ margin: '16px 0' }} />
                   <button
+                    className="btn-salmon"
                     onClick={handleSignOut}
-                    style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
                   >
                     Sign Out
                   </button>
@@ -1218,7 +1225,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No notifications yet</div>
             ) : (
               <>
-                {notifications.map(n => {
+                {(() => { const firstReadIdx = notifications.findIndex(n => !!n.read_at); return notifications.map((n, i) => {
                   const actionText = n.type === 'friend_request' ? `${n.actorUsername || 'Someone'} wants to be friends`
                     : n.type === 'friend_accepted' ? `${n.actorUsername || 'Someone'} accepted your friend request`
                     : n.type === 'admin_update' ? 'Updated Your Spot'
@@ -1227,12 +1234,18 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                     : n.type === 'report' ? 'Reported Your Spot'
                     : 'Interacted With Your Spot'
                   return (
+                    <div key={n.id}>
+                    {i === firstReadIdx && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 12px 4px' }}>
+                        <span className="section-label" style={{ marginBottom: 0, whiteSpace: 'nowrap' }}>Read Messages</span>
+                        <div style={{ flex: 1, height: 1, background: '#E8DDD0' }} />
+                      </div>
+                    )}
                     <div
-                      key={n.id}
                       style={{
                         margin: '8px 12px',
                         borderRadius: 10,
-                        background: !n.read_at ? 'rgba(212,120,90,0.07)' : '#FFFFFF',
+                        background: !n.read_at ? '#FFFFFF' : 'transparent',
                         border: `1px solid ${!n.read_at ? 'rgba(212,120,90,0.3)' : '#EAD8C8'}`,
                         overflow: 'hidden',
                         display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
@@ -1264,6 +1277,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                         {n.spotTitle && (
                           <div style={{ fontSize: 11, color: '#d4785a', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.spotTitle}</div>
                         )}
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>{relativeTime(n.created_at)}</div>
                       </div>
 
                       {/* Friend request controls, or the existing View button */}
@@ -1300,8 +1314,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                         </div>
                       )}
                     </div>
+                    </div>
                   )
-                })}
+                }) })()}
                 {notifHasMore && (
                   <div
                     onClick={() => onFetchNotifications?.()}

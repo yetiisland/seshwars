@@ -37,9 +37,11 @@ export function ListIcon({ color = '#ffffff', size = 22, filled = false }) {
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
       {filled ? (
         <>
-          <rect x="4" y="7" width="40" height="10" rx="3" fill={color} />
-          <rect x="4" y="21" width="40" height="10" rx="3" fill={color} />
-          <rect x="4" y="35" width="40" height="10" rx="3" fill={color} />
+          {/* Thinner than the original 10-tall bars, each recentered on its
+              original row (centers 12/26/40) to match MapPinIcon's visual weight */}
+          <rect x="4" y="9" width="40" height="6" rx="2" fill={color} />
+          <rect x="4" y="23" width="40" height="6" rx="2" fill={color} />
+          <rect x="4" y="37" width="40" height="6" rx="2" fill={color} />
         </>
       ) : (
         <>
@@ -157,6 +159,22 @@ export function ProfileIcon({ color = '#ffffff', size = 22, filled = false }) {
           <path d={PROFILE_PATH} stroke={color} strokeWidth="5" fill="none" strokeLinejoin="round" clipPath={`url(#${clipId})`} />
         </>
       )}
+    </svg>
+  )
+}
+
+// Filled person silhouette (reuses PROFILE_PATH, shrunk into the top-left of a
+// wider viewBox) plus a small plus badge in the bottom-right — same compositing
+// idea as the circle+pin+white-dot "Sign In" icon in AddSpot.jsx.
+export function PersonPlusIcon({ color = '#d4785a', size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 52 52" fill="none">
+      <g transform="translate(-1.12,-2.68) scale(0.78)">
+        <path d={PROFILE_PATH} fill={color} />
+      </g>
+      <circle cx="40" cy="40" r="12" fill={color} />
+      <line x1="40" y1="34" x2="40" y2="46" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+      <line x1="34" y1="40" x2="46" y2="40" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   )
 }

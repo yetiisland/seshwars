@@ -127,9 +127,9 @@ export default function CommentsSection({ spotId, user, onGoProfile }) {
       <div className="divider" />
       <div className="section-label">Comments ({comments.length})</div>
 
-      {/* Input row */}
+      {/* Input row — white card, same border as comment cards below */}
       {user ? (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 16, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: 10 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <textarea
               value={text}
@@ -176,7 +176,7 @@ export default function CommentsSection({ spotId, user, onGoProfile }) {
             const profile = profiles[comment.user_id]
             const isOwn = user?.id === comment.user_id
             return (
-              <div key={comment.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <div key={comment.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: 10 }}>
                 <Avatar profile={profile} size={28} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>

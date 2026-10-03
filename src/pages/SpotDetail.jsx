@@ -640,12 +640,16 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </div>
             ))
           ) : (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F0E8DE' }}>
-              <svg width="180" height="120" viewBox="0 0 180 120" fill="none">
-                <rect x="4" y="80" width="172" height="34" rx="2" fill="#ddd0bc" />
-                <rect x="12" y="52" width="156" height="34" rx="2" fill="#e0cebc" />
-                <rect x="22" y="28" width="136" height="30" rx="2" fill="#e8d8c8" />
-              </svg>
+            // Rectangle treatment matching the spot list preview: one large
+            // rectangle on the left, two stacked smaller rectangles on the
+            // right, all in the placeholder background color with a gap
+            // between each — replaces the old single "mountain icon" block.
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 6, padding: 6, background: '#F0E8DE' }}>
+              <div style={{ flex: '1 1 0', background: '#e8d8c8', borderRadius: 6 }} />
+              <div style={{ flex: '1 1 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ flex: '1 1 0', background: '#e0cebc', borderRadius: 6 }} />
+                <div style={{ flex: '1 1 0', background: '#ddd0bc', borderRadius: 6 }} />
+              </div>
             </div>
           )}
 
@@ -780,9 +784,10 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             </div>
           )}
 
-          {/* Publisher row */}
+          {/* Publisher row — white card, hugs its contents (inline-flex)
+              rather than spanning the full page width */}
           {(publisherAvatar || publisherUsername || spot.added_by === null) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ display: 'inline-flex', maxWidth: '100%', alignItems: 'center', gap: 10, marginBottom: 12, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '10px 12px' }}>
               <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
                 {publisherAvatar ? (
                   <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

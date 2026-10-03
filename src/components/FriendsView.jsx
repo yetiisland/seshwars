@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import AddFriendButton from './AddFriendButton'
+import { PersonPlusIcon, CloseIcon } from './Icons'
 
 // Row container + avatar — copied verbatim from the notification card
 // markup in ProfileView.jsx (~line 1009-1035).
@@ -15,16 +17,28 @@ const errorTextStyle = { fontSize: 11, color: '#e07070', fontWeight: 700 }
 const countBadgeStyle = { minWidth: 17, height: 17, borderRadius: 9, background: '#FDF8F0', border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }
 const countBadgeTextStyle = { fontSize: 9, fontWeight: 900, color: '#d4785a', lineHeight: 1 }
 
-// Soft circular "X" — copied verbatim from the LocationChip clear icon in
-// FiltersModal.jsx (~line 16-25).
-function IgnoreIcon({ onClick }) {
+// Stat card — copied verbatim from the 2x2 stat-card grid in ProfileView.jsx
+// (~line 580-648), minus the icon/chevron (these cards are narrower, 3-across).
+const statCardStyle = { flex: 1, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', textAlign: 'center' }
+const statCardCountStyle = { fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }
+const statCardLabelStyle = { fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }
+
+// "Deny" outline button — copied verbatim from the friend-request
+// notification card's Deny button in ProfileView.jsx (~line 1299-1303).
+const denyBtnStyle = { flexShrink: 0, border: '1px solid rgba(212,120,90,0.5)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+const denyBtnTextStyle = { fontSize: 10, fontWeight: 700, color: 'var(--salmon)', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }
+
+// Shared icon container (shared icon spec): rounded box, radius 6, salmon
+// stroke, transparent fill, salmon icon inside. Used for the add-person
+// icon and every X next to a username. Border width/pattern copied
+// verbatim from the "Create New List" plus-icon box in SaveToListModal.jsx.
+function IconBox({ onClick, size = 34, children }) {
   return (
-    <div onClick={onClick} style={{ marginLeft: 2, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <circle cx="6" cy="6" r="5" fill="rgba(212,120,90,0.15)" />
-        <line x1="4" y1="4" x2="8" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
-        <line x1="8" y1="4" x2="4" y2="8" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
-      </svg>
+    <div
+      onClick={onClick}
+      style={{ width: size, height: size, borderRadius: 6, border: '1.5px solid #d4785a', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: onClick ? 'pointer' : 'default', flexShrink: 0 }}
+    >
+      {children}
     </div>
   )
 }
@@ -52,10 +66,14 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
   const [searchError, setSearchError] = useState('')
   const [requests, setRequests] = useState([])
   const [friends, setFriends] = useState([])
+  const [sentPending, setSentPending] = useState([])
   const [requestsError, setRequestsError] = useState('')
   const [friendsError, setFriendsError] = useState('')
+  const [sentPendingError, setSentPendingError] = useState('')
+  const [activeSheet, setActiveSheet] = useState(null) // null | 'friends' | 'requests' | 'pending'
   const [nearbySkaters, setNearbySkaters] = useState([])
   const nearbyFetchedRef = useRef(false)
+  const searchInputRef = useRef(null)
 
   // Reuses the location the spots list already gets from useGeolocation()
   // (passed down via App.jsx -> ProfileView -> here) — no separate geolocation
@@ -124,9 +142,38 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
     setFriends(data || [])
   }
 
+  // No RPC exists for "requests I sent that are still pending" — two-step
+  // fetch (friendship rows, then a batch profile lookup) using the exact
+  // same .in('id', ids) pattern already used by ReviewsSection.jsx and
+  // ClipsSection.jsx to resolve a list of user ids to profiles.
+  const loadSentPending = async () => {
+    if (!user?.id) return
+    const { data, error } = await supabase
+      .from('friendships')
+      .select('id, addressee_id, created_at')
+      .eq('requester_id', user.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    if (error) { setSentPendingError('Could not load pending requests'); return }
+    setSentPendingError('')
+    const rows = data || []
+    const ids = [...new Set(rows.map(r => r.addressee_id))]
+    if (ids.length === 0) { setSentPending([]); return }
+    const { data: profiles } = await supabase.from('profiles').select('id, username, avatar_url').in('id', ids)
+    const profileMap = {}
+    for (const p of profiles || []) profileMap[p.id] = p
+    setSentPending(rows.map(r => ({
+      friendship_id: r.id,
+      id: r.addressee_id,
+      username: profileMap[r.addressee_id]?.username,
+      avatar_url: profileMap[r.addressee_id]?.avatar_url,
+    })))
+  }
+
   useEffect(() => {
     loadRequests()
     loadFriends()
+    loadSentPending()
   }, [user?.id])
 
   const handleIgnoreRequest = async (friendshipId) => {
@@ -140,8 +187,57 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
     onFriendsChanged?.()
   }
 
+  const handleRemoveFriend = async (friendshipId) => {
+    setFriends(prev => prev.filter(f => f.friendship_id !== friendshipId))
+    await supabase.from('friendships').delete().eq('id', friendshipId)
+    onFriendsChanged?.()
+  }
+
+  const handleCancelPending = async (friendshipId) => {
+    setSentPending(prev => prev.filter(r => r.friendship_id !== friendshipId))
+    await supabase.from('friendships').delete().eq('id', friendshipId)
+  }
+
   return (
     <div>
+      {/* Three count cards — tapping each opens its bottom sheet */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        <div onClick={() => setActiveSheet('friends')} style={statCardStyle}>
+          <div style={statCardCountStyle}>{friends.length}</div>
+          <div style={statCardLabelStyle}>Friends</div>
+        </div>
+        <div onClick={() => setActiveSheet('requests')} style={statCardStyle}>
+          <div style={statCardCountStyle}>{requests.length}</div>
+          <div style={statCardLabelStyle}>Requests</div>
+        </div>
+        <div onClick={() => setActiveSheet('pending')} style={statCardStyle}>
+          <div style={statCardCountStyle}>{sentPending.length}</div>
+          <div style={statCardLabelStyle}>Pending</div>
+        </div>
+      </div>
+
+      {/* Add-person icon sits outside the search input, to its left, per
+          the shared icon spec. Tapping it focuses the search field. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <IconBox size={42} onClick={() => searchInputRef.current?.focus()}>
+          <PersonPlusIcon color="#d4785a" size={18} />
+        </IconBox>
+        {/* Persistent "@" prefix — a separate absolutely-positioned element, not
+            part of the input's value, so it can't be edited or deleted. Any
+            leading "@" typed/pasted into the input is stripped in onChange. */}
+        <div style={{ position: 'relative', flex: 1 }}>
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-primary)', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
+          <input
+            ref={searchInputRef}
+            className="form-input"
+            placeholder="Search for skaters..."
+            value={query}
+            onChange={e => setQuery(e.target.value.replace(/^@+/, ''))}
+            style={{ paddingLeft: 24 }}
+          />
+        </div>
+      </div>
+
       {nearbySkaters.length > 0 && query.trim().length < 2 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -167,20 +263,6 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
           ))}
         </div>
       )}
-
-      {/* Persistent "@" prefix — a separate absolutely-positioned element, not
-          part of the input's value, so it can't be edited or deleted. Any
-          leading "@" typed/pasted into the input is stripped in onChange. */}
-      <div style={{ position: 'relative', marginBottom: 12 }}>
-        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-primary)', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
-        <input
-          className="form-input"
-          placeholder="Search by username..."
-          value={query}
-          onChange={e => setQuery(e.target.value.replace(/^@+/, ''))}
-          style={{ paddingLeft: 24 }}
-        />
-      </div>
 
       {query.trim().length >= 2 && (
         <div style={{ marginBottom: 20 }}>
@@ -221,54 +303,89 @@ export default function FriendsView({ user, userLocation, onFriendsChanged }) {
         </div>
       )}
 
-      {requests.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <div className="section-label" style={{ marginBottom: 0 }}>Requests</div>
-            <div style={countBadgeStyle}>
-              <span style={countBadgeTextStyle}>{requests.length}</span>
-            </div>
-          </div>
-          {requestsError && <div style={errorTextStyle}>{requestsError}</div>}
-          {requests.map(r => (
-            <div key={r.friendship_id} style={rowStyle}>
-              <Avatar avatarUrl={r.avatar_url} username={r.username} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={usernameStyle}>@{r.username}</div>
+      {/* FRIENDS sheet */}
+      {activeSheet === 'friends' && createPortal(
+        <div className="modal-overlay" onClick={() => setActiveSheet(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <div className="modal-title" style={{ padding: '0 20px' }}>Friends</div>
+            {friendsError && <div style={{ ...errorTextStyle, padding: '0 20px 12px' }}>{friendsError}</div>}
+            {friends.length === 0 ? (
+              <div style={{ padding: '0 20px 20px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No friends yet</div>
+            ) : friends.map(f => (
+              <div key={f.friendship_id} className="modal-row">
+                <Avatar avatarUrl={f.avatar_url} username={f.username} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={usernameStyle}>@{f.username}</div>
+                </div>
+                <IconBox onClick={() => handleRemoveFriend(f.friendship_id)}>
+                  <CloseIcon color="#d4785a" />
+                </IconBox>
               </div>
-              <AddFriendButton
-                targetUserId={r.id}
-                friendshipStatus="pending"
-                isRequester={false}
-                friendshipId={r.friendship_id}
-                onChange={handleRequestAccepted}
-              />
-              <IgnoreIcon onClick={() => handleIgnoreRequest(r.friendship_id)} />
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </div>,
+        document.body
       )}
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <div className="section-label" style={{ marginBottom: 0 }}>Friends</div>
-          <div style={countBadgeStyle}>
-            <span style={countBadgeTextStyle}>{friends.length}</span>
+      {/* REQUESTS sheet — incoming requests, Accept solid / Deny outline */}
+      {activeSheet === 'requests' && createPortal(
+        <div className="modal-overlay" onClick={() => setActiveSheet(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <div className="modal-title" style={{ padding: '0 20px' }}>Requests</div>
+            {requestsError && <div style={{ ...errorTextStyle, padding: '0 20px 12px' }}>{requestsError}</div>}
+            {requests.length === 0 ? (
+              <div style={{ padding: '0 20px 20px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No requests</div>
+            ) : requests.map(r => (
+              <div key={r.friendship_id} className="modal-row">
+                <Avatar avatarUrl={r.avatar_url} username={r.username} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={usernameStyle}>@{r.username}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <AddFriendButton
+                    targetUserId={r.id}
+                    friendshipStatus="pending"
+                    isRequester={false}
+                    friendshipId={r.friendship_id}
+                    onChange={handleRequestAccepted}
+                  />
+                  <div onClick={() => handleIgnoreRequest(r.friendship_id)} style={denyBtnStyle}>
+                    <span style={denyBtnTextStyle}>Deny</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
-        {friendsError && <div style={errorTextStyle}>{friendsError}</div>}
-        {friends.length === 0 && !friendsError && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, padding: '4px 0' }}>No friends yet</div>
-        )}
-        {friends.map(f => (
-          <div key={f.friendship_id} style={rowStyle}>
-            <Avatar avatarUrl={f.avatar_url} username={f.username} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={usernameStyle}>@{f.username}</div>
-            </div>
+        </div>,
+        document.body
+      )}
+
+      {/* PENDING sheet — requests I sent, still awaiting a response */}
+      {activeSheet === 'pending' && createPortal(
+        <div className="modal-overlay" onClick={() => setActiveSheet(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <div className="modal-title" style={{ padding: '0 20px' }}>Pending</div>
+            {sentPendingError && <div style={{ ...errorTextStyle, padding: '0 20px 12px' }}>{sentPendingError}</div>}
+            {sentPending.length === 0 ? (
+              <div style={{ padding: '0 20px 20px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No pending requests</div>
+            ) : sentPending.map(r => (
+              <div key={r.friendship_id} className="modal-row">
+                <Avatar avatarUrl={r.avatar_url} username={r.username} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={usernameStyle}>@{r.username}</div>
+                </div>
+                <IconBox onClick={() => handleCancelPending(r.friendship_id)}>
+                  <CloseIcon color="#d4785a" />
+                </IconBox>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

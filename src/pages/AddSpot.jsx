@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { CloseIcon } from '../components/Icons'
 import { slugify } from '../utils/slugify'
 import DraggablePhotos from '../components/DraggablePhotos'
+import LoadingOverlay from '../components/LoadingOverlay'
 import SpotFormFields from '../components/SpotFormFields'
 import { compressImage } from '../utils/compressImage'
 import { checkPhotosSafe } from '../utils/moderation'
@@ -422,38 +423,34 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
       <div style={{ flex: '0 0 auto', padding: '12px 14px calc(12px + env(safe-area-inset-bottom))', borderTop: '1px solid #E8DDD0', background: '#FDF8F0' }}>
         <button className="btn-salmon" onClick={handleSubmit} disabled={uploading}>
-          {uploading ? uploadingText : 'Drop This Spot'}
+          Drop This Spot
         </button>
       </div>
 
       {/* Photo upload progress overlay */}
       {uploadingPhotos && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <div style={{ background: '#FDF8F0', borderRadius: 12, padding: '32px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center', width: '100%', maxWidth: 300 }}>
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <circle cx="24" cy="24" r="20" stroke="#EAD8C8" strokeWidth="3" fill="none" />
-              <circle cx="24" cy="24" r="20" stroke="#d4785a" strokeWidth="3" fill="none"
-                strokeDasharray={`${(photoUploadProgress.current / Math.max(photoUploadProgress.total, 1)) * 125.6} 125.6`}
-                strokeDashoffset="0" strokeLinecap="round"
-                style={{ transform: 'rotate(-90deg)', transformOrigin: 'center', transition: 'stroke-dasharray 0.4s' }} />
-            </svg>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Uploading Your Photos</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                {photoUploadProgress.current < photoUploadProgress.total
-                  ? `${photoUploadProgress.current} of ${photoUploadProgress.total}`
-                  : 'Almost done…'
-                }
-              </div>
-            </div>
-            <div style={{ width: '100%', height: 4, borderRadius: 2, background: '#EAD8C8', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', borderRadius: 2, background: '#d4785a', transition: 'width 0.4s',
-                width: `${photoUploadProgress.total > 0 ? (photoUploadProgress.current / photoUploadProgress.total) * 100 : 0}%`
-              }} />
-            </div>
-          </div>
-        </div>
+        <LoadingOverlay
+          title="Uploading Your Photos"
+          subtitle={photoUploadProgress.current < photoUploadProgress.total
+            ? `${photoUploadProgress.current} of ${photoUploadProgress.total}`
+            : 'Almost done…'}
+          current={photoUploadProgress.current}
+          total={photoUploadProgress.total}
+        />
+      )}
+
+      {/* Submit progress overlay — same component/treatment as the photo
+          upload overlay above, instead of the "checking content" state only
+          changing the disabled submit button's own label. Two steps
+          (checking, saving) drive the same determinate ring the photo
+          overlay uses. */}
+      {uploading && (
+        <LoadingOverlay
+          title="Submitting Your Spot"
+          subtitle={uploadingText}
+          current={uploadingText === 'Saving...' ? 2 : 1}
+          total={2}
+        />
       )}
         {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
     </div>
