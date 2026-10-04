@@ -58,6 +58,7 @@ export default function FriendsView({ user, userLocation, locationPermission, re
   const [activeSheet, setActiveSheet] = useState(null) // null | 'friends' | 'requests' | 'pending'
   const [pendingRemoveFriend, setPendingRemoveFriend] = useState(null) // { friendshipId, username }
   const [pendingCancelPending, setPendingCancelPending] = useState(null) // { friendshipId, username }
+  const [actionError, setActionError] = useState('')
   const [nearbySkaters, setNearbySkaters] = useState([])
   const [inputFocused, setInputFocused] = useState(false)
   const nearbyFetchedRef = useRef(false)
@@ -165,8 +166,14 @@ export default function FriendsView({ user, userLocation, locationPermission, re
   }, [user?.id])
 
   const handleIgnoreRequest = async (friendshipId) => {
+    const { data, error } = await supabase.from('friendships').delete().eq('id', friendshipId).select()
+    if (error || !data || data.length === 0) {
+      console.error('[FriendsView] handleIgnoreRequest delete failed:', error)
+      setRequestsError('Could not deny this request. Try again.')
+      return
+    }
+    setRequestsError('')
     setRequests(prev => prev.filter(r => r.friendship_id !== friendshipId))
-    await supabase.from('friendships').delete().eq('id', friendshipId)
   }
 
   const handleRequestAccepted = () => {
@@ -178,18 +185,30 @@ export default function FriendsView({ user, userLocation, locationPermission, re
   const confirmRemoveFriend = async () => {
     if (!pendingRemoveFriend) return
     const { friendshipId } = pendingRemoveFriend
+    setActionError('')
+    const { data, error } = await supabase.from('friendships').delete().eq('id', friendshipId).select()
+    if (error || !data || data.length === 0) {
+      console.error('[FriendsView] confirmRemoveFriend delete failed:', error)
+      setActionError('Could not remove this friend. Try again.')
+      return
+    }
     setPendingRemoveFriend(null)
     setFriends(prev => prev.filter(f => f.friendship_id !== friendshipId))
-    await supabase.from('friendships').delete().eq('id', friendshipId)
     onFriendsChanged?.()
   }
 
   const confirmCancelPending = async () => {
     if (!pendingCancelPending) return
     const { friendshipId } = pendingCancelPending
+    setActionError('')
+    const { data, error } = await supabase.from('friendships').delete().eq('id', friendshipId).select()
+    if (error || !data || data.length === 0) {
+      console.error('[FriendsView] confirmCancelPending delete failed:', error)
+      setActionError('Could not cancel this request. Try again.')
+      return
+    }
     setPendingCancelPending(null)
     setSentPending(prev => prev.filter(r => r.friendship_id !== friendshipId))
-    await supabase.from('friendships').delete().eq('id', friendshipId)
   }
 
   return (
@@ -386,14 +405,15 @@ export default function FriendsView({ user, userLocation, locationPermission, re
           (modal-overlay/modal-sheet, solid-salmon action + outline cancel)
           copied verbatim from ReviewsSection.jsx's "Delete Rating" modal. */}
       {pendingRemoveFriend && createPortal(
-        <div className="modal-overlay" onClick={() => setPendingRemoveFriend(null)}>
+        <div className="modal-overlay" onClick={() => { setPendingRemoveFriend(null); setActionError('') }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Friend</div>
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Remove @{pendingRemoveFriend.username} from your friends?</div>
+            {actionError && <div style={{ ...errorTextStyle, padding: '0 16px 12px' }}>{actionError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={confirmRemoveFriend} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Remove</button>
-              <button onClick={() => setPendingRemoveFriend(null)} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+              <button onClick={() => { setPendingRemoveFriend(null); setActionError('') }} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
             </div>
           </div>
         </div>,
@@ -402,14 +422,15 @@ export default function FriendsView({ user, userLocation, locationPermission, re
 
       {/* Cancel-pending-request confirmation — same pattern as above */}
       {pendingCancelPending && createPortal(
-        <div className="modal-overlay" onClick={() => setPendingCancelPending(null)}>
+        <div className="modal-overlay" onClick={() => { setPendingCancelPending(null); setActionError('') }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cancel Request</div>
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Cancel your friend request to @{pendingCancelPending.username}?</div>
+            {actionError && <div style={{ ...errorTextStyle, padding: '0 16px 12px' }}>{actionError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={confirmCancelPending} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel Request</button>
-              <button onClick={() => setPendingCancelPending(null)} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Never Mind</button>
+              <button onClick={() => { setPendingCancelPending(null); setActionError('') }} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Never Mind</button>
             </div>
           </div>
         </div>,

@@ -60,6 +60,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteClosing, setDeleteClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [viewMode, setViewMode] = useState('list')
   const viewToggleTrackRef = useRef(null)
   const viewToggleThumbRef = useRef(null)
@@ -94,6 +95,8 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const [memberInputFocused, setMemberInputFocused] = useState(false)
   const [showMembersSheet, setShowMembersSheet] = useState(false)
   const [pendingRemoveMember, setPendingRemoveMember] = useState(null) // { id, username }
+  const [removeMemberError, setRemoveMemberError] = useState('')
+  const [addMemberError, setAddMemberError] = useState('')
   const memberInputRef = useRef(null)
 
   const fetchMembers = async () => {
@@ -128,7 +131,13 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   }, [memberQuery, isOwner])
 
   const handleAddMember = async (profile) => {
-    await supabase.from('list_members').insert({ list_id: listId, user_id: profile.id, added_by: userId })
+    setAddMemberError('')
+    const { data, error } = await supabase.from('list_members').insert({ list_id: listId, user_id: profile.id, added_by: userId }).select().single()
+    if (error || !data) {
+      console.error('[SavedView] handleAddMember failed:', error)
+      setAddMemberError(`Could not add @${profile.username}. Try again.`)
+      return
+    }
     setMembers(prev => prev.some(m => m.id === profile.id) ? prev : [...prev, profile])
     setMemberSuggestions(prev => prev.filter(p => p.id !== profile.id))
     setMemberSearchResults(prev => prev.filter(p => p.id !== profile.id))
@@ -137,9 +146,15 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const confirmRemoveMember = async () => {
     if (!pendingRemoveMember) return
     const memberId = pendingRemoveMember.id
+    setRemoveMemberError('')
+    const { data, error } = await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', memberId).select()
+    if (error || !data || data.length === 0) {
+      console.error('[SavedView] confirmRemoveMember failed:', error)
+      setRemoveMemberError('Could not remove this member. Try again.')
+      return
+    }
     setPendingRemoveMember(null)
     setMembers(prev => prev.filter(m => m.id !== memberId))
-    await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', memberId)
     fetchMemberSuggestions()
   }
 
@@ -161,13 +176,31 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
 
   const closeDeleteConfirm = () => {
     setDeleteClosing(true)
+    setDeleteError('')
     setTimeout(() => { setDeleteClosing(false); setShowDeleteConfirm(false) }, 180)
   }
 
   const handleDelete = async () => {
     setDeleting(true)
-    await supabase.from('saved_spots').delete().eq('list_id', listId)
-    await supabase.from('spot_lists').delete().eq('id', listId)
+    setDeleteError('')
+    // saved_spots here deletes every row for this list — a list with no
+    // spots in it legitimately deletes zero rows, so only a real `error`
+    // means failure. spot_lists below deletes one specific known-to-exist
+    // row by id, so an empty result there does mean the delete was blocked.
+    const { error: savedSpotsError } = await supabase.from('saved_spots').delete().eq('list_id', listId).select()
+    if (savedSpotsError) {
+      console.error('[SavedView] handleDelete: saved_spots delete failed:', savedSpotsError)
+      setDeleting(false)
+      setDeleteError('Could not delete this list. Try again.')
+      return
+    }
+    const { data, error } = await supabase.from('spot_lists').delete().eq('id', listId).select()
+    if (error || !data || data.length === 0) {
+      console.error('[SavedView] handleDelete: spot_lists delete failed:', error)
+      setDeleting(false)
+      setDeleteError('Could not delete this list. Try again.')
+      return
+    }
     _listsFetchSeq++ // invalidate any in-flight fetchLists() — see comment at the declaration
     _cachedLists = _cachedLists.filter(l => l.id !== listId)
     const { [listId]: _removed, ...rest } = _cachedListSpotIds
@@ -313,6 +346,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               Delete "{title}"? This cannot be undone.
             </div>
+            {deleteError && <div style={{ padding: '0 16px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{deleteError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button
                 onClick={handleDelete}
@@ -365,14 +399,15 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           (modal-overlay/modal-sheet, solid-salmon action + outline cancel)
           copied verbatim from ReviewsSection.jsx's "Delete Rating" modal. */}
       {pendingRemoveMember && createPortal(
-        <div className="modal-overlay" onClick={() => setPendingRemoveMember(null)}>
+        <div className="modal-overlay" onClick={() => { setPendingRemoveMember(null); setRemoveMemberError('') }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Member</div>
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Remove @{pendingRemoveMember.username} from this list?</div>
+            {removeMemberError && <div style={{ padding: '0 16px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{removeMemberError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={confirmRemoveMember} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Remove</button>
-              <button onClick={() => setPendingRemoveMember(null)} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+              <button onClick={() => { setPendingRemoveMember(null); setRemoveMemberError('') }} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
             </div>
           </div>
         </div>,
@@ -444,6 +479,9 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                       </div>
                     )}
                   </div>
+                  {addMemberError && (
+                    <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginTop: 6 }}>{addMemberError}</div>
+                  )}
                 </div>
               )}
 

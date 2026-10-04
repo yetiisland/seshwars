@@ -103,6 +103,8 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [editPhotos, setEditPhotos] = useState([])
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
+  const [modActionError, setModActionError] = useState('')
+  const [skateableAgainError, setSkateableAgainError] = useState('')
   const [editUploading, setEditUploading] = useState(false)
   const editFileRef = useRef()
   const [editGeoQuery, setEditGeoQuery] = useState('')
@@ -499,11 +501,18 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   }
 
   const handleAdminApprove = async () => {
-    await supabase.from('spots').update({ moderation_status: 'approved' }).eq('id', spot.id)
+    setModActionError('')
+    const { data, error } = await supabase.from('spots').update({ moderation_status: 'approved' }).eq('id', spot.id).select()
+    if (error || !data || data.length === 0) {
+      console.error('[SpotDetail] handleAdminApprove failed:', error)
+      setModActionError('Could not approve this spot. Try again.')
+      return
+    }
     setModStatus('approved')
   }
 
   const handleAdminReject = async () => {
+    setModActionError('')
     const photoPaths = (spot.photos || []).map(url => {
       const match = url.match(/\/spot-photos\/(.+)$/)
       return match ? match[1] : null
@@ -511,14 +520,30 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     if (photoPaths.length > 0) {
       await supabase.storage.from('spot-photos').remove(photoPaths)
     }
-    await Promise.all([
-      supabase.from('spot_clips').delete().eq('spot_id', spot.id),
-      supabase.from('spot_comments').delete().eq('spot_id', spot.id),
-      supabase.from('spot_reviews').delete().eq('spot_id', spot.id),
-      supabase.from('spot_reports').delete().eq('spot_id', spot.id),
-      supabase.from('saved_spots').delete().eq('spot_id', spot.id),
-    ])
-    await supabase.from('spots').delete().eq('id', spot.id)
+    // Each of these deletes "every row matching spot_id" — most will
+    // legitimately match zero rows (a spot with no reports/reviews/etc is
+    // normal), so only a real `error` means failure here, not an empty
+    // `data`. The final spots.delete below is different: that row is known
+    // to exist (we're viewing it), so an empty result there does mean the
+    // delete was blocked.
+    const childTables = ['spot_clips', 'spot_comments', 'spot_reviews', 'spot_reports', 'saved_spots']
+    const results = await Promise.all(
+      childTables.map(table => supabase.from(table).delete().eq('spot_id', spot.id).select())
+    )
+    const failed = results
+      .map((r, i) => ({ table: childTables[i], error: r.error }))
+      .filter(r => r.error)
+    if (failed.length > 0) {
+      console.error('[SpotDetail] handleAdminReject: failed to clear related data:', failed)
+      setModActionError(`Could not reject this spot — failed to remove data from: ${failed.map(f => f.table).join(', ')}.`)
+      return
+    }
+    const { data, error } = await supabase.from('spots').delete().eq('id', spot.id).select()
+    if (error || !data || data.length === 0) {
+      console.error('[SpotDetail] handleAdminReject: spots.delete failed:', error)
+      setModActionError('Could not reject this spot. Try again.')
+      return
+    }
     window.dispatchEvent(new Event('seshwars:spots-changed'))
     onEditSuccess?.()
   }
@@ -807,6 +832,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <span style={{ fontSize: 11, fontWeight: 900, color: '#7a5c00', letterSpacing: 0.5, textTransform: 'uppercase' }}>Flagged — Pending Review</span>
               </div>
               <div style={{ fontSize: 11, color: '#7a5c00', marginBottom: 10, lineHeight: 1.5 }}>This spot was auto-flagged for possible nudity or gore and is hidden from the public feed.</div>
+              {modActionError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 10, lineHeight: 1.5 }}>{modActionError}</div>}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={handleAdminApprove} style={{ flex: 1, padding: '8px 0', borderRadius: 6, background: '#4a7a3a', border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>Approve</button>
                 <button onClick={handleAdminReject} style={{ flex: 1, padding: '8px 0', borderRadius: 6, background: '#c0453a', border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>Reject</button>
@@ -910,22 +936,33 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             const activeReport = liveReport?.most_recent_report ?? spot.most_recent_report
             if (!activeReport || activeReport === 'Skateable Again') return null
             return (
-              <div
-                onClick={async () => {
-                  if (!user) { onGoProfile?.(); return }
-                  const { data: { user: cu } } = await supabase.auth.getUser()
-                  if (!cu) return
-                  await supabase.from('spot_reports').insert({ spot_id: spot.id, user_id: cu.id, report_type: 'Skateable Again', custom_text: null })
-                  handleReported('Skateable Again', null)
-                }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1.5px solid #4a7a3a', borderRadius: 6, padding: 13, cursor: 'pointer', marginBottom: 20, background: 'transparent' }}
-              >
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                  <path d="M2 7L6 11L12 3" stroke="#4a7a3a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#4a7a3a', letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
-                  Report Skateable Again
-                </span>
+              <div style={{ marginBottom: 20 }}>
+                <div
+                  onClick={async () => {
+                    if (!user) { onGoProfile?.(); return }
+                    const { data: { user: cu } } = await supabase.auth.getUser()
+                    if (!cu) return
+                    setSkateableAgainError('')
+                    const { data, error } = await supabase.from('spot_reports').insert({ spot_id: spot.id, user_id: cu.id, report_type: 'Skateable Again', custom_text: null }).select().single()
+                    if (error || !data) {
+                      console.error('[SpotDetail] Report Skateable Again insert failed:', error)
+                      setSkateableAgainError('Could not submit this report. Try again.')
+                      return
+                    }
+                    handleReported('Skateable Again', null)
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1.5px solid #4a7a3a', borderRadius: 6, padding: 13, cursor: 'pointer', background: 'transparent' }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                    <path d="M2 7L6 11L12 3" stroke="#4a7a3a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#4a7a3a', letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif' }}>
+                    Report Skateable Again
+                  </span>
+                </div>
+                {skateableAgainError && (
+                  <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginTop: 6 }}>{skateableAgainError}</div>
+                )}
               </div>
             )
           })()}

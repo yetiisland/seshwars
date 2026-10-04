@@ -85,6 +85,8 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
   const [uploadError, setUploadError] = useState('')
   const [showClipDeleteModal, setShowClipDeleteModal] = useState(false)
   const [clipDeleteModalClosing, setClipDeleteModalClosing] = useState(false)
+  const [clipDeleteError, setClipDeleteError] = useState('')
+  const [clipModError, setClipModError] = useState('')
   const [signInPrompt, setSignInPrompt] = useState(false)
   const [videoError, setVideoError] = useState(false)
   const [videoPlaying, setVideoPlaying] = useState(false)
@@ -225,11 +227,18 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
 
   const closeClipDeleteModal = () => {
     setClipDeleteModalClosing(true)
+    setClipDeleteError('')
     setTimeout(() => { setClipDeleteModalClosing(false); setShowClipDeleteModal(false) }, 180)
   }
 
   const handleDeleteClip = async () => {
-    await supabase.from('spot_clips').delete().eq('id', activeClip.id)
+    setClipDeleteError('')
+    const { data, error } = await supabase.from('spot_clips').delete().eq('id', activeClip.id).select()
+    if (error || !data || data.length === 0) {
+      console.error('[ClipsSection] handleDeleteClip failed:', error)
+      setClipDeleteError('Could not delete this clip. Try again.')
+      return
+    }
     const newClips = clips.filter(c => c.id !== activeClip.id)
     setClips(newClips)
     closeClipDeleteModal()
@@ -556,14 +565,21 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
           {/* Admin moderation banner for pending clips */}
           {isAdmin && activeClip.moderation_status === 'pending' && (
             <div
-              style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', left: 16, right: 16, background: 'rgba(255,175,0,0.93)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10001 }}
+              style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', left: 16, right: 16, background: 'rgba(255,175,0,0.93)', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, zIndex: 10001 }}
               onClick={e => e.stopPropagation()}
             >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#2a1e14' }}>⚠️ Pending Review</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 <div
                   onClick={async () => {
-                    await supabase.from('spot_clips').update({ moderation_status: 'approved' }).eq('id', activeClip.id)
+                    setClipModError('')
+                    const { data, error } = await supabase.from('spot_clips').update({ moderation_status: 'approved' }).eq('id', activeClip.id).select()
+                    if (error || !data || data.length === 0) {
+                      console.error('[ClipsSection] approve clip failed:', error)
+                      setClipModError('Could not approve this clip. Try again.')
+                      return
+                    }
                     setClips(prev => prev.map(c => c.id === activeClip.id ? { ...c, moderation_status: 'approved' } : c))
                     setActiveClip(prev => ({ ...prev, moderation_status: 'approved' }))
                   }}
@@ -571,13 +587,23 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
                 >APPROVE</div>
                 <div
                   onClick={async () => {
-                    await supabase.from('spot_clips').update({ moderation_status: 'rejected' }).eq('id', activeClip.id)
+                    setClipModError('')
+                    const { data, error } = await supabase.from('spot_clips').update({ moderation_status: 'rejected' }).eq('id', activeClip.id).select()
+                    if (error || !data || data.length === 0) {
+                      console.error('[ClipsSection] reject clip failed:', error)
+                      setClipModError('Could not reject this clip. Try again.')
+                      return
+                    }
                     setClips(prev => prev.filter(c => c.id !== activeClip.id))
                     closeLightbox()
                   }}
                   style={{ padding: '5px 11px', borderRadius: 4, background: 'rgba(192,69,58,0.9)', cursor: 'pointer', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#fff' }}
                 >REJECT</div>
               </div>
+              </div>
+              {clipModError && (
+                <div style={{ fontSize: 10, color: '#e07070', fontWeight: 700, textAlign: 'right' }}>{clipModError}</div>
+              )}
             </div>
           )}
 
@@ -611,6 +637,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Clip</div>
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Delete this clip? This cannot be undone.</div>
+            {clipDeleteError && <div style={{ padding: '0 16px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{clipDeleteError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={handleDeleteClip} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Delete</button>
               <button onClick={closeClipDeleteModal} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>

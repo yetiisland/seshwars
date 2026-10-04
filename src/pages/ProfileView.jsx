@@ -152,6 +152,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
   const storeProfile = useProfileStore()
   const [editDraft, setEditDraft] = useState(null)
+  const [editProfileError, setEditProfileError] = useState('')
   const [saving, setSaving] = useState(false)
   const [cropFile, setCropFile] = useState(null)
   const avatarRef = useRef()
@@ -209,14 +210,20 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const handleSaveProfile = async () => {
     if (!user?.id || !editDraft) return
     setSaving(true)
-    await supabase.from('profiles').upsert({
+    setEditProfileError('')
+    const { data, error } = await supabase.from('profiles').upsert({
       id: user.id,
       username: editDraft.username,
       first_name: editDraft.first_name,
       last_name: editDraft.last_name,
-    })
-    setProfileDirect({ ...storeProfile, ...editDraft }, user)
+    }).select().single()
     setSaving(false)
+    if (error || !data) {
+      console.error('[ProfileView] handleSaveProfile failed:', error)
+      setEditProfileError('Could not save your profile. Try again.')
+      return
+    }
+    setProfileDirect({ ...storeProfile, ...editDraft }, user)
     setEditDraft(null)
     setShowEditSheet(false)
   }
@@ -289,11 +296,13 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
   const openEditSheet = () => {
     setEditDraft({ username: storeProfile.username, first_name: storeProfile.first_name, last_name: storeProfile.last_name })
+    setEditProfileError('')
     setShowEditSheet(true)
   }
   const closeEditSheet = () => {
     setShowEditSheet(false)
     setEditDraft(null)
+    setEditProfileError('')
   }
 
   const openSettingsSheet = () => setShowSettingsSheet(true)
@@ -1113,6 +1122,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   </div>
                 </>
               )}
+              {editProfileError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700 }}>{editProfileError}</div>}
               <button className="btn-salmon" onClick={handleSaveProfile} disabled={saving}>{saving ? 'Saving...' : 'Save Profile'}</button>
               <button
                 onClick={() => { closeEditSheet(); setTimeout(openPasswordModal, 200) }}

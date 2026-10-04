@@ -122,7 +122,19 @@ export default function SharedListPage() {
         .from('spot_lists').insert({ user_id: user.id, name: finalName }).select('id').single()
       if (error || !newList) throw new Error('Failed to create list')
 
-      await supabase.from('saved_spots').insert(spots.map(s => ({ user_id: user.id, spot_id: s.id, list_id: newList.id })))
+      const { data: savedRows, error: savedSpotsError } = await supabase
+        .from('saved_spots')
+        .insert(spots.map(s => ({ user_id: user.id, spot_id: s.id, list_id: newList.id })))
+        .select()
+      if (savedSpotsError || !savedRows || savedRows.length === 0) {
+        console.error('[SharedListPage] handleSaveList saved_spots insert failed:', savedSpotsError)
+        if (savedSpotsError?.code === '23505') {
+          showToastMsg('Some of those spots are already saved.')
+        } else {
+          showToastMsg('Something went wrong. Try again.')
+        }
+        return
+      }
       showToastMsg('Saved to your lists!')
     } catch {
       showToastMsg('Something went wrong. Try again.')

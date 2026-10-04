@@ -28,6 +28,7 @@ export default function LikesRow({ spotId, user }) {
   const [likers, setLikers] = useState([])
   const [animating, setAnimating] = useState(false)
   const [signInPrompt, setSignInPrompt] = useState(false)
+  const [likeError, setLikeError] = useState('')
   const channelRef = useRef(null)
 
   const fetchLikes = useCallback(async () => {
@@ -57,6 +58,7 @@ export default function LikesRow({ spotId, user }) {
   const toggle = async () => {
     if (!user) { setSignInPrompt(true); return }
     setSignInPrompt(false)
+    setLikeError('')
     const { data: { user: cu } } = await supabase.auth.getUser()
     if (!cu) return
     setAnimating(true)
@@ -66,7 +68,13 @@ export default function LikesRow({ spotId, user }) {
       await supabase.from('spot_likes').delete().eq('spot_id', spotId).eq('user_id', cu.id)
     } else {
       setLiked(true); setCount(c => c + 1)
-      await supabase.from('spot_likes').insert({ spot_id: spotId, user_id: cu.id })
+      const { data, error } = await supabase.from('spot_likes').insert({ spot_id: spotId, user_id: cu.id }).select().single()
+      if (error || !data) {
+        console.error('[LikesRow] like insert failed:', error)
+        setLiked(false); setCount(c => Math.max(0, c - 1))
+        setLikeError('Could not like this spot. Try again.')
+        return
+      }
     }
     fetchLikes()
   }
@@ -103,6 +111,9 @@ export default function LikesRow({ spotId, user }) {
 
         {signInPrompt && (
           <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, fontFamily: 'Barlow, sans-serif' }}>Sign in to like.</span>
+        )}
+        {likeError && (
+          <span style={{ fontSize: 10, color: '#e07070', fontWeight: 700, fontFamily: 'Barlow, sans-serif' }}>{likeError}</span>
         )}
       </div>
     </div>

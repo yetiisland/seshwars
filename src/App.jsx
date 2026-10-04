@@ -604,6 +604,7 @@ export default function App() {
                 sortMode={sortMode}
                 onSortModeChange={handleSortModeChange}
                 locationPermission={locationPermission}
+                requestLocation={requestLocation}
               />
             </div>
             {mapEverOpened && (
@@ -745,6 +746,7 @@ export default function App() {
                   sortMode={sortMode}
                   onSortModeChange={handleSortModeChange}
                   locationPermission={locationPermission}
+                  requestLocation={requestLocation}
                 />
               </div>
               {effectiveTab === 'saved' && (

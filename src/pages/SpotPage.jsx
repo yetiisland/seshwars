@@ -32,12 +32,12 @@ export default function SpotPage() {
   const rawTab = location.state?.prevTab || sessionStorage.getItem('activeTab') || 'spots'
   const prevTab = (rawTab === 'list' || rawTab === 'map') ? 'spots' : rawTab
   const { saved, refetchSaved } = useSavedSpots(user?.id)
-  const { hiddenIds, refetchHidden } = useHiddenSpots(user?.id)
+  const { hiddenIds, unhideSpot } = useHiddenSpots(user?.id)
 
   const handleUnhide = async () => {
     if (!user?.id || !spot) return
-    await supabase.from('hidden_spots').delete().eq('user_id', user.id).eq('spot_id', spot.id)
-    refetchHidden()
+    const { error } = await unhideSpot(spot.id)
+    if (error) console.error('[SpotPage] unhide failed:', error)
   }
 
   useEffect(() => {

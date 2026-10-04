@@ -50,6 +50,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteModalClosing, setDeleteModalClosing] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
+  const [deleteError, setDeleteError] = useState('')
   const [replyingTo, setReplyingTo] = useState(null) // { id, username } | null
   const [expandedThreads, setExpandedThreads] = useState(new Set())
   const [mentionQuery, setMentionQuery] = useState(null) // null = dropdown closed
@@ -66,6 +67,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
 
   const closeDeleteModal = () => {
     setDeleteModalClosing(true)
+    setDeleteError('')
     setTimeout(() => { setDeleteModalClosing(false); setShowDeleteModal(false); setPendingDeleteId(null) }, 180)
   }
 
@@ -289,7 +291,13 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
 
   const handleDelete = async () => {
     if (!pendingDeleteId) return
-    await supabase.from('spot_comments').delete().eq('id', pendingDeleteId)
+    setDeleteError('')
+    const { data, error } = await supabase.from('spot_comments').delete().eq('id', pendingDeleteId).select()
+    if (error || !data || data.length === 0) {
+      console.error('[CommentsSection] handleDelete failed:', error)
+      setDeleteError('Could not delete this comment. Try again.')
+      return
+    }
     setComments(prev => prev.filter(c => c.id !== pendingDeleteId))
     closeDeleteModal()
   }
@@ -492,6 +500,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Comment</div>
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Delete this comment? This cannot be undone.</div>
+            {deleteError && <div style={{ padding: '0 16px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{deleteError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={handleDelete} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Delete</button>
               <button onClick={closeDeleteModal} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
