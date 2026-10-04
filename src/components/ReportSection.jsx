@@ -51,13 +51,18 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
     setError('')
     const { data: { user: cu }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !cu) { setError('Sign in to submit a report.'); setSubmitting(false); return }
-    const { error: insertErr } = await supabase.from('spot_reports').insert({
+    const { data, error: insertErr } = await supabase.from('spot_reports').insert({
       spot_id: spotId,
       user_id: cu.id,
       report_type: selectedType,
       custom_text: selectedType === 'Other' ? customText.trim() : null,
-    })
-    if (insertErr) { setError(insertErr.message); setSubmitting(false); return }
+    }).select().single()
+    if (insertErr || !data) {
+      console.error('[ReportSection] handleSubmit insert failed:', insertErr)
+      setError(insertErr?.message || 'Could not submit this report. Try again.')
+      setSubmitting(false)
+      return
+    }
 
     if (CONTENT_REPORT_TYPES.has(selectedType) && spot) {
       supabase.functions.invoke('notify-new-spot', {

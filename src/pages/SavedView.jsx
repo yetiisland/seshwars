@@ -84,6 +84,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   }, [viewMode])
   const [sharing, setSharing] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [shareError, setShareError] = useState('')
   const scrollRef = useRef(null)
   const scrollRestoredRef = useRef(false)
 
@@ -214,6 +215,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const handleShare = async () => {
     if (sharing) return
     setSharing(true)
+    setShareError('')
     try {
       let token = shareToken
       if (!token) {
@@ -231,13 +233,15 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           }
           onTokenGenerated?.(token, data?.id)
         } else {
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('spot_lists')
             .update({ share_token: token })
             .eq('id', listId)
-          if (error) {
+            .select()
+          if (error || !data || data.length === 0) {
             console.error('[share] failed to save share token:', error)
-            alert('Could not create a share link: ' + error.message)
+            setShareError('Could not create a share link. Try again.')
+            setTimeout(() => setShareError(''), 3000)
             return
           }
           onTokenGenerated?.(token)
@@ -331,6 +335,13 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
       {copied && createPortal(
         <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           Link Copied!
+        </div>,
+        document.body
+      )}
+
+      {shareError && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          {shareError}
         </div>,
         document.body
       )}

@@ -70,6 +70,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
   const [deleteModalClosing, setDeleteModalClosing] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [deleteError, setDeleteError] = useState('')
+  const [submitError, setSubmitError] = useState('')
 
   const closeDeleteModal = () => {
     setDeleteModalClosing(true)
@@ -111,6 +112,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
     const { data: { user: cu }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !cu) return
     setSubmitting(true)
+    setSubmitError('')
     const profileMap = await fetchProfiles([cu.id])
     const { data, error } = await supabase
       .from('spot_reviews')
@@ -126,6 +128,9 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
         const avg = all.reduce((a, r) => a + r.rating, 0) / all.length
         onStatsChange(parseFloat(avg.toFixed(1)), all.length)
       }
+    } else {
+      console.error('[ReviewsSection] handleSubmit upsert failed:', error)
+      setSubmitError('Could not save your rating. Try again.')
     }
   }
 
@@ -185,6 +190,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
               {submitting ? 'Saving…' : myReviewId ? 'Update Rating' : 'Post Rating'}
             </button>
           )}
+          {submitError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginTop: 8 }}>{submitError}</div>}
         </div>
       ) : null}
 

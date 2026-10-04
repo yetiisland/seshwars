@@ -117,6 +117,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [deleting, setDeleting] = useState(false)
   const [showHideModal, setShowHideModal] = useState(false)
   const [hideModalClosing, setHideModalClosing] = useState(false)
+  const [hideError, setHideError] = useState('')
   const [showUnhideModal, setShowUnhideModal] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [liveReport, setLiveReport] = useState(null)
@@ -616,15 +617,17 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
   const closeHideModal = () => {
     setHideModalClosing(true)
+    setHideError('')
     setTimeout(() => { setHideModalClosing(false); setShowHideModal(false) }, 180)
   }
 
   const confirmHide = async () => {
     if (!user?.id) return
-    const { error } = await supabase.from('hidden_spots').insert({ user_id: user.id, spot_id: spot.id })
-    if (error) {
-      console.error('hide spot failed:', error)
-      alert('Could not hide this spot: ' + error.message)
+    setHideError('')
+    const { data, error } = await supabase.from('hidden_spots').insert({ user_id: user.id, spot_id: spot.id }).select().single()
+    if (error || !data) {
+      console.error('[SpotDetail] confirmHide insert failed:', error)
+      setHideError('Could not hide this spot. Try again.')
       return
     }
     onBack?.()
@@ -1367,6 +1370,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               This spot won't show up in your feed anymore. You can unhide it anytime from your profile.
             </div>
+            {hideError && <div style={{ padding: '0 16px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{hideError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={confirmHide} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
                 Hide Spot

@@ -403,12 +403,20 @@ export default function App() {
           if (!profile) {
             const meta = u.user_metadata || {}
             if (meta.username) {
-              await supabase.from('profiles').upsert({
-                id: u.id,
-                username: meta.username,
-                first_name: meta.first_name || '',
-                last_name: meta.last_name || null,
-              }, { onConflict: 'id' }).catch(() => {})
+              // No UI is open at this point (this runs off an auth-state-change
+              // event, not a user action) — nowhere to show this inline, so
+              // logging is the only available surface.
+              try {
+                const { data, error } = await supabase.from('profiles').upsert({
+                  id: u.id,
+                  username: meta.username,
+                  first_name: meta.first_name || '',
+                  last_name: meta.last_name || null,
+                }, { onConflict: 'id' }).select()
+                if (error || !data || data.length === 0) console.error('[App] email-confirm profile upsert failed:', error)
+              } catch (err) {
+                console.error('[App] email-confirm profile upsert threw:', err)
+              }
             }
           }
         } else if (isNewSignup) {
@@ -426,7 +434,13 @@ export default function App() {
             const lastName = meta.family_name || parts.slice(1).join(' ') || ''
             const base = firstName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'skater'
             const uname = base + '_' + Math.floor(Math.random() * 9000 + 1000)
-            await supabase.from('profiles').insert({ id: u.id, username: uname, first_name: firstName, last_name: lastName || null }).catch(() => {})
+            // Same as above — no UI open here, logging is the only surface.
+            try {
+              const { data, error } = await supabase.from('profiles').insert({ id: u.id, username: uname, first_name: firstName, last_name: lastName || null }).select()
+              if (error || !data || data.length === 0) console.error('[App] OAuth profile insert failed:', error)
+            } catch (err) {
+              console.error('[App] OAuth profile insert threw:', err)
+            }
           }
         }
       }

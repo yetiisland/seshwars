@@ -51,6 +51,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
   const [deleteModalClosing, setDeleteModalClosing] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [deleteError, setDeleteError] = useState('')
+  const [submitError, setSubmitError] = useState('')
   const [replyingTo, setReplyingTo] = useState(null) // { id, username } | null
   const [expandedThreads, setExpandedThreads] = useState(new Set())
   const [mentionQuery, setMentionQuery] = useState(null) // null = dropdown closed
@@ -273,6 +274,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
     const content = text.trim()
     if (!content || !user || submitting) return
     setSubmitting(true)
+    setSubmitError('')
     const { data: { user: currentUser }, error: authErr } = await supabase.auth.getUser()
     if (authErr || !currentUser) { setSubmitting(false); return }
     const { data, error } = await supabase
@@ -286,6 +288,9 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
       setReplyingTo(null)
       setComments(prev => prev.some(c => c.id === data.id) ? prev : [...prev, data])
       if (myProfile) setProfiles(prev => ({ ...prev, [currentUser.id]: myProfile }))
+    } else {
+      console.error('[CommentsSection] handleSubmit insert failed:', error)
+      setSubmitError('Could not post your comment. Try again.')
     }
   }
 
@@ -378,6 +383,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
               </button>
             )}
           </div>
+          {submitError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginTop: 6 }}>{submitError}</div>}
         </div>
       ) : (
         <div

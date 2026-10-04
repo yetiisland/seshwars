@@ -155,6 +155,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [editProfileError, setEditProfileError] = useState('')
   const [saving, setSaving] = useState(false)
   const [cropFile, setCropFile] = useState(null)
+  const [avatarError, setAvatarError] = useState('')
   const avatarRef = useRef()
 
   const mySpots = spots.filter(s => s.added_by === user?.id)
@@ -195,12 +196,18 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       else {
         setMessage('Check your email to confirm your account!')
         if (data?.user) {
-          await supabase.from('profiles').upsert({
+          const { data: profileRow, error: profileErr } = await supabase.from('profiles').upsert({
             id: data.user.id,
             username: email.split('@')[0],
             first_name: firstName,
             last_name: lastName,
-          })
+          }).select()
+          if (profileErr || !profileRow || profileRow.length === 0) {
+            console.error('[ProfileView] signup profile upsert failed:', profileErr)
+            // Keep the "check your email" success message — the account was
+            // created — but also surface that the profile details didn't save.
+            setError('Your profile details could not be saved. You can update them after signing in.')
+          }
         }
       }
     }
@@ -238,6 +245,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const handleCropConfirm = async (croppedFile) => {
     setCropFile(null)
     if (!user?.id) return
+    setAvatarError('')
     let compressed
     try {
       compressed = await compressImage(croppedFile, 250, 0.8)
@@ -258,12 +266,18 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       } catch {}
     }
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(newPath)
-    await supabase.from('profiles').upsert({ id: user.id, avatar_url: publicUrl })
+    const { data, error } = await supabase.from('profiles').upsert({ id: user.id, avatar_url: publicUrl }).select()
+    if (error || !data || data.length === 0) {
+      console.error('[ProfileView] avatar upload upsert failed:', error)
+      setAvatarError('Could not save your new photo. Try again.')
+      return
+    }
     setProfileDirect({ ...storeProfile, avatar_url: publicUrl }, user)
   }
 
   const handleRemoveAvatar = async () => {
     if (!user?.id) return
+    setAvatarError('')
     const oldUrl = storeProfile?.avatar_url
     if (oldUrl) {
       try {
@@ -274,7 +288,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         }
       } catch {}
     }
-    await supabase.from('profiles').upsert({ id: user.id, avatar_url: null })
+    const { data, error } = await supabase.from('profiles').upsert({ id: user.id, avatar_url: null }).select()
+    if (error || !data || data.length === 0) {
+      console.error('[ProfileView] avatar removal upsert failed:', error)
+      setAvatarError('Could not remove your photo. Try again.')
+      return
+    }
     setProfileDirect({ ...storeProfile, avatar_url: null }, user)
   }
 
@@ -396,8 +415,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: null, error: 'Could not ignore request' } }))
       return
     }
-    const { error } = await supabase.from('friendships').delete().eq('id', rowId)
-    if (error) {
+    const { data, error } = await supabase.from('friendships').delete().eq('id', rowId).select()
+    if (error || !data || data.length === 0) {
+      console.error('[ProfileView] handleIgnoreFriendRequestNotif delete failed:', error)
       setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: null, error: 'Could not ignore request' } }))
       return
     }
@@ -592,6 +612,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               </div>
             </div>
           </div>
+          {avatarError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginTop: -8, marginBottom: 12 }}>{avatarError}</div>}
 
           {/* Stat cards — 2x2 grid, same card style/gap as the original
               Spots Added / Spots Hidden pair (#FFFFFF bg, #EAD8C8 border,
@@ -1104,6 +1125,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   )}
                 </div>
               </div>
+              {avatarError && <div style={{ textAlign: 'center', fontSize: 11, color: '#e07070', fontWeight: 700, marginTop: -4 }}>{avatarError}</div>}
               {editDraft && (
                 <>
                   <div style={{ display: 'flex', gap: 8 }}>

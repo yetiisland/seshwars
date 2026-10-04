@@ -65,7 +65,13 @@ export default function LikesRow({ spotId, user }) {
     setTimeout(() => setAnimating(false), 300)
     if (liked) {
       setLiked(false); setCount(c => Math.max(0, c - 1))
-      await supabase.from('spot_likes').delete().eq('spot_id', spotId).eq('user_id', cu.id)
+      const { data, error } = await supabase.from('spot_likes').delete().eq('spot_id', spotId).eq('user_id', cu.id).select()
+      if (error || !data || data.length === 0) {
+        console.error('[LikesRow] unlike delete failed:', error)
+        setLiked(true); setCount(c => c + 1)
+        setLikeError('Could not unlike this spot. Try again.')
+        return
+      }
     } else {
       setLiked(true); setCount(c => c + 1)
       const { data, error } = await supabase.from('spot_likes').insert({ spot_id: spotId, user_id: cu.id }).select().single()

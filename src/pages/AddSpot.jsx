@@ -211,7 +211,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     }
     const moderation_status = allSafe ? 'approved' : 'pending'
     setUploadingText('Saving...')
-    const { error } = await supabase.from('spots').insert({
+    const { data, error } = await supabase.from('spots').insert({
       title: form.title,
       slug: slugify(form.title, Math.random().toString(36).slice(2, 6)),
       type: form.type,
@@ -226,9 +226,13 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
       added_by: user?.id || 'anon',
       moderation_status,
       visibility: form.visibility,
-    })
+    }).select().single()
     setUploading(false)
-    if (error) { setError(error.message); return }
+    if (error || !data) {
+      console.error('[AddSpot] handleSubmit insert failed:', error)
+      setError(error?.message || 'Could not save this spot. Try again.')
+      return
+    }
     sessionStorage.removeItem(DRAFT_KEY)
     if (moderation_status === 'pending') {
       setSpotPending(true)
