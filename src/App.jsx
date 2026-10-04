@@ -284,7 +284,7 @@ export default function App() {
   const [distanceRadius, setDistanceRadius] = useState(_cachedDistance)
   const [sortMode, setSortMode] = useState(_cachedSortMode)
   const { spots, loading, refetch } = useSpots()
-  const { saved, refetchSaved } = useSavedSpots(user?.id)
+  const { saved } = useSavedSpots(user?.id)
   const { hiddenIds, hideSpot, unhideSpot } = useHiddenSpots(user?.id)
   const [hideTarget, setHideTarget] = useState(null)
   const [showHideConfirm, setShowHideConfirm] = useState(false)
@@ -892,7 +892,7 @@ export default function App() {
         <SaveToListModal
           spot={saveModalSpot}
           user={user}
-          onClose={() => { setSaveModalSpot(null); refetchSaved() }}
+          onClose={() => setSaveModalSpot(null)}
         />
       )}
 

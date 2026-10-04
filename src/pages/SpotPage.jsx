@@ -31,7 +31,7 @@ export default function SpotPage() {
   const spotDetailRef = useRef(null)
   const rawTab = location.state?.prevTab || sessionStorage.getItem('activeTab') || 'spots'
   const prevTab = (rawTab === 'list' || rawTab === 'map') ? 'spots' : rawTab
-  const { saved, refetchSaved } = useSavedSpots(user?.id)
+  const { saved } = useSavedSpots(user?.id)
   const { hiddenIds, unhideSpot } = useHiddenSpots(user?.id)
 
   const handleUnhide = async () => {
@@ -213,7 +213,7 @@ export default function SpotPage() {
         <SaveToListModal
           spot={saveModalSpot}
           user={user}
-          onClose={() => { setSaveModalSpot(null); refetchSaved() }}
+          onClose={() => setSaveModalSpot(null)}
         />
       )}
       {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}

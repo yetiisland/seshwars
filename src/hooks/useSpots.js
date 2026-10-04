@@ -124,6 +124,17 @@ export function useSavedSpots(userId) {
     }
   }, [userId, refetchSaved])
 
+  // This hook's single instance lives at the App root for the app's whole
+  // lifetime (unlike SavedView's list cache, which only exists while that
+  // tab is mounted), so there's no "next mount" to defer to — a save or
+  // removal from any tab, including SaveToListModal's favorites toggle,
+  // can just refetch directly and immediately.
+  useEffect(() => {
+    if (!userId) return
+    window.addEventListener('seshwars:lists-changed', refetchSaved)
+    return () => window.removeEventListener('seshwars:lists-changed', refetchSaved)
+  }, [userId, refetchSaved])
+
   return { saved, refetchSaved }
 }
 

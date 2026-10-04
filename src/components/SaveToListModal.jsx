@@ -75,8 +75,17 @@ export default function SaveToListModal({ spot, user, onClose }) {
   const toggleFavorites = async () => {
     setSaveError('')
     if (isFav) {
-      await supabase.from('saved_spots')
+      // Targeted delete — this row is known to exist (isFav is true), so an
+      // empty result means the delete was blocked, not that there was
+      // nothing to remove.
+      const { data, error } = await supabase.from('saved_spots')
         .delete().eq('user_id', user.id).eq('spot_id', spot.id).is('list_id', null)
+        .select()
+      if (error || !data || data.length === 0) {
+        console.error('[SaveToListModal] toggleFavorites delete failed:', error)
+        setSaveError('Could not remove this spot from Saved Spots. Try again.')
+        return
+      }
       setIsFav(false)
     } else {
       const { data, error } = await supabase.from('saved_spots')
@@ -89,6 +98,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
       }
       setIsFav(true)
     }
+    notifyListsChanged()
   }
 
   const toggleList = async (listId) => {
