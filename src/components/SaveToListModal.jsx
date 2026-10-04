@@ -104,11 +104,20 @@ export default function SaveToListModal({ spot, user, onClose }) {
   const toggleList = async (listId) => {
     setSaveError('')
     if (listItems.has(listId)) {
-      await supabase.from('saved_spots')
+      // Targeted delete — this row is known to exist (listItems has it), so
+      // an empty result means the delete was blocked, not that there was
+      // nothing to remove.
+      const { data, error } = await supabase.from('saved_spots')
         .delete()
         .eq('user_id', user.id)
         .eq('spot_id', spot.id)
         .eq('list_id', listId)
+        .select()
+      if (error || !data || data.length === 0) {
+        console.error('[SaveToListModal] toggleList delete failed:', error)
+        setSaveError('Could not remove this spot from the list. Try again.')
+        return
+      }
       setListItems(prev => { const s = new Set(prev); s.delete(listId); return s })
     } else {
       const { data, error } = await supabase.from('saved_spots')
