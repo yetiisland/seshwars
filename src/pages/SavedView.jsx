@@ -47,6 +47,17 @@ export function invalidateListsCache() {
   _listsUserId = null
 }
 
+// Always-on, module-scope listener — not tied to SavedView's own mount
+// state. SaveToListModal (and anything else that writes to a list) can be
+// opened from any tab, so the save/remove often happens while SavedView
+// itself is unmounted and has no listener to hear the event; without this,
+// _listsUserId never gets invalidated, and the next mount's "already fresh
+// for this user" check (below) skips refetching, serving the stale cache
+// until a hard reload resets the module state from scratch.
+if (typeof window !== 'undefined') {
+  window.addEventListener('seshwars:lists-changed', invalidateListsCache)
+}
+
 // 20 bytes of crypto.getRandomValues() output, one char each — well above the
 // RPCs' 16-character minimum, with margin.
 function generateShareToken() {
@@ -99,6 +110,11 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const [removeMemberError, setRemoveMemberError] = useState('')
   const [addMemberError, setAddMemberError] = useState('')
   const memberInputRef = useRef(null)
+  // Guards against refetching suggestions on every refocus of the add-
+  // skaters input — set once the first fetch (for this list) lands, cleared
+  // only by a fresh mount (i.e. switching lists, since CollectionView is
+  // keyed by listId).
+  const suggestionsFetchedRef = useRef(false)
 
   const fetchMembers = async () => {
     if (!listId) return
@@ -115,8 +131,16 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   useEffect(() => {
     if (!isList || !listId) return
     fetchMembers()
-    if (isOwner) fetchMemberSuggestions()
-  }, [isList, listId, isOwner])
+  }, [isList, listId])
+
+  // Suggestions are only useful once the owner opens the add-skaters input,
+  // so fetch them on first focus instead of unconditionally on mount.
+  const handleMemberInputFocus = () => {
+    setMemberInputFocused(true)
+    if (!isOwner || suggestionsFetchedRef.current) return
+    suggestionsFetchedRef.current = true
+    fetchMemberSuggestions()
+  }
 
   // Switches from suggest_friends_for_list to search_profiles once the
   // owner starts typing — same debounce as FriendsView's own search.
@@ -156,6 +180,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
     }
     setRemoveMemberError('')
     setMembers(prev => prev.filter(m => m.id !== memberId))
+    suggestionsFetchedRef.current = true
     fetchMemberSuggestions()
   }
 
@@ -472,7 +497,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                       placeholder="Add skaters to this list..."
                       value={memberQuery}
                       onChange={e => setMemberQuery(e.target.value.replace(/^@+/, ''))}
-                      onFocus={() => setMemberInputFocused(true)}
+                      onFocus={handleMemberInputFocus}
                       onBlur={() => setTimeout(() => setMemberInputFocused(false), 150)}
                       style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
                     />
@@ -527,8 +552,8 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           {spots.length === 0 ? (
             <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No spots saved here yet</div>
           ) : (
-            spots.map(spot => (
-              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} />
+            spots.map((spot, i) => (
+              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} priority={i < 3} />
             ))
           )}
           <div style={{ height: BOTTOM_PAD }} />

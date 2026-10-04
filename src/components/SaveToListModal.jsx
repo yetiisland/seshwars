@@ -124,7 +124,6 @@ export default function SaveToListModal({ spot, user, onClose }) {
       .select().single()
     if (data) {
       setLists(prev => [...prev, data])
-      notifyListsChanged()
       const { data: savedSpotRow, error: savedSpotError } = await supabase.from('saved_spots')
         .insert({ user_id: user.id, spot_id: spot.id, list_id: data.id })
         .select().single()
@@ -134,6 +133,10 @@ export default function SaveToListModal({ spot, user, onClose }) {
       } else {
         setListItems(prev => new Set([...prev, data.id]))
       }
+      // Fired after both inserts resolve, not before, so a listener that
+      // refetches on this event sees the list with its spot already linked
+      // instead of a 0-spot snapshot it would never be notified to correct.
+      notifyListsChanged()
     }
     setNewListName('')
     setCreatingList(false)

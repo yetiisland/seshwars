@@ -120,8 +120,8 @@ export default function ListView({ spots, loading, saved, onSavePress, onSpotCli
               <div className="loading">No spots found</div>
             ) : (
               <div className="spots-list-grid">
-                {sorted.map(spot => (
-                  <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} onHidePress={onHidePress} />
+                {sorted.map((spot, i) => (
+                  <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} onHidePress={onHidePress} priority={i < 3} />
                 ))}
               </div>
             )}

@@ -20,7 +20,7 @@ function bustStyle(rating) {
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344', borderRadius: 6 }
 }
 
-export default function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress, onUnhidePress }) {
+export default function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress, onUnhidePress, priority = false }) {
   const handleSave = (e) => {
     e.stopPropagation()
     onSavePress?.(spot)
@@ -48,7 +48,15 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
         style={spot.photos?.[0] ? undefined : { aspectRatio: 'auto', height: 84, background: isShop ? '#2e3344' : '#F0E8DE' }}
       >
         {spot.photos?.[0] && (
-          <img src={transformImageUrl(spot.photos[0], 400)} alt={spot.title} width="800" height="450" loading="lazy" decoding="async" />
+          <img
+            src={transformImageUrl(spot.photos[0], 400)}
+            alt={spot.title}
+            width="800"
+            height="450"
+            loading={priority ? 'eager' : 'lazy'}
+            fetchpriority={priority ? 'high' : undefined}
+            decoding="async"
+          />
         )}
         <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <div className="spot-badge">{displayType}</div>

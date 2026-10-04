@@ -494,6 +494,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
                 onSavePress={onSavePress}
                 onClick={onSpotClick}
                 onHidePress={onHidePress}
+                priority
               />
             </div>
           ) : (
@@ -505,6 +506,7 @@ export default function MapView({ spots, saved, onSavePress, onSpotClick, onAddS
                 onSavePress={onSavePress}
                 onClick={onSpotClick}
                 onHidePress={onHidePress}
+                priority
               />
             </div>
           )

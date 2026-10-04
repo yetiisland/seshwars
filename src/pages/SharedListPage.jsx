@@ -216,8 +216,8 @@ export default function SharedListPage() {
               No spots in this list yet.
             </div>
           ) : (
-            spots.map(spot => (
-              <SpotCard key={spot.id} spot={spot} saved={false} onSavePress={() => {}} onClick={handleSpotClick} />
+            spots.map((spot, i) => (
+              <SpotCard key={spot.id} spot={spot} saved={false} onSavePress={() => {}} onClick={handleSpotClick} priority={i < 3} />
             ))
           )}
           <div style={{ height: BOTTOM_PAD }} />

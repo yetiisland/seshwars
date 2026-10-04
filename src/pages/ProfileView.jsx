@@ -930,7 +930,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             {hiddenSpots.length === 0 ? (
               <div style={{ padding: '40px 24px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No hidden spots.</div>
             ) : (
-              hiddenSpots.map(spot => (
+              hiddenSpots.map((spot, i) => (
                 <SpotCard
                   key={spot.id}
                   spot={spot}
@@ -938,6 +938,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                   onSavePress={() => {}}
                   onClick={onSpotClick}
                   onUnhidePress={(s) => { setUnhideTarget(s); setShowUnhideConfirm(true) }}
+                  priority={i < 3}
                 />
               ))
             )}
@@ -1001,7 +1002,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 No spots added yet
               </div>
             ) : (
-              mySpots.map(spot => (
+              mySpots.map((spot, i) => (
                 <SpotCard
                   key={spot.id}
                   spot={spot}
@@ -1011,6 +1012,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                     _mySpotsScrollTop = mySpotsScrollRef.current?.scrollTop || 0
                     onSpotClick?.(s)
                   }}
+                  priority={i < 3}
                 />
               ))
             )}
