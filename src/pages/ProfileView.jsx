@@ -16,6 +16,7 @@ import ImageCropModal from '../components/ImageCropModal'
 import FriendsView from '../components/FriendsView'
 import AddFriendButton from '../components/AddFriendButton'
 import { ListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
+import { transformImageUrl } from '../utils/imageUrl'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -1261,6 +1262,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                     : n.type === 'comment_mention' ? `${n.actorUsername || 'Someone'} tagged you in a comment`
                     : n.type === 'comment_reply' ? `${n.actorUsername || 'Someone'} replied to your comment`
                     : n.type === 'list_invite' ? `${n.actorUsername || 'Someone'} added you to a list`
+                    : n.type === 'spot_share' ? `${n.actorUsername || 'Someone'} shared ${n.spotTitle || 'a spot'} with you`
                     : n.type === 'admin_update' ? 'Updated Your Spot'
                     : n.type === 'rating' ? 'Rated Your Spot'
                     : n.type === 'comment' ? 'Commented On Your Spot'
@@ -1284,22 +1286,32 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                         display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
                       }}
                     >
-                      {/* Avatar */}
-                      <div style={{ flexShrink: 0, width: 38, height: 38, borderRadius: '50%', background: '#ECEDF2', border: '1px solid #C8CAD4', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {n.type === 'admin_update' ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
-                            <path d="M2 17l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
-                            <path d="M2 12l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
-                          </svg>
-                        ) : n.actorAvatar ? (
-                          <img src={n.actorAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <span style={{ fontSize: 15, fontWeight: 900, color: '#6a6c7a' }}>
-                            {n.actorUsername ? n.actorUsername[0].toUpperCase() : '?'}
-                          </span>
-                        )}
-                      </div>
+                      {/* Avatar — spot_share shows the spot's own cover photo
+                          (card-image placeholder treatment) instead of the
+                          actor's avatar */}
+                      {n.type === 'spot_share' ? (
+                        <div style={{ flexShrink: 0, width: 38, height: 38, borderRadius: 6, background: '#F0E8DE', border: '1px solid #C8CAD4', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {n.spotPhoto && (
+                            <img src={transformImageUrl(n.spotPhoto, 80)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ flexShrink: 0, width: 38, height: 38, borderRadius: '50%', background: '#ECEDF2', border: '1px solid #C8CAD4', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {n.type === 'admin_update' ? (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                              <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
+                              <path d="M2 17l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
+                              <path d="M2 12l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
+                            </svg>
+                          ) : n.actorAvatar ? (
+                            <img src={n.actorAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <span style={{ fontSize: 15, fontWeight: 900, color: '#6a6c7a' }}>
+                              {n.actorUsername ? n.actorUsername[0].toUpperCase() : '?'}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Text column */}
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1307,8 +1319,11 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{n.actorUsername}</div>
                         )}
                         <div style={{ fontSize: 11, fontWeight: n.read_at ? 600 : 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{actionText}</div>
-                        {n.spotTitle && (
+                        {n.spotTitle && n.type !== 'spot_share' && (
                           <div style={{ fontSize: 11, color: '#d4785a', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.spotTitle}</div>
+                        )}
+                        {n.type === 'spot_share' && n.message && (
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.4, overflowWrap: 'break-word' }}>{n.message}</div>
                         )}
                         <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>{relativeTime(n.created_at)}</div>
                       </div>

@@ -48,7 +48,7 @@ export function useNotifications(userId) {
           ? supabase.from('profiles').select('id, username, avatar_url, first_name').in('id', actorIds)
           : { data: [] },
         spotIds.length > 0
-          ? supabase.from('spots').select('id, title, slug').in('id', spotIds)
+          ? supabase.from('spots').select('id, title, slug, photos').in('id', spotIds)
           : { data: [] },
       ])
       const profileMap = {}
@@ -73,6 +73,7 @@ export function useNotifications(userId) {
           actorAvatar,
           spotTitle: spot?.title || null,
           spotSlug: spot?.slug || null,
+          spotPhoto: spot?.photos?.[0] || null,
         }
       })
 

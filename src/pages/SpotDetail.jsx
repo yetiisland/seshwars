@@ -3,13 +3,14 @@ import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
-import { ShareIcon, BookmarkIcon, PencilIcon } from '../components/Icons'
+import { ShareIcon, BookmarkIcon, PencilIcon, SendToFriendsIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import SpotFormFields from '../components/SpotFormFields'
 import ClipsSection from '../components/ClipsSection'
 import ReviewsSection from '../components/ReviewsSection'
 import ReportSection from '../components/ReportSection'
 import CommentsSection from '../components/CommentsSection'
+import SendToFriendsSheet from '../components/SendToFriendsSheet'
 import { slugify } from '../utils/slugify'
 import { compressImage } from '../utils/compressImage'
 import { checkImageModeration } from '../utils/moderation'
@@ -55,6 +56,8 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [dragX, setDragX] = useState(0)
   const [transitioning, setTransitioning] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
+  const [showSendSheet, setShowSendSheet] = useState(false)
+  const [sendToast, setSendToast] = useState('')
   const touchStartX = useRef(null)
   const touchStartY = useRef(null)
   const dragging = useRef(false)
@@ -615,6 +618,12 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     }
   }
 
+  const handleSpotSent = (message) => {
+    setShowSendSheet(false)
+    setSendToast(message)
+    setTimeout(() => setSendToast(''), 2500)
+  }
+
   const closeHideModal = () => {
     setHideModalClosing(true)
     setHideError('')
@@ -791,6 +800,12 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 2 }}
               >
                 <ShareIcon color="#d4785a" />
+              </div>
+              <div
+                onClick={() => { if (!user) { onGoProfile?.(); return } setShowSendSheet(true) }}
+                style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 2 }}
+              >
+                <SendToFriendsIcon color="#d4785a" />
               </div>
             </div>
           </div>
@@ -1390,6 +1405,20 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       {shareCopied && createPortal(
         <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           Link Copied!
+        </div>,
+        document.body
+      )}
+      {showSendSheet && (
+        <SendToFriendsSheet
+          spot={spot}
+          onClose={() => setShowSendSheet(false)}
+          onSent={handleSpotSent}
+          onGoProfile={onGoProfile}
+        />
+      )}
+      {sendToast && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, maxWidth: 'calc(100vw - 48px)', textAlign: 'center', pointerEvents: 'none' }}>
+          {sendToast}
         </div>,
         document.body
       )}

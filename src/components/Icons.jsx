@@ -251,6 +251,15 @@ export function ShareIcon({ color = '#6a6c7a' }) {
   )
 }
 
+export function SendToFriendsIcon({ color = '#d4785a' }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M12.5 1.5L1 6L5.5 8L7.5 12.5L12.5 1.5Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
+      <path d="M5.5 8L12.5 1.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function CloseIcon({ color = '#fff' }) {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
