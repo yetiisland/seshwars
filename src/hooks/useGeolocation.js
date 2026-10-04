@@ -11,11 +11,14 @@ export function haversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 // permissionState: 'granted' | 'denied' | 'prompt' | 'unsupported'
-// 'unsupported' covers both "no navigator.geolocation at all" and "the
-// Permissions API (or its 'geolocation' name) isn't queryable here" — in
-// the latter case this falls back to the old unconditional watchPosition
-// call so platforms without Permissions API support (older browsers, and
-// possibly the Capacitor WebView — untested) keep working exactly as before.
+// Location is requested unconditionally on mount (the OS/browser handles the
+// native permission prompt correctly on its own) — this hook does not defer
+// the request to an explicit user action. 'unsupported' covers both "no
+// navigator.geolocation at all" and "the Permissions API (or its
+// 'geolocation' name) isn't queryable here" — in the latter case this falls
+// back to the old unconditional watchPosition call so platforms without
+// Permissions API support (older browsers, and possibly the Capacitor
+// WebView — untested) keep working exactly as before.
 export function useGeolocation() {
   const [location, setLocation] = useState(null)
   const [error, setError] = useState(null)
@@ -55,10 +58,9 @@ export function useGeolocation() {
     }
   }, [])
 
-  // Explicit trigger for the 'prompt' case — call this from a real user
-  // action (e.g. opening the map), not on mount. Also the fallback entry
-  // point wherever permission state can't be read in advance. No-ops if
-  // permission is already known to be denied, or if already watching.
+  // Still exposed as a no-op-safe manual trigger for any other caller that
+  // wants to re-request after a denial is lifted elsewhere, but is no longer
+  // needed to kick off the initial request — that now happens on mount below.
   const requestLocation = useCallback(() => {
     if (permissionStateRef.current === 'denied') return
     startWatching()
@@ -78,7 +80,7 @@ export function useGeolocation() {
       if (cancelled) return
       permissionStatus = status
       updatePermissionState(status.state)
-      if (status.state === 'granted') startWatching()
+      if (status.state !== 'denied') startWatching()
       handleChange = () => {
         updatePermissionState(status.state)
         if (status.state === 'granted') startWatching()

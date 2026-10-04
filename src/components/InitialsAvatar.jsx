@@ -31,7 +31,11 @@ export default function InitialsAvatar({ profile, user, size = 32 }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexShrink: 0,
     }}>
-      <span style={{ fontSize: Math.max(7, Math.round(size * 0.38)), fontWeight: 900, color: '#fff', fontFamily: 'Barlow, sans-serif', lineHeight: 1 }}>{text}</span>
+      <span style={{
+        fontSize: Math.max(7, Math.round(size * 0.38)), fontWeight: 900, color: '#fff',
+        fontFamily: 'Barlow, sans-serif', lineHeight: 1, display: 'inline-block',
+        transform: 'translateY(0.04em)',
+      }}>{text}</span>
     </div>
   )
 }

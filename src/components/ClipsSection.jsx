@@ -232,16 +232,16 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
   }
 
   const handleDeleteClip = async () => {
-    setClipDeleteError('')
+    closeClipDeleteModal()
     const { data, error } = await supabase.from('spot_clips').delete().eq('id', activeClip.id).select()
     if (error || !data || data.length === 0) {
       console.error('[ClipsSection] handleDeleteClip failed:', error)
       setClipDeleteError('Could not delete this clip. Try again.')
       return
     }
+    setClipDeleteError('')
     const newClips = clips.filter(c => c.id !== activeClip.id)
     setClips(newClips)
-    closeClipDeleteModal()
     if (newClips.length === 0) {
       closeLightbox()
     } else {
@@ -492,7 +492,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
           {/* Delete button (own clips only) */}
           {user?.id === activeClip.user_id && (
             <div
-              onClick={e => { e.stopPropagation(); setShowClipDeleteModal(true) }}
+              onClick={e => { e.stopPropagation(); setClipDeleteError(''); setShowClipDeleteModal(true) }}
               style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 20, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000 }}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 5H13M6 5V3H10V5M5 5V13H11V5H5Z" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -618,6 +618,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
               </div>
             )}
             {activeClip.title && <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 5 }}>{activeClip.title}</div>}
+            {clipDeleteError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 5 }}>{clipDeleteError}</div>}
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>
                 @{activeClip.profile?.username || activeClip.profile?.first_name || 'Anonymous'}
@@ -637,7 +638,6 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Clip</div>
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Delete this clip? This cannot be undone.</div>
-            {clipDeleteError && <div style={{ padding: '0 16px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{clipDeleteError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={handleDeleteClip} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Delete</button>
               <button onClick={closeClipDeleteModal} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>

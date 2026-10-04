@@ -296,15 +296,16 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
 
   const handleDelete = async () => {
     if (!pendingDeleteId) return
-    setDeleteError('')
-    const { data, error } = await supabase.from('spot_comments').delete().eq('id', pendingDeleteId).select()
+    const deleteId = pendingDeleteId
+    closeDeleteModal()
+    const { data, error } = await supabase.from('spot_comments').delete().eq('id', deleteId).select()
     if (error || !data || data.length === 0) {
       console.error('[CommentsSection] handleDelete failed:', error)
       setDeleteError('Could not delete this comment. Try again.')
       return
     }
-    setComments(prev => prev.filter(c => c.id !== pendingDeleteId))
-    closeDeleteModal()
+    setDeleteError('')
+    setComments(prev => prev.filter(c => c.id !== deleteId))
   }
 
   const topLevelComments = comments.filter(c => !c.parent_id)
@@ -320,6 +321,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
     <div>
       <div className="divider" />
       <div className="section-label">Comments ({comments.length})</div>
+      {deleteError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 10 }}>{deleteError}</div>}
 
       {/* Input row — exactly one rounded box (the textarea itself carries
           the white fill + border now); the wrapper below is layout-only */}
@@ -423,7 +425,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                       {isOwn && (
                         <div style={{ marginLeft: 'auto' }}>
                           <div
-                            onClick={() => { setPendingDeleteId(comment.id); setShowDeleteModal(true) }}
+                            onClick={() => { setDeleteError(''); setPendingDeleteId(comment.id); setShowDeleteModal(true) }}
                             style={{ minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 6 }}
                           >
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -470,7 +472,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                                 {isOwnReply && (
                                   <div style={{ marginLeft: 'auto' }}>
                                     <div
-                                      onClick={() => { setPendingDeleteId(reply.id); setShowDeleteModal(true) }}
+                                      onClick={() => { setDeleteError(''); setPendingDeleteId(reply.id); setShowDeleteModal(true) }}
                                       style={{ minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 6 }}
                                     >
                                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -506,7 +508,6 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Comment</div>
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Delete this comment? This cannot be undone.</div>
-            {deleteError && <div style={{ padding: '0 16px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{deleteError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={handleDelete} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Delete</button>
               <button onClick={closeDeleteModal} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>

@@ -147,14 +147,14 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const confirmRemoveMember = async () => {
     if (!pendingRemoveMember) return
     const memberId = pendingRemoveMember.id
-    setRemoveMemberError('')
+    setPendingRemoveMember(null)
     const { data, error } = await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', memberId).select()
     if (error || !data || data.length === 0) {
       console.error('[SavedView] confirmRemoveMember failed:', error)
       setRemoveMemberError('Could not remove this member. Try again.')
       return
     }
-    setPendingRemoveMember(null)
+    setRemoveMemberError('')
     setMembers(prev => prev.filter(m => m.id !== memberId))
     fetchMemberSuggestions()
   }
@@ -183,7 +183,6 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
 
   const handleDelete = async () => {
     setDeleting(true)
-    setDeleteError('')
     // saved_spots here deletes every row for this list — a list with no
     // spots in it legitimately deletes zero rows, so only a real `error`
     // means failure. spot_lists below deletes one specific known-to-exist
@@ -192,14 +191,18 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
     if (savedSpotsError) {
       console.error('[SavedView] handleDelete: saved_spots delete failed:', savedSpotsError)
       setDeleting(false)
+      closeDeleteConfirm()
       setDeleteError('Could not delete this list. Try again.')
+      setTimeout(() => setDeleteError(''), 3000)
       return
     }
     const { data, error } = await supabase.from('spot_lists').delete().eq('id', listId).select()
     if (error || !data || data.length === 0) {
       console.error('[SavedView] handleDelete: spot_lists delete failed:', error)
       setDeleting(false)
+      closeDeleteConfirm()
       setDeleteError('Could not delete this list. Try again.')
+      setTimeout(() => setDeleteError(''), 3000)
       return
     }
     _listsFetchSeq++ // invalidate any in-flight fetchLists() — see comment at the declaration
@@ -312,7 +315,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
             {isList && isOwner && (
               <div
-                onClick={() => setShowDeleteConfirm(true)}
+                onClick={() => { setDeleteError(''); setShowDeleteConfirm(true) }}
                 style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
               >
                 <svg width="14" height="16" viewBox="0 0 14 16" fill="none">
@@ -346,6 +349,13 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
         document.body
       )}
 
+      {deleteError && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          {deleteError}
+        </div>,
+        document.body
+      )}
+
       {/* Delete confirmation popup */}
       {(showDeleteConfirm || deleteClosing) && createPortal(
         <div className="modal-overlay" onClick={closeDeleteConfirm}>
@@ -357,7 +367,6 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               Delete "{title}"? This cannot be undone.
             </div>
-            {deleteError && <div style={{ padding: '0 16px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{deleteError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button
                 onClick={handleDelete}
@@ -385,6 +394,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
             <div className="modal-handle" />
             <div className="modal-title" style={{ padding: '0 20px' }}>Members</div>
+            {removeMemberError && <div style={{ padding: '0 20px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{removeMemberError}</div>}
             {members.map(m => (
               <div key={m.id} className="modal-row">
                 <MemberAvatar profile={m} size={38} />
@@ -395,7 +405,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>@{m.username}</div>
                 </div>
                 {isOwner && (
-                  <IconBox onClick={() => setPendingRemoveMember({ id: m.id, username: m.username })}>
+                  <IconBox onClick={() => { setRemoveMemberError(''); setPendingRemoveMember({ id: m.id, username: m.username }) }}>
                     <CloseIcon color="#d4785a" />
                   </IconBox>
                 )}
@@ -410,15 +420,14 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           (modal-overlay/modal-sheet, solid-salmon action + outline cancel)
           copied verbatim from ReviewsSection.jsx's "Delete Rating" modal. */}
       {pendingRemoveMember && createPortal(
-        <div className="modal-overlay" onClick={() => { setPendingRemoveMember(null); setRemoveMemberError('') }}>
+        <div className="modal-overlay" onClick={() => setPendingRemoveMember(null)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Member</div>
             <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Remove @{pendingRemoveMember.username} from this list?</div>
-            {removeMemberError && <div style={{ padding: '0 16px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{removeMemberError}</div>}
             <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={confirmRemoveMember} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Remove</button>
-              <button onClick={() => { setPendingRemoveMember(null); setRemoveMemberError('') }} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+              <button onClick={() => setPendingRemoveMember(null)} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
             </div>
           </div>
         </div>,
@@ -499,7 +508,10 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
               {/* B) Shared-with summary — overlapping avatars + count,
                   tappable by anyone who can see the list (owner or member) */}
               {members.length > 0 && (
-                <div onClick={() => setShowMembersSheet(true)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <div onClick={() => { setRemoveMemberError(''); setShowMembersSheet(true) }} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
+                    Shared with:
+                  </span>
                   <div style={{ display: 'flex' }}>
                     {members.map((m, i) => (
                       <div key={m.id} style={{ marginLeft: i === 0 ? 0 : -12, zIndex: members.length - i }}>
@@ -507,9 +519,6 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                       </div>
                     ))}
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
-                    Shared with {members.length} skater{members.length !== 1 ? 's' : ''}
-                  </span>
                 </div>
               )}
             </div>
@@ -670,6 +679,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     return (
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <CollectionView
+          key={openCollection.type === 'favorites' ? 'favorites' : openCollection.id}
           title={openCollection.name}
           isList={openCollection.type === 'list'}
           isFavorites={openCollection.type === 'favorites'}
