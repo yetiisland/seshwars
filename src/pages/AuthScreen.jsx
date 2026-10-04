@@ -93,10 +93,17 @@ export default function AuthScreen({ onClose }) {
         first_name: firstName.trim(),
         last_name: lastName.trim() || null,
       }
-      const { error: profileErr } = await supabase
+      const { data: profileRow, error: profileErr } = await supabase
         .from('profiles')
         .upsert(profileValues, { onConflict: 'id' })
-      if (!profileErr) setProfileDirect(profileValues, data.user)
+        .select()
+        .single()
+      if (profileErr || !profileRow) {
+        console.error('[AuthScreen] signup profile upsert failed:', profileErr)
+        setError('Your profile could not be created. Try again.')
+      } else {
+        setProfileDirect(profileRow, data.user)
+      }
     }
     // Component unmounts when session fires — no setLoading(false) needed
   }
