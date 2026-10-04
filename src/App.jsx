@@ -37,6 +37,31 @@ function normalizeTab(t) {
   return 'spots'
 }
 
+// Shared by the email-confirm redirect and fresh-email-signup auth-state-
+// change paths: both need "does a profile row exist yet, and if not, create
+// one from the signup metadata" — the signup path additionally covers the
+// case where AuthScreen's own upsert (same table, same metadata) failed,
+// since the component unmounts the moment the session fires, before any
+// error it hit could ever have been shown. No UI is open here either way —
+// logging is the only available surface.
+async function ensureProfileFromSignupMeta(u) {
+  const { data: profile } = await supabase.from('profiles').select('id').eq('id', u.id).maybeSingle()
+  if (profile) return
+  const meta = u.user_metadata || {}
+  if (!meta.username) return
+  try {
+    const { data, error } = await supabase.from('profiles').upsert({
+      id: u.id,
+      username: meta.username,
+      first_name: meta.first_name || '',
+      last_name: meta.last_name || null,
+    }, { onConflict: 'id' }).select()
+    if (error || !data || data.length === 0) console.error('[App] signup profile upsert fallback failed:', error)
+  } catch (err) {
+    console.error('[App] signup profile upsert fallback threw:', err)
+  }
+}
+
 const IS_STANDALONE = window.navigator.standalone === true ||
   window.matchMedia('(display-mode: standalone)').matches
 
@@ -399,31 +424,16 @@ export default function App() {
         if (isConfirmRedirect) {
           window.history.replaceState(null, '', window.location.pathname + '#/')
           showToast('Email confirmed — welcome to Seshwars! 🤙')
-          const { data: profile } = await supabase.from('profiles').select('id').eq('id', u.id).maybeSingle()
-          if (!profile) {
-            const meta = u.user_metadata || {}
-            if (meta.username) {
-              // No UI is open at this point (this runs off an auth-state-change
-              // event, not a user action) — nowhere to show this inline, so
-              // logging is the only available surface.
-              try {
-                const { data, error } = await supabase.from('profiles').upsert({
-                  id: u.id,
-                  username: meta.username,
-                  first_name: meta.first_name || '',
-                  last_name: meta.last_name || null,
-                }, { onConflict: 'id' }).select()
-                if (error || !data || data.length === 0) console.error('[App] email-confirm profile upsert failed:', error)
-              } catch (err) {
-                console.error('[App] email-confirm profile upsert threw:', err)
-              }
-            }
-          }
+          await ensureProfileFromSignupMeta(u)
         } else if (isNewSignup) {
           sessionStorage.removeItem('seshwars:newSignup')
           setTab('spots')
           sessionStorage.setItem('activeTab', 'spots')
-          // Profile is created by AuthScreen's own upsert — no creation here to avoid race
+          // AuthScreen's own upsert normally already created the profile —
+          // this only runs the same fallback as the confirm-redirect path
+          // above when a profile row still doesn't exist, i.e. that upsert
+          // silently failed.
+          await ensureProfileFromSignupMeta(u)
         } else if (provider && provider !== 'email') {
           const { data: profile } = await supabase.from('profiles').select('id').eq('id', u.id).maybeSingle()
           if (!profile) {
