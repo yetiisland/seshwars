@@ -14,6 +14,7 @@ import SupportPage from './SupportPage'
 import DeleteAccountPage from './DeleteAccountPage'
 import ImageCropModal from '../components/ImageCropModal'
 import FriendsView from '../components/FriendsView'
+import TrickListPage from './TrickListPage'
 import AddFriendButton from '../components/AddFriendButton'
 import { ListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
 import { transformImageUrl } from '../utils/imageUrl'
@@ -21,6 +22,25 @@ import { transformImageUrl } from '../utils/imageUrl'
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
 let _mySpotsScrollTop = 0
+
+// Module-level trick-count cache — same event-refresh approach as
+// SavedView.jsx's list-count cache. A trick can be added/toggled/deleted
+// from a spot's own page (a separate route, not nested under ProfileView),
+// so a plain mount-time fetch would go stale the moment the user navigates
+// away and back without this component hearing about it directly.
+// invalidateTrickCounts() is wired to an always-on module-scope listener
+// below, so the next mount sees fresh data regardless of whether
+// ProfileView happened to be mounted when the change was made.
+let _cachedTrickCounts = { landed: 0, total: 0 }
+let _trickCountsUserId = null
+
+export function invalidateTrickCounts() {
+  _trickCountsUserId = null
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('seshwars:tricks-changed', invalidateTrickCounts)
+}
 
 function relativeTime(iso) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -60,6 +80,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showMySpots, setShowMySpots] = useState(() => sessionStorage.getItem('mySpots:open') === '1')
   const [showFriendsScreen, setShowFriendsScreen] = useState(false)
   const [showTrickList, setShowTrickList] = useState(false)
+  const [trickCounts, setTrickCounts] = useState(() => _trickCountsUserId === user?.id ? _cachedTrickCounts : { landed: 0, total: 0 })
   const [friendCount, setFriendCount] = useState(0)
   const [friendReqState, setFriendReqState] = useState({})
   const [showNotifications, setShowNotifications] = useState(false)
@@ -114,6 +135,32 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
   useEffect(() => {
     fetchFriendCount()
+  }, [user?.id])
+
+  const fetchTrickCounts = async () => {
+    if (!user?.id) return
+    const { data, error } = await supabase.from('user_tricks').select('landed').eq('user_id', user.id)
+    if (error || !data) return
+    const counts = { landed: data.filter(t => t.landed).length, total: data.length }
+    _cachedTrickCounts = counts
+    _trickCountsUserId = user.id
+    setTrickCounts(counts)
+  }
+
+  useEffect(() => {
+    if (!user?.id) return
+    if (_trickCountsUserId === user.id) return
+    fetchTrickCounts()
+  }, [user?.id])
+
+  // Live refresh while mounted — mirrors SavedView.jsx's dual-listener
+  // approach: the module-scope listener above keeps the cache correct for
+  // the next mount, this one updates the number on screen immediately if
+  // ProfileView happens to already be open when a trick changes.
+  useEffect(() => {
+    const handler = () => fetchTrickCounts()
+    window.addEventListener('seshwars:tricks-changed', handler)
+    return () => window.removeEventListener('seshwars:tricks-changed', handler)
   }, [user?.id])
 
   // Any AddFriendButton anywhere (search results, Skaters Near You, a spot's
@@ -661,7 +708,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <ListIcon color="#d4785a" size={18} filled />
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>0</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{trickCounts.landed}/{trickCounts.total}</div>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Trick List</div>
                 </div>
               </div>
@@ -1054,8 +1101,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         document.body
       )}
 
-      {/* Trick List placeholder screen (Section B) — tricks aren't built
-          yet, so this is a back arrow and nothing else. */}
+      {/* Trick List screen (Section B) — same shell as My Spots/Friends;
+          TrickListPage supplies the body. */}
       {showTrickList && createPortal(
         <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
           <div style={{
@@ -1072,6 +1119,14 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               Trick List
             </div>
             <div style={{ width: 36 }} />
+          </div>
+          <div className="scroll-area">
+            <TrickListPage
+              user={user}
+              spots={spots}
+              onSpotClick={onSpotClick}
+            />
+            <div style={{ height: BOTTOM_PAD }} />
           </div>
           {onTabChange && <TabBar active="profile" onChange={t => { setShowTrickList(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
         </div>,
