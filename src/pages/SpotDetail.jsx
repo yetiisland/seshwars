@@ -661,9 +661,19 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <img src={transformImageUrl(photo, 1000)} alt={spot.title} width="800" height="600" loading="eager" fetchpriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
               </div>
             ))
-          ) : null /* No icon, no rectangle grid — same placeholder treatment
-                       as SpotCard's no-photo state: just the background
-                       color already set on this hero container above. */}
+          ) : (
+            // Recovered verbatim from SpotCard.jsx as it existed before
+            // commit 190662e removed it (git show 190662e^:src/components/
+            // SpotCard.jsx) — the original stacked-bars no-photo placeholder,
+            // category-tinted the same way.
+            <div style={{ width: '100%', height: '100%', background: spot.type === 'Skate Shop' ? '#2e3344' : '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="60" height="34" viewBox="0 0 60 34" fill="none">
+                <rect x="2" y="22" width="56" height="8" rx="1.5" fill={spot.type === 'Skate Shop' ? '#3a3d50' : '#ddd0bc'} />
+                <rect x="6" y="12" width="48" height="8" rx="1.5" fill={spot.type === 'Skate Shop' ? '#434658' : '#e0cebc'} />
+                <rect x="10" y="4" width="40" height="7" rx="1.5" fill={spot.type === 'Skate Shop' ? '#4c5060' : '#e8d8c8'} />
+              </svg>
+            </div>
+          )}
 
           {/* Gradient overlay */}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.28) 0%, transparent 40%, rgba(20,28,20,0.85) 100%)', pointerEvents: 'none' }} />
