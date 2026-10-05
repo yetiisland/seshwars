@@ -10,6 +10,7 @@ import SpotFormFields from '../components/SpotFormFields'
 import { compressImage } from '../utils/compressImage'
 import { checkPhotosSafe } from '../utils/moderation'
 import TermsOfService from './TermsOfService'
+import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const DRAFT_KEY = 'seshwars_spot_draft'
@@ -21,23 +22,11 @@ const VISIBILITY_OPTIONS = [
   { value: 'private', label: 'Private', desc: 'Only you can see it' },
 ]
 
-async function reverseGeocode(lng, lat) {
-  try {
-    const res = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&limit=1`
-    )
-    const data = await res.json()
-    return data.features?.[0]?.place_name || ''
-  } catch {
-    return ''
-  }
-}
-
 export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [form, setForm] = useState({
-    title: '', type: '', features: [], bust_rating: '', lighting: '', description: '', address: '',
-    latitude: null, longitude: null, visibility: 'public',
+    title: '', type: '', features: [], bust_rating: '', lighting: '', description: '', visibility: 'public',
   })
+  const addr = useAddressConfirmation()
   const [photos, setPhotos] = useState([])
   const [uploading, setUploading] = useState(false)
   const [uploadingText, setUploadingText] = useState('Compressing...')
@@ -48,13 +37,6 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [showTos, setShowTos] = useState(false)
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
   const [photoUploadProgress, setPhotoUploadProgress] = useState({ current: 0, total: 0 })
-
-  const [geoQuery, setGeoQuery] = useState('')
-  const [geoResults, setGeoResults] = useState([])
-  const [showDropdown, setShowDropdown] = useState(false)
-  const geocodeTimer = useRef(null)
-  const geoInputFocused = useRef(false)
-  const skipGeoRef = useRef(false)
 
   const [mapCenter, setMapCenter] = useState({ longitude: -104.9903, latitude: 39.7392, zoom: 13 })
   const [geoPermissionDenied, setGeoPermissionDenied] = useState(false)
@@ -67,39 +49,37 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     try {
       const raw = sessionStorage.getItem(DRAFT_KEY)
       if (raw) {
-        const { form: f, photos: p, geoQuery: gq, mapCenter: mc } = JSON.parse(raw)
-        if (f) {
-          setForm(prev => ({ ...prev, ...f }))
-          if (f.latitude) draftRestoredRef.current = true
-        }
+        const { form: f, photos: p, mapCenter: mc, address, latitude, longitude, confirmed } = JSON.parse(raw)
+        if (f) setForm(prev => ({ ...prev, ...f }))
         if (p?.length) setPhotos(p)
-        if (gq) { skipGeoRef.current = true; setGeoQuery(gq) }
         if (mc) setMapCenter(mc)
+        if (address || latitude != null) {
+          addr.hydrate({ address, latitude, longitude, confirmed })
+          if (confirmed && latitude != null) draftRestoredRef.current = true
+        }
       }
     } catch {}
+    // addr is stable across renders (its own methods are memoized), and this
+    // must only run once on mount — including it would make eslint's
+    // exhaustive-deps happy at the cost of re-running on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-locate on mount — skipped if draft already has coordinates. Opening
-  // this screen is itself the deliberate user action that needs location
-  // (picking where to drop a pin), so it's fine to request immediately here
-  // rather than waiting for a further explicit control — but only when
-  // permission isn't already known to be denied, and only after checking
-  // because repeating a known-denied request is pointless and can't prompt
-  // again anyway.
+  // Auto-locate on mount — skipped if draft already had a confirmed pin.
+  // Opening this screen is itself the deliberate user action that needs
+  // location (picking where to drop a pin), so it's fine to request
+  // immediately here rather than waiting for a further explicit control —
+  // but only when permission isn't already known to be denied, and only
+  // after checking because repeating a known-denied request is pointless
+  // and can't prompt again anyway.
   useEffect(() => {
     if (!navigator.geolocation) return
     const doLocate = () => {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
+      navigator.geolocation.getCurrentPosition((pos) => {
         if (draftRestoredRef.current) return
         const { latitude: lat, longitude: lng } = pos.coords
-        setForm(p => ({ ...p, latitude: lat, longitude: lng }))
         setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
-        const address = await reverseGeocode(lng, lat)
-        if (address) {
-          skipGeoRef.current = true
-          setGeoQuery(address)
-          setForm(p => ({ ...p, address }))
-        }
+        addr.handlePinMove(lat, lng)
       }, err => {
         console.error('[AddSpot] getCurrentPosition error:', err.code, err.message)
         if (err.code === err.PERMISSION_DENIED) setGeoPermissionDenied(true)
@@ -113,51 +93,33 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
       doLocate()
     }).catch(doLocate)
     return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Geocoding search debounce
-  useEffect(() => {
-    if (skipGeoRef.current) { skipGeoRef.current = false; return }
-    if (!geoQuery.trim()) { setGeoResults([]); setShowDropdown(false); return }
-    clearTimeout(geocodeTimer.current)
-    geocodeTimer.current = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(geoQuery)}.json?access_token=${MAPBOX_TOKEN}&limit=5`
-        )
-        const data = await res.json()
-        setGeoResults(data.features || [])
-        if (geoInputFocused.current) setShowDropdown(true)
-      } catch {
-        setGeoResults([])
-      }
-    }, 300)
-    return () => clearTimeout(geocodeTimer.current)
-  }, [geoQuery])
 
   // Persist draft to sessionStorage, debounced 300 ms; photos are already-uploaded URLs so safe to store
   useEffect(() => {
     clearTimeout(draftTimer.current)
     draftTimer.current = setTimeout(() => {
       try {
-        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ form, photos, geoQuery, mapCenter }))
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+          form, photos, mapCenter,
+          address: addr.addressText, latitude: addr.latitude, longitude: addr.longitude,
+          confirmed: addr.status === 'confirmed',
+        }))
       } catch {}
     }, 300)
     return () => clearTimeout(draftTimer.current)
-  }, [form, photos, geoQuery, mapCenter])
+  }, [form, photos, mapCenter, addr.addressText, addr.latitude, addr.longitude, addr.status])
 
   const handleClose = () => {
     sessionStorage.removeItem(DRAFT_KEY)
     onClose()
   }
 
-  const selectGeoResult = (feature) => {
+  const handleSelectSuggestion = (feature) => {
     const [lng, lat] = feature.geometry.coordinates
-    setForm(p => ({ ...p, address: feature.place_name, latitude: lat, longitude: lng }))
+    addr.selectSuggestion(feature)
     setMapCenter({ longitude: lng, latitude: lat, zoom: 16 })
-    skipGeoRef.current = true
-    setGeoQuery(feature.place_name)
-    setShowDropdown(false)
   }
 
   const handlePhotos = async (e) => {
@@ -200,6 +162,15 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const handleSubmit = async () => {
     if (!form.title) { setError('Spot name is required'); return }
     if (!form.type) { setError('Please select a type'); return }
+    // CORE RULE: the pin is the single source of truth for the address —
+    // only a CONFIRMED location (one the hook itself derived from the pin)
+    // may be saved. EMPTY uses the same required-field treatment as title/
+    // type above; UNCONFIRMED has its own standing inline hint, but still
+    // blocks here too rather than failing silently.
+    if (addr.status !== 'confirmed') {
+      setError(addr.status === 'empty' ? 'Spot location is required' : 'Select a location from the list, enter coordinates, or tap the map')
+      return
+    }
     setError('')
     setUploading(true)
     setUploadingText('Checking content...')
@@ -219,9 +190,9 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
       bust_rating: form.bust_rating || null,
       lighting: form.lighting || null,
       description: form.description,
-      address: form.address,
-      latitude: form.latitude,
-      longitude: form.longitude,
+      address: addr.addressText,
+      latitude: addr.latitude,
+      longitude: addr.longitude,
       photos,
       added_by: user?.id || 'anon',
       moderation_status,
@@ -342,19 +313,27 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
               Location is blocked, so this can't be auto-filled. Search for the address below, or re-enable location for this app in your browser or device settings.
             </div>
           )}
-          <div style={{ position: 'relative', marginBottom: 8 }}>
+          <div style={{ position: 'relative', marginBottom: 4 }}>
             <input
               className="form-input"
-              placeholder="Search address or place..."
-              value={geoQuery}
-              onChange={e => { setGeoQuery(e.target.value); setForm(p => ({ ...p, address: e.target.value })) }}
-              onFocus={() => { geoInputFocused.current = true; if (geoResults.length > 0) setShowDropdown(true) }}
-              onBlur={() => { geoInputFocused.current = false; setTimeout(() => setShowDropdown(false), 150) }}
+              placeholder="Search address, place, or coordinates..."
+              value={addr.addressText}
+              onChange={e => addr.handleTextChange(e.target.value)}
+              onFocus={addr.onInputFocus}
+              onBlur={addr.onInputBlur}
+              style={addr.status === 'confirmed' ? { paddingRight: 36 } : undefined}
             />
-            {showDropdown && geoResults.length > 0 && (
+            {addr.status === 'confirmed' && (
+              <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, pointerEvents: 'none' }}>
+                <svg width="18" height="18" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 7L6 11L12 3" stroke="#4a9a5a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
+            {addr.showDropdown && addr.geoResults.length > 0 && (
               <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }}>
-                {geoResults.map(r => (
-                  <div key={r.id} onMouseDown={() => selectGeoResult(r)} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
+                {addr.geoResults.map(r => (
+                  <div key={r.id} onMouseDown={() => handleSelectSuggestion(r)} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
                     <div style={{ fontWeight: 700 }}>{r.text}</div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: 10 }}>{r.place_name}</div>
                   </div>
@@ -362,6 +341,13 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
               </div>
             )}
           </div>
+          {addr.rangeError ? (
+            <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 8 }}>{addr.rangeError}</div>
+          ) : addr.status === 'unconfirmed' && !addr.showDropdown ? (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 8 }}>Pick a location from the list below.</div>
+          ) : (
+            <div style={{ marginBottom: 8 }} />
+          )}
           <div style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid #EAD8C8', height: 280 }}>
             <Map
               {...mapCenter}
@@ -379,12 +365,12 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
               mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
               mapboxAccessToken={MAPBOX_TOKEN}
               style={{ width: '100%', height: '100%' }}
-              onClick={e => { const { lng, lat } = e.lngLat; setForm(p => ({ ...p, latitude: lat, longitude: lng })) }}
+              onClick={e => { const { lng, lat } = e.lngLat; addr.handlePinMove(lat, lng) }}
               cursor="crosshair"
             >
               <NavigationControl position="top-right" showCompass={false} />
-              {form.latitude && form.longitude && (
-                <Marker longitude={form.longitude} latitude={form.latitude} anchor="bottom" draggable onDragEnd={e => { const { lng, lat } = e.lngLat; setForm(p => ({ ...p, latitude: lat, longitude: lng })) }}>
+              {addr.latitude != null && addr.longitude != null && (
+                <Marker longitude={addr.longitude} latitude={addr.latitude} anchor="bottom" draggable onDragEnd={e => { const { lng, lat } = e.lngLat; addr.handlePinMove(lat, lng) }}>
                   <svg width="20" height="24" viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.4))' }}>
                     <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
                     <circle cx="10" cy="10" r="4" fill="#fff" />
@@ -393,8 +379,8 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
               )}
             </Map>
           </div>
-          {form.latitude
-            ? <div style={{ fontSize: 10, color: 'var(--salmon)', marginTop: 5, fontWeight: 700 }}>{form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}</div>
+          {addr.status === 'confirmed'
+            ? <div style={{ fontSize: 10, color: 'var(--salmon)', marginTop: 5, fontWeight: 700 }}>{addr.latitude.toFixed(5)}, {addr.longitude.toFixed(5)}</div>
             : <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 5 }}>Tap the map or search to pin a location</div>
           }
         </div>

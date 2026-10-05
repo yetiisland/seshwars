@@ -21,6 +21,7 @@ import { isAdminUser } from '../lib/admin'
 import AddFriendButton from '../components/AddFriendButton'
 import { SPOT_FIELDS } from '../lib/spotFields'
 import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
+import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024
@@ -31,18 +32,6 @@ const VISIBILITY_OPTIONS = [
   { value: 'private', label: 'Private', desc: 'Only you can see it' },
 ]
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
-
-async function reverseGeocode(lng, lat) {
-  try {
-    const res = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&limit=1`
-    )
-    const data = await res.json()
-    return data.features?.[0]?.place_name || ''
-  } catch {
-    return ''
-  }
-}
 
 function bustBadgeStyle(rating) {
   if (rating === 'No Bust') return { background: '#4a7a3a', color: '#ffffff', border: '1px solid #3d6830' }
@@ -111,11 +100,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [skateableAgainError, setSkateableAgainError] = useState('')
   const [editUploading, setEditUploading] = useState(false)
   const editFileRef = useRef()
-  const [editGeoQuery, setEditGeoQuery] = useState('')
-  const [editGeoResults, setEditGeoResults] = useState([])
-  const [editShowDropdown, setEditShowDropdown] = useState(false)
-  const editGeoTimer = useRef(null)
-  const editInputFocused = useRef(false)
+  const editAddr = useAddressConfirmation()
   const [editMapCenter, setEditMapCenter] = useState({ longitude: -104.9903, latitude: 39.7392, zoom: 13 })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -203,23 +188,6 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       })
   }, [spot.id, spot.added_by, user?.id])
 
-
-  // ── Edit geocode ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!editGeoQuery.trim()) { setEditGeoResults([]); setEditShowDropdown(false); return }
-    clearTimeout(editGeoTimer.current)
-    editGeoTimer.current = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(editGeoQuery)}.json?access_token=${MAPBOX_TOKEN}&limit=5`
-        )
-        const data = await res.json()
-        setEditGeoResults(data.features || [])
-        if (editInputFocused.current) setEditShowDropdown(true)
-      } catch { setEditGeoResults([]) }
-    }, 300)
-    return () => clearTimeout(editGeoTimer.current)
-  }, [editGeoQuery])
 
   // ── Hero photo swipe ──────────────────────────────────────────
   const onPhotoTouchStart = (e) => {
@@ -379,13 +347,19 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       bust_rating: spot.bust_rating || '',
       lighting: spot.lighting || '',
       description: spot.description || '',
-      address: spot.address || '',
-      latitude: spot.latitude,
-      longitude: spot.longitude,
       visibility: spot.visibility || 'public',
     })
     setEditPhotos([...(spot.photos || [])])
-    setEditGeoQuery(spot.address || '')
+    // An existing spot's own saved address/coordinates are the current
+    // confirmed state of a real record, not an in-progress pick — treat
+    // them as CONFIRMED on open so editing unrelated fields doesn't force
+    // the owner to re-pick a location that was never touched.
+    editAddr.hydrate({
+      address: spot.address || '',
+      latitude: spot.latitude,
+      longitude: spot.longitude,
+      confirmed: !!(spot.address && spot.latitude != null && spot.longitude != null),
+    })
     setEditMapCenter({
       longitude: spot.longitude || -104.9903,
       latitude: spot.latitude || 39.7392,
@@ -412,12 +386,10 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
   useImperativeHandle(ref, () => ({ handleEditClick }))
 
-  const selectEditGeoResult = (feature) => {
+  const handleSelectEditSuggestion = (feature) => {
     const [lng, lat] = feature.geometry.coordinates
-    setEditForm(p => ({ ...p, address: feature.place_name, latitude: lat, longitude: lng }))
+    editAddr.selectSuggestion(feature)
     setEditMapCenter({ longitude: lng, latitude: lat, zoom: 16 })
-    setEditGeoQuery(feature.place_name)
-    setEditShowDropdown(false)
   }
 
   const handleEditPhotos = async (e) => {
@@ -455,6 +427,12 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const handleEditSave = async () => {
     if (!editForm.title) { setEditError('Spot name is required'); return }
     if (!editForm.type) { setEditError('Please select a type'); return }
+    // CORE RULE: the pin is the single source of truth for the address —
+    // same A-E states as Drop a Spot, applied here too.
+    if (editAddr.status !== 'confirmed') {
+      setEditError(editAddr.status === 'empty' ? 'Spot location is required' : 'Select a location from the list, enter coordinates, or tap the map')
+      return
+    }
     setEditSaving(true)
     setEditError('')
     const originalPhotos = spot.photos || []
@@ -473,9 +451,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       slug: spot.slug || slugify(editForm.title, Math.random().toString(36).slice(2, 6)),
       type: currentType,
       description: editForm.description,
-      address: editForm.address,
-      latitude: editForm.latitude ? parseFloat(editForm.latitude) : null,
-      longitude: editForm.longitude ? parseFloat(editForm.longitude) : null,
+      address: editAddr.addressText,
+      latitude: editAddr.latitude,
+      longitude: editAddr.longitude,
       photos: editPhotos,
       visibility: editForm.visibility || 'public',
     }
@@ -1137,19 +1115,27 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             {/* Location */}
             <div style={{ marginBottom: 14 }}>
               <div className="section-label">Location</div>
-              <div style={{ position: 'relative', marginBottom: 8 }}>
+              <div style={{ position: 'relative', marginBottom: 4 }}>
                 <input
                   className="form-input"
-                  placeholder="Search address or place..."
-                  value={editGeoQuery}
-                  onChange={e => { setEditGeoQuery(e.target.value); setEditForm(p => ({ ...p, address: e.target.value })) }}
-                  onFocus={() => { editInputFocused.current = true; if (editGeoResults.length > 0) setEditShowDropdown(true) }}
-                  onBlur={() => { editInputFocused.current = false; setTimeout(() => setEditShowDropdown(false), 150) }}
+                  placeholder="Search address, place, or coordinates..."
+                  value={editAddr.addressText}
+                  onChange={e => editAddr.handleTextChange(e.target.value)}
+                  onFocus={editAddr.onInputFocus}
+                  onBlur={editAddr.onInputBlur}
+                  style={editAddr.status === 'confirmed' ? { paddingRight: 36 } : undefined}
                 />
-                {editShowDropdown && editGeoResults.length > 0 && (
+                {editAddr.status === 'confirmed' && (
+                  <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, pointerEvents: 'none' }}>
+                    <svg width="18" height="18" viewBox="0 0 14 14" fill="none">
+                      <path d="M2 7L6 11L12 3" stroke="#4a9a5a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
+                {editAddr.showDropdown && editAddr.geoResults.length > 0 && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }}>
-                    {editGeoResults.map(r => (
-                      <div key={r.id} onMouseDown={() => selectEditGeoResult(r)} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
+                    {editAddr.geoResults.map(r => (
+                      <div key={r.id} onMouseDown={() => handleSelectEditSuggestion(r)} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
                         <div style={{ fontWeight: 700 }}>{r.text}</div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: 10 }}>{r.place_name}</div>
                       </div>
@@ -1157,6 +1143,13 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   </div>
                 )}
               </div>
+              {editAddr.rangeError ? (
+                <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 8 }}>{editAddr.rangeError}</div>
+              ) : editAddr.status === 'unconfirmed' && !editAddr.showDropdown ? (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 8 }}>Pick a location from the list below.</div>
+              ) : (
+                <div style={{ marginBottom: 8 }} />
+              )}
               <div style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid #EAD8C8', height: 280 }}>
                 <Map
                   {...editMapCenter}
@@ -1173,12 +1166,12 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
                   mapboxAccessToken={MAPBOX_TOKEN}
                   style={{ width: '100%', height: '100%' }}
-                  onClick={e => { const { lng, lat } = e.lngLat; setEditForm(p => ({ ...p, latitude: lat, longitude: lng })) }}
+                  onClick={e => { const { lng, lat } = e.lngLat; editAddr.handlePinMove(lat, lng) }}
                   cursor="crosshair"
                 >
                   <NavigationControl position="top-right" showCompass={false} />
-                  {editForm.latitude && editForm.longitude && (
-                    <Marker longitude={editForm.longitude} latitude={editForm.latitude} anchor="bottom" draggable onDragEnd={e => { const { lng, lat } = e.lngLat; setEditForm(p => ({ ...p, latitude: lat, longitude: lng })) }}>
+                  {editAddr.latitude != null && editAddr.longitude != null && (
+                    <Marker longitude={editAddr.longitude} latitude={editAddr.latitude} anchor="bottom" draggable onDragEnd={e => { const { lng, lat } = e.lngLat; editAddr.handlePinMove(lat, lng) }}>
                       <svg width="20" height="24" viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.4))' }}>
                         <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
                         <circle cx="10" cy="10" r="4" fill="#fff" />
@@ -1187,8 +1180,8 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   )}
                 </Map>
               </div>
-              {editForm.latitude
-                ? <div style={{ fontSize: 10, color: 'var(--salmon)', marginTop: 5, fontWeight: 700 }}>{editForm.latitude.toFixed(5)}, {editForm.longitude.toFixed(5)}</div>
+              {editAddr.status === 'confirmed'
+                ? <div style={{ fontSize: 10, color: 'var(--salmon)', marginTop: 5, fontWeight: 700 }}>{editAddr.latitude.toFixed(5)}, {editAddr.longitude.toFixed(5)}</div>
                 : <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 5 }}>Tap the map or search to pin a location</div>
               }
             </div>
