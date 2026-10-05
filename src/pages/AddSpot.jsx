@@ -26,7 +26,6 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [form, setForm] = useState({
     title: '', type: '', features: [], bust_rating: '', lighting: '', description: '', visibility: 'public',
   })
-  const addr = useAddressConfirmation()
   const [photos, setPhotos] = useState([])
   const [uploading, setUploading] = useState(false)
   const [uploadingText, setUploadingText] = useState('Compressing...')
@@ -39,6 +38,13 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [photoUploadProgress, setPhotoUploadProgress] = useState({ current: 0, total: 0 })
 
   const [mapCenter, setMapCenter] = useState({ longitude: -104.9903, latitude: 39.7392, zoom: 13 })
+  // Suggestion-select recenters itself via handleSelectSuggestion below;
+  // coordinate entry resolves inside the hook with no equivalent call site,
+  // so it recenters here instead — same zoom, same "the user hasn't already
+  // navigated there" reasoning. Pin drag/tap deliberately don't recenter.
+  const addr = useAddressConfirmation((lat, lng, source) => {
+    if (source === 'coordinates') setMapCenter({ longitude: lng, latitude: lat, zoom: 16 })
+  })
   const [geoPermissionDenied, setGeoPermissionDenied] = useState(false)
   const fileRef = useRef()
   const draftTimer = useRef(null)

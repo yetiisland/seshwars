@@ -100,8 +100,14 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [skateableAgainError, setSkateableAgainError] = useState('')
   const [editUploading, setEditUploading] = useState(false)
   const editFileRef = useRef()
-  const editAddr = useAddressConfirmation()
   const [editMapCenter, setEditMapCenter] = useState({ longitude: -104.9903, latitude: 39.7392, zoom: 13 })
+  // Suggestion-select recenters itself via handleSelectEditSuggestion below;
+  // coordinate entry resolves inside the hook with no equivalent call site,
+  // so it recenters here instead — same zoom, same "the user hasn't already
+  // navigated there" reasoning. Pin drag/tap deliberately don't recenter.
+  const editAddr = useAddressConfirmation((lat, lng, source) => {
+    if (source === 'coordinates') setEditMapCenter({ longitude: lng, latitude: lat, zoom: 16 })
+  })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showHideModal, setShowHideModal] = useState(false)

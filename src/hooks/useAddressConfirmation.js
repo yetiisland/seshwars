@@ -32,7 +32,13 @@ export async function reverseGeocode(lng, lat) {
 // drag, or a map tap. It is therefore impossible to save text that didn't
 // come from the current pin position: callers must check status === 'confirmed'
 // before submitting.
-export function useAddressConfirmation() {
+// onConfirm(lat, lng, source), source one of 'suggestion' | 'coordinates' |
+// 'pin' — lets a caller recenter the map only for the two sources where the
+// user hasn't already navigated there themselves (picking a suggestion or
+// typing coordinates can land somewhere entirely outside the current
+// viewport); a pin drag or map tap is already exactly where the user is
+// looking, so callers should leave those two alone.
+export function useAddressConfirmation(onConfirm) {
   const [addressText, setAddressText] = useState('')
   const [latitude, setLatitude] = useState(null)
   const [longitude, setLongitude] = useState(null)
@@ -44,8 +50,10 @@ export function useAddressConfirmation() {
   const skipSearchRef = useRef(false)
   const geocodeTimer = useRef(null)
   const inputFocusedRef = useRef(false)
+  const onConfirmRef = useRef(onConfirm)
+  onConfirmRef.current = onConfirm
 
-  const applyConfirmed = useCallback((lat, lng, address) => {
+  const applyConfirmed = useCallback((lat, lng, address, source) => {
     skipSearchRef.current = true
     setLatitude(lat)
     setLongitude(lng)
@@ -54,20 +62,21 @@ export function useAddressConfirmation() {
     setRangeError('')
     setGeoResults([])
     setShowDropdown(false)
+    onConfirmRef.current?.(lat, lng, source)
   }, [])
 
   // Shared by pin drag, map tap, and a valid typed coordinate pair. Falls
   // back to the coordinates themselves (formatted) on reverse-geocode
   // failure, still CONFIRMED — a spot in a parking lot with no street
   // address must still be savable.
-  const confirmFromPin = useCallback(async (lat, lng) => {
+  const confirmFromPin = useCallback(async (lat, lng, source) => {
     const address = await reverseGeocode(lng, lat)
-    applyConfirmed(lat, lng, address || formatCoords(lat, lng))
+    applyConfirmed(lat, lng, address || formatCoords(lat, lng), source)
   }, [applyConfirmed])
 
   const selectSuggestion = useCallback((feature) => {
     const [lng, lat] = feature.geometry.coordinates
-    applyConfirmed(lat, lng, feature.place_name)
+    applyConfirmed(lat, lng, feature.place_name, 'suggestion')
   }, [applyConfirmed])
 
   // Pin drag and map tap are handled identically: move the pin immediately,
@@ -79,7 +88,7 @@ export function useAddressConfirmation() {
     setAddressText('')
     setRangeError('')
     setStatus('unconfirmed')
-    confirmFromPin(lat, lng)
+    confirmFromPin(lat, lng, 'pin')
   }, [confirmFromPin])
 
   // Typing always clears any existing pin and returns to UNCONFIRMED/EMPTY —
@@ -109,7 +118,7 @@ export function useAddressConfirmation() {
         return
       }
       setRangeError('')
-      confirmFromPin(lat, lng)
+      confirmFromPin(lat, lng, 'coordinates')
       return
     }
 
