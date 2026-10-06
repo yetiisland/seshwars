@@ -69,7 +69,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -81,6 +81,14 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showMySpots, setShowMySpots] = useState(() => sessionStorage.getItem('mySpots:open') === '1')
   const [showFriendsScreen, setShowFriendsScreen] = useState(false)
   const [showTrickList, setShowTrickList] = useState(false)
+
+  // VIEW TRICK LIST from a spot page's Add To Trick List sheet — same
+  // deep-link shape as openListId/onOpenListIdHandled for shared spot
+  // lists (App.jsx sets this from sessionStorage on remount after
+  // navigating back from /spots/:slug).
+  useEffect(() => {
+    if (openTrickListId) setShowTrickList(true)
+  }, [openTrickListId])
   const [trickCounts, setTrickCounts] = useState(() => _trickCountsUserId === user?.id ? _cachedTrickCounts : { landed: 0, total: 0 })
   const [friendCount, setFriendCount] = useState(0)
   const [friendReqState, setFriendReqState] = useState({})
@@ -1197,35 +1205,23 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         document.body
       )}
 
-      {/* Trick List screen (Section B) — same shell as My Spots/Friends;
-          TrickListPage supplies the body. */}
+      {/* Trick List screen — fully self-contained (list-of-lists plus a
+          per-list detail view), same two-level shape as SavedView.jsx, so
+          it owns its own header/back-navigation instead of sharing the
+          simple single-level shell My Spots/Friends/Hidden Spots use. */}
       {showTrickList && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center',
-            padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
-            background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
-          }}>
-            <div onClick={() => setShowTrickList(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-              Trick List
-            </div>
-            <div style={{ width: 36 }} />
-          </div>
-          <div className="scroll-area">
-            <TrickListPage
-              user={user}
-              spots={spots}
-              onSpotClick={onSpotClick}
-            />
-            <div style={{ height: BOTTOM_PAD }} />
-          </div>
-          {onTabChange && <TabBar active="profile" onChange={t => { setShowTrickList(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
-        </div>,
+        <TrickListPage
+          user={user}
+          spots={spots}
+          onSpotClick={onSpotClick}
+          onClose={() => setShowTrickList(false)}
+          openListId={openTrickListId}
+          onOpenListIdHandled={onOpenTrickListIdHandled}
+          onTabChange={onTabChange ? (t => { setShowTrickList(false); onTabChange(t) }) : undefined}
+          profileAvatar={storeProfile?.avatar_url}
+          profileInitials={storeProfile?.initials}
+          unreadCount={unreadCount}
+        />,
         document.body
       )}
       </>

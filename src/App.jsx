@@ -291,6 +291,16 @@ export default function App() {
   const [tab, setTab] = useState(() => normalizeTab(sessionStorage.getItem('activeTab') || 'spots'))
   const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')
   const [openListId, setOpenListId] = useState(null)
+  // VIEW TRICK LIST from a spot page — SpotPage.jsx is a separate route
+  // tree (not nested under App), so it can't set this directly; it stashes
+  // the target list id in sessionStorage before navigating back to '/' and
+  // this reads it once on the resulting fresh mount, same shape as how
+  // 'activeTab' itself is restored above.
+  const [openTrickListId, setOpenTrickListId] = useState(() => {
+    const id = sessionStorage.getItem('seshwars:openTrickListId')
+    if (id) sessionStorage.removeItem('seshwars:openTrickListId')
+    return id
+  })
   // Shared by both the desktop and mobile spots-view toggle pills below —
   // only one of the two is ever mounted at a time (isDesktop branch).
   const spotsToggleTrackRef = useRef(null)
@@ -739,6 +749,8 @@ export default function App() {
                   onTabChange={handleTabChange}
                   hiddenIds={hiddenIds}
                   onUnhideSpot={unhideSpot}
+                  openTrickListId={openTrickListId}
+                  onOpenTrickListIdHandled={() => setOpenTrickListId(null)}
                 />
               </div>
             )}
@@ -848,6 +860,8 @@ export default function App() {
                   onTabChange={handleTabChange}
                   hiddenIds={hiddenIds}
                   onUnhideSpot={unhideSpot}
+                  openTrickListId={openTrickListId}
+                  onOpenTrickListIdHandled={() => setOpenTrickListId(null)}
                 />
               )}
             </>

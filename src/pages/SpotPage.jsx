@@ -98,6 +98,18 @@ export default function SpotPage() {
     navigate('/')
   }
 
+  // VIEW TRICK LIST (Add To Trick List sheet) — SpotPage is a separate
+  // route tree from App.jsx, so there's no shared state to set directly;
+  // stash the target list id and let App.jsx's own openTrickListId state
+  // pick it up on the fresh mount navigating back to '/' causes, same
+  // shape goToProfile already uses for 'activeTab'.
+  const goToTrickList = (listId) => {
+    if (!user) { setShowAuth(true); return }
+    sessionStorage.setItem('activeTab', 'profile')
+    if (listId) sessionStorage.setItem('seshwars:openTrickListId', listId)
+    navigate('/')
+  }
+
   if (loading || !authLoaded) {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#FDF8F0' }}>
@@ -198,6 +210,7 @@ export default function SpotPage() {
           }}
           user={user}
           onGoProfile={goToProfile}
+          onViewTrickList={goToTrickList}
           isHidden={hiddenIds.has(spot.id)}
           onHidePress={() => { if (!user) { setShowAuth(true); return } }}
           onUnhidePress={handleUnhide}

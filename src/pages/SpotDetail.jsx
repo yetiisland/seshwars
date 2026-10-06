@@ -11,7 +11,7 @@ import ReviewsSection from '../components/ReviewsSection'
 import ReportSection from '../components/ReportSection'
 import CommentsSection from '../components/CommentsSection'
 import { SendToFriendsContent } from '../components/SendToFriendsSheet'
-import TricksSection from '../components/TricksSection'
+import AddToTrickListSheet from '../components/AddToTrickListSheet'
 import { slugify } from '../utils/slugify'
 import { compressImage } from '../utils/compressImage'
 import { checkImageModeration } from '../utils/moderation'
@@ -40,13 +40,14 @@ function bustBadgeStyle(rating) {
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
 }
 
-const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, isHidden, onUnhidePress, onHidePress, sheetPad = 0, scrollToCommentId }, ref) {
+const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, onViewTrickList, isHidden, onUnhidePress, onHidePress, sheetPad = 0, scrollToCommentId }, ref) {
   // ── Photo / hero state ────────────────────────────────────────
   const [photoIndex, setPhotoIndex] = useState(0)
   const [dragX, setDragX] = useState(0)
   const [transitioning, setTransitioning] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [showShareSheet, setShowShareSheet] = useState(false)
+  const [showTrickSheet, setShowTrickSheet] = useState(false)
   const [shareSheetMode, setShareSheetMode] = useState('choice') // 'choice' | 'friends'
   const [sendToast, setSendToast] = useState('')
   const touchStartX = useRef(null)
@@ -805,12 +806,11 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             </div>
           </div>
 
-          {/* Add To Trick List — placeholder handler; wiring up the actual
-              add-trick sheet is a follow-up task. */}
+          {/* Add To Trick List */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
             <button
               className="btn-salmon"
-              onClick={() => { if (!user) { onGoProfile?.(); return } console.log('[SpotDetail] Add To Trick List tapped — placeholder') }}
+              onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
               style={{ width: 'auto', padding: '10px 18px' }}
             >
               Add To Trick List
@@ -997,7 +997,6 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           })()}
           <ClipsSection spotId={spot.id} user={user} onGoProfile={onGoProfile} isAdmin={isAdmin} />
           <ReviewsSection spotId={spot.id} user={user} onStatsChange={handleStatsChange} />
-          <TricksSection spotId={spot.id} user={user} />
           <CommentsSection spotId={spot.id} user={user} onGoProfile={onGoProfile} scrollToCommentId={scrollToCommentId} />
           <div style={{ height: sheetPad > 0 ? `calc(${BOTTOM_PAD} + ${sheetPad}px)` : BOTTOM_PAD }} />
         </div>
@@ -1474,6 +1473,15 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           {sendToast}
         </div>,
         document.body
+      )}
+      {showTrickSheet && (
+        <AddToTrickListSheet
+          spot={spot}
+          user={user}
+          onClose={() => setShowTrickSheet(false)}
+          onViewTrickList={onViewTrickList}
+          onGoProfile={onGoProfile}
+        />
       )}
     </div>
   )
