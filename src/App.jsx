@@ -10,9 +10,10 @@ import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
 import { useNotifications } from './hooks/useNotifications'
 import TabBar from './components/TabBar'
 import Logo from './components/Logo'
-import { PlusIcon, ListIcon, MapPinIcon } from './components/Icons'
+import { PlusIcon } from './components/Icons'
 import { NAV_TABS } from './lib/navTabs'
 import { fetchLocationSuggestions, toSearchLocationEntry } from './lib/locationSearch'
+import { openLocationSettings } from './lib/locationSettings'
 import SaveToListModal from './components/SaveToListModal'
 import ListView from './pages/ListView'
 import MapView from './pages/MapView'
@@ -97,6 +98,29 @@ function AuthPromptModal({ onClose, onGoProfile }) {
           <button className="btn-salmon" onClick={onGoProfile}>Create Account / Sign In</button>
         </div>
         <div className="modal-cancel" onClick={onClose}>Not now</div>
+      </div>
+    </div>
+  )
+}
+
+// One-time popup shown only when location permission is denied — copied
+// verbatim from AuthPromptModal's shape (modal-overlay/modal-sheet/handle,
+// centered title+body, single salmon CTA, modal-cancel dismiss row).
+function LocationPermissionPopup({ onTurnOn, onDismiss }) {
+  return (
+    <div className="modal-overlay" onClick={onDismiss}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <div style={{ padding: '0 20px 8px', textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Turn On Location</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            Location gives you the best experience — nearby spots, accurate distances, and skaters near you.
+          </div>
+        </div>
+        <div style={{ padding: '8px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button className="btn-salmon" onClick={onTurnOn}>Turn On Location</button>
+        </div>
+        <div className="modal-cancel" onClick={onDismiss}>Not now</div>
       </div>
     </div>
   )
@@ -323,6 +347,27 @@ export default function App() {
   useEffect(() => {
     if (spotsView === 'map') requestLocation()
   }, [spotsView, requestLocation])
+
+  // One-time "location gives the best experience" popup — only when
+  // permission is actually denied (never for 'granted'/'prompt'/
+  // 'unsupported'), and only until the user dismisses it once, ever
+  // (localStorage, not per-session — a plain UI preference, not account
+  // data, so no Supabase write per docs/supabase-writes.md).
+  const [showLocationPopup, setShowLocationPopup] = useState(false)
+  useEffect(() => {
+    if (locationPermission !== 'denied') return
+    try {
+      if (localStorage.getItem('seshwars_location_popup_dismissed') === '1') return
+    } catch { /* localStorage unavailable — just show it */ }
+    setShowLocationPopup(true)
+  }, [locationPermission])
+  const dismissLocationPopup = () => {
+    setShowLocationPopup(false)
+    try { localStorage.setItem('seshwars_location_popup_dismissed', '1') } catch { /* best-effort */ }
+  }
+  const handleTurnOnLocation = () => {
+    if (!openLocationSettings()) showToast('Re-enable location for this app in your browser or device settings.')
+  }
   const isAdmin = isAdminUser(user)
   const { notifications, unreadCount, loading: notifLoading, hasMore: notifHasMore, fetchNotifications, markRead, markAllRead } = useNotifications(user?.id)
 
@@ -704,14 +749,8 @@ export default function App() {
             <div style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
                 <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
-                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-                  <ListIcon color={spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
-                  LIST
-                </div>
-                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-                  <MapPinIcon color={spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
-                  MAP
-                </div>
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
               </div>
             </div>
           )}
@@ -851,14 +890,8 @@ export default function App() {
             <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 1001, pointerEvents: 'none' }}>
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
                 <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
-                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-                  <ListIcon color={spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
-                  LIST
-                </div>
-                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-                  <MapPinIcon color={spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
-                  MAP
-                </div>
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
               </div>
             </div>
           )}
@@ -872,6 +905,12 @@ export default function App() {
           )}
 
           {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
+          {showLocationPopup && (
+            <LocationPermissionPopup
+              onTurnOn={() => { dismissLocationPopup(); handleTurnOnLocation() }}
+              onDismiss={dismissLocationPopup}
+            />
+          )}
         </>
       )}
 

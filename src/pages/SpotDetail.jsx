@@ -10,7 +10,7 @@ import ClipsSection from '../components/ClipsSection'
 import ReviewsSection from '../components/ReviewsSection'
 import ReportSection from '../components/ReportSection'
 import CommentsSection from '../components/CommentsSection'
-import SendToFriendsSheet from '../components/SendToFriendsSheet'
+import { SendToFriendsContent } from '../components/SendToFriendsSheet'
 import TricksSection from '../components/TricksSection'
 import { slugify } from '../utils/slugify'
 import { compressImage } from '../utils/compressImage'
@@ -46,7 +46,8 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [dragX, setDragX] = useState(0)
   const [transitioning, setTransitioning] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
-  const [showSendSheet, setShowSendSheet] = useState(false)
+  const [showShareSheet, setShowShareSheet] = useState(false)
+  const [shareSheetMode, setShareSheetMode] = useState('choice') // 'choice' | 'friends'
   const [sendToast, setSendToast] = useState('')
   const touchStartX = useRef(null)
   const touchStartY = useRef(null)
@@ -604,9 +605,14 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   }
 
   const handleSpotSent = (message) => {
-    setShowSendSheet(false)
+    setShowShareSheet(false)
     setSendToast(message)
     setTimeout(() => setSendToast(''), 2500)
+  }
+
+  const closeShareSheet = () => {
+    setShowShareSheet(false)
+    setShareSheetMode('choice')
   }
 
   const closeHideModal = () => {
@@ -791,18 +797,24 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               )}
               {spot.distance != null && <span className="dist-text">{spot.distance} mi</span>}
               <div
-                onClick={handleShare}
+                onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
                 style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 2 }}
               >
                 <ShareIcon color="#d4785a" />
               </div>
-              <div
-                onClick={() => { if (!user) { onGoProfile?.(); return } setShowSendSheet(true) }}
-                style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 2 }}
-              >
-                <SendToFriendsIcon color="#d4785a" />
-              </div>
             </div>
+          </div>
+
+          {/* Add To Trick List — placeholder handler; wiring up the actual
+              add-trick sheet is a follow-up task. */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+            <button
+              className="btn-salmon"
+              onClick={() => { if (!user) { onGoProfile?.(); return } console.log('[SpotDetail] Add To Trick List tapped — placeholder') }}
+              style={{ width: 'auto', padding: '10px 18px' }}
+            >
+              Add To Trick List
+            </button>
           </div>
 
           {/* Feature chips — above publisher */}
@@ -829,7 +841,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   {spot.added_by === null ? 'Anonymous' : publisherUsername ? `@${publisherUsername}` : ''}
                 </div>
               </div>
-              {publisherFriendship && (
+              {publisherFriendship && publisherFriendship.status !== 'accepted' && (
                 <AddFriendButton
                   targetUserId={spot.added_by}
                   friendshipStatus={publisherFriendship.status}
@@ -1419,13 +1431,43 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         </div>,
         document.body
       )}
-      {showSendSheet && (
-        <SendToFriendsSheet
-          spot={spot}
-          onClose={() => setShowSendSheet(false)}
-          onSent={handleSpotSent}
-          onGoProfile={onGoProfile}
-        />
+      {/* ONE share sheet: a choice screen (Share With Friends / Share Link),
+          swapped in place for the friend-picker content — never a second
+          sheet animated on top of this one. */}
+      {showShareSheet && createPortal(
+        <div className="modal-overlay" onClick={closeShareSheet}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-handle" />
+            {shareSheetMode === 'choice' ? (
+              <>
+                <div className="modal-title" style={{ padding: '0 20px' }}>Share</div>
+                <div
+                  className="modal-row"
+                  onClick={() => { if (!user) { closeShareSheet(); onGoProfile?.(); return } setShareSheetMode('friends') }}
+                >
+                  <SendToFriendsIcon color="#d4785a" />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share With Friends</span>
+                </div>
+                <div
+                  className="modal-row"
+                  onClick={() => { closeShareSheet(); handleShare() }}
+                >
+                  <ShareIcon color="#d4785a" />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share Link</span>
+                </div>
+              </>
+            ) : (
+              <SendToFriendsContent
+                spot={spot}
+                onBack={() => setShareSheetMode('choice')}
+                onClose={closeShareSheet}
+                onSent={handleSpotSent}
+                onGoProfile={onGoProfile}
+              />
+            )}
+          </div>
+        </div>,
+        document.body
       )}
       {sendToast && createPortal(
         <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, maxWidth: 'calc(100vw - 48px)', textAlign: 'center', pointerEvents: 'none' }}>

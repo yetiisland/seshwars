@@ -18,6 +18,7 @@ import TrickListPage from './TrickListPage'
 import AddFriendButton from '../components/AddFriendButton'
 import { ListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
 import { transformImageUrl } from '../utils/imageUrl'
+import { openLocationSettings } from '../lib/locationSettings'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -125,6 +126,14 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showUnhideConfirm, setShowUnhideConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [locationToast, setLocationToast] = useState('')
+
+  const handleTurnOnLocation = () => {
+    if (!openLocationSettings()) {
+      setLocationToast('Re-enable location for this app in your browser or device settings.')
+      setTimeout(() => setLocationToast(''), 4000)
+    }
+  }
 
   useEffect(() => {
     const handler = () => setIsDesktop(window.innerWidth >= 769)
@@ -769,7 +778,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <HiddenEyeIcon color="#d4785a" size={16} />
+                <HiddenEyeIcon color="#d4785a" size={16} slashed={false} />
                 <div>
                   <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{hiddenSpots.length}</div>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Spots Hidden</div>
@@ -810,6 +819,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               </svg>
             </div>
           </div>
+
+          {/* Persistent location CTA — only while permission is actually
+              denied (never granted/prompt/unsupported). */}
+          {locationPermission === 'denied' && (
+            <button className="btn-salmon" onClick={handleTurnOnLocation} style={{ marginTop: 20 }}>
+              Turn On Location
+            </button>
+          )}
+          <div style={{ height: BOTTOM_PAD }} />
 
           {/* Feedback bottom sheet — portalled above bottom nav; opened from
               the Settings sheet's Send Feedback row now (Section E). Lives
@@ -1558,6 +1576,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         document.body
       )}
 
+      {locationToast && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, maxWidth: 'calc(100vw - 48px)', textAlign: 'center', pointerEvents: 'none' }}>
+          {locationToast}
+        </div>,
+        document.body
+      )}
     </>
   )
 }

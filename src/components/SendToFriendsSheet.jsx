@@ -37,7 +37,11 @@ function FriendAvatar({ profile, size = 38 }) {
   return <InitialsAvatar profile={profile} size={size} />
 }
 
-export default function SendToFriendsSheet({ spot, onClose, onSent, onGoProfile }) {
+// Content-only (no portal/overlay/handle of its own) so the spot-page share
+// sheet can swap this in as a second "screen" inside the SAME modal-sheet
+// element it already opened for the Share/Share Link choice, instead of
+// mounting a second sheet on top of the first.
+export function SendToFriendsContent({ spot, onSent, onGoProfile, onBack, onClose }) {
   const [friends, setFriends] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(new Set())
@@ -101,11 +105,18 @@ export default function SendToFriendsSheet({ spot, onClose, onSent, onGoProfile 
     onSent('Spot sent!')
   }
 
-  return createPortal(
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="modal-handle" />
-        <div className="modal-title" style={{ padding: '0 20px' }}>Send To Friends</div>
+  return (
+    <>
+        <div className="modal-title" style={{ padding: '0 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          {onBack && (
+            <div onClick={onBack} style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          )}
+          <span>Send To Friends</span>
+        </div>
 
         {loading ? (
           <div style={{ padding: '0 20px 20px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>Loading...</div>
@@ -115,7 +126,7 @@ export default function SendToFriendsSheet({ spot, onClose, onSent, onGoProfile 
               You don't have any friends yet. Add some from the Friends page first.
             </div>
             <div
-              onClick={() => { onClose(); onGoProfile?.() }}
+              onClick={() => { onClose?.(); onGoProfile?.() }}
               style={{ fontSize: 11, color: '#d4785a', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
             >
               Go to Friends
@@ -172,6 +183,18 @@ export default function SendToFriendsSheet({ spot, onClose, onSent, onGoProfile 
             </div>
           </>
         )}
+    </>
+  )
+}
+
+// Standalone, portal-wrapped version — kept for parity/reuse, though the
+// spot page now uses SendToFriendsContent directly inside its own sheet.
+export default function SendToFriendsSheet({ spot, onClose, onSent, onGoProfile }) {
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-handle" />
+        <SendToFriendsContent spot={spot} onSent={onSent} onGoProfile={onGoProfile} onClose={onClose} />
       </div>
     </div>,
     document.body

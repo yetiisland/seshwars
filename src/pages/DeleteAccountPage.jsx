@@ -1,11 +1,19 @@
 export default function DeleteAccountPage({ onClose, onDeleteClick }) {
+  // Every claim below is read directly from the account-deletion code path
+  // (supabase/functions/delete-account/index.ts) — it anonymizes added
+  // spots (added_by -> null), hard-deletes spot_clips/spot_reviews/
+  // spot_comments/spot_reports/saved_spots/spot_lists/profiles rows for
+  // this user, then deletes the auth user itself. It does not touch hidden
+  // spots, trick-list entries, friend connections, or notifications, so
+  // those are deliberately not claimed here — see the PR/report for this
+  // change for that gap.
   const sections = [
     {
       title: 'HOW TO DELETE IN THE APP',
       steps: [
         'Open Sesh Wars and tap the Profile tab (bottom right).',
         'Open Settings and tap "Delete Account" under Account.',
-        'Tap "Delete Account" below, then "Confirm" in the confirmation dialog.',
+        'Tap "Delete Account" above, then "Confirm" in the confirmation dialog.',
       ],
     },
     {
@@ -17,16 +25,17 @@ export default function DeleteAccountPage({ onClose, onDeleteClick }) {
       title: 'WHAT GETS DELETED',
       bullets: [
         'Your account and login credentials',
-        'Your email address and profile information (name, username, avatar)',
-        'Your saved spots lists',
-        'Spots you marked as hidden',
+        'Your profile information (name, username, avatar)',
+        'Spots you saved, and any custom lists you created',
         'Ratings and reviews you submitted',
+        'Comments you posted',
+        'Reports you filed on spots',
         'Clips you submitted',
       ],
     },
     {
       title: 'WHAT IS KEPT',
-      body: 'Spots you contributed remain on the public map. They are anonymized and are no longer attributed to your account.',
+      body: 'Spots you contributed remain on the public map. The "added by" attribution is cleared from them, so they are no longer linked to your account.',
     },
   ]
 
@@ -62,9 +71,16 @@ export default function DeleteAccountPage({ onClose, onDeleteClick }) {
           <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
             Delete Your Sesh Wars Account
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 24 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 20 }}>
             Sesh Wars is developed by Yeti Island Studio LLC. You can delete your account at any time using either method below.
           </div>
+
+          {onDeleteClick && (
+            <button className="btn-salmon" onClick={onDeleteClick}>
+              Delete Account
+            </button>
+          )}
+          <div className="divider" />
 
           {sections.map((section, i) => (
             <div key={i} style={{ marginBottom: 24 }}>
@@ -99,12 +115,6 @@ export default function DeleteAccountPage({ onClose, onDeleteClick }) {
               )}
             </div>
           ))}
-
-          {onDeleteClick && (
-            <button className="btn-salmon" onClick={onDeleteClick} style={{ marginTop: 4 }}>
-              Delete Account
-            </button>
-          )}
         </div>
       </div>
     </div>

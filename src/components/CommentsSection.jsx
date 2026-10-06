@@ -5,6 +5,22 @@ import { getProfiles } from '../utils/profileCache'
 import InitialsAvatar from './InitialsAvatar'
 import AddFriendButton from './AddFriendButton'
 
+// Same ~80px fixed-bottom-nav height used as BOTTOM_PAD elsewhere
+// (SpotDetail.jsx, SavedView.jsx, ProfileView.jsx), plus a safe-area-
+// inset-bottom buffer — env() isn't readable from JS directly, so this
+// approximates it rather than matching it exactly.
+const NAV_CLEARANCE_PX = 96
+
+function findScrollParent(el) {
+  let node = el?.parentElement
+  while (node) {
+    const style = getComputedStyle(node)
+    if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight) return node
+    node = node.parentElement
+  }
+  return document.scrollingElement || document.documentElement
+}
+
 function relativeTime(ts) {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
   if (diff < 60) return 'just now'
@@ -62,9 +78,43 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
   const [viewingProfileFriendship, setViewingProfileFriendship] = useState(null)
   const channelRef = useRef(null)
   const textareaRef = useRef(null)
+  const composerEndRef = useRef(null)
   const commentRefs = useRef({})
   const hasScrolledRef = useRef(false)
   const mentionBlurTimer = useRef(null)
+
+  // Keeps the composer (and the POST COMMENT button once it appears) fully
+  // above both the fixed bottom nav and the on-screen keyboard when the
+  // textarea is focused. Scrolls the nearest actual scroll container
+  // (found via findScrollParent, not necessarily window) by whatever
+  // overlap remains against the real visible viewport — visualViewport
+  // shrinks to exclude the keyboard on platforms that report it; where
+  // it's unavailable this falls back to window.innerHeight (nav-only
+  // clearance, no keyboard-aware correction).
+  const scrollComposerClear = () => {
+    const anchor = composerEndRef.current
+    if (!anchor) return
+    const scrollParent = findScrollParent(anchor)
+    const vv = window.visualViewport
+    const visibleBottom = vv ? vv.height + vv.offsetTop : window.innerHeight
+    const rect = anchor.getBoundingClientRect()
+    const overlap = rect.bottom - (visibleBottom - NAV_CLEARANCE_PX)
+    if (overlap > 0) scrollParent.scrollBy({ top: overlap, behavior: 'smooth' })
+  }
+
+  const scheduleComposerScroll = () => {
+    scrollComposerClear()
+    // Keyboard opening is async relative to the focus event on most
+    // platforms — try again shortly after, and once more on the visual
+    // viewport actually resizing (keyboard finished animating in).
+    setTimeout(scrollComposerClear, 320)
+    const vv = window.visualViewport
+    if (vv) {
+      const onResize = () => scrollComposerClear()
+      vv.addEventListener('resize', onResize)
+      setTimeout(() => vv.removeEventListener('resize', onResize), 1200)
+    }
+  }
 
   const closeDeleteModal = () => {
     setDeleteModalClosing(true)
@@ -185,7 +235,12 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
   const handleTextChange = (e) => {
     const val = e.target.value
     const cursorPos = e.target.selectionStart
+    const hadText = text.trim().length > 0
     setText(val)
+    // The POST COMMENT button only mounts once there's text — re-check the
+    // nav/keyboard clearance right as it appears, since the earlier focus-
+    // time scroll ran before it existed and so couldn't account for it.
+    if (!hadText && val.trim().length > 0) requestAnimationFrame(scrollComposerClear)
     const upToCursor = val.slice(0, cursorPos)
     const atIndex = upToCursor.lastIndexOf('@')
     if (atIndex === -1 || /\s/.test(upToCursor.slice(atIndex + 1))) {
@@ -211,17 +266,31 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
     })
   }
 
-  const handleReplyClick = (comment) => {
-    const p = profiles[comment.user_id]
-    const username = p?.username || p?.first_name || 'user'
-    setReplyingTo({ id: comment.id, username })
+  // Shared by both "Reply" entry points — a top-level comment, or a reply
+  // to a reply. Threads stay flat (one level visually): replying to a
+  // reply still targets the top-level comment's id as parent_id, with the
+  // reply-being-answered's @username prefilled so it's clear who it's for.
+  const startReply = (topLevelId, username) => {
+    setReplyingTo({ id: topLevelId, username })
     const prefill = `@${username} `
     setText(prefill)
     requestAnimationFrame(() => {
-      textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       textareaRef.current?.focus()
       textareaRef.current?.setSelectionRange(prefill.length, prefill.length)
     })
+    scheduleComposerScroll()
+  }
+
+  const handleReplyClick = (comment) => {
+    const p = profiles[comment.user_id]
+    const username = p?.username || p?.first_name || 'user'
+    startReply(comment.id, username)
+  }
+
+  const handleReplyToReplyClick = (topLevelId, reply) => {
+    const p = profiles[reply.user_id]
+    const username = p?.username || p?.first_name || 'user'
+    startReply(topLevelId, username)
   }
 
   const toggleExpand = (commentId) => {
@@ -326,7 +395,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
       {/* Input row — exactly one rounded box (the textarea itself carries
           the white fill + border now); the wrapper below is layout-only */}
       {user ? (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 32 }}>
           {replyingTo && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>
               Replying to @{replyingTo.username}
@@ -347,7 +416,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                 lineHeight: 1.5, boxSizing: 'border-box',
               }}
               onBlur={() => { mentionBlurTimer.current = setTimeout(() => setMentionQuery(null), 150) }}
-              onFocus={() => clearTimeout(mentionBlurTimer.current)}
+              onFocus={() => { clearTimeout(mentionBlurTimer.current); scheduleComposerScroll() }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -372,18 +441,19 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
             )}
             {text.trim().length > 0 && (
               <button
+                className="btn-salmon"
                 onClick={handleSubmit}
                 disabled={submitting}
-                style={{
-                  alignSelf: 'flex-end', padding: '6px 14px', borderRadius: 6,
-                  background: '#d4785a', color: '#fff', border: 'none', cursor: 'pointer',
-                  fontSize: 11, fontWeight: 700, fontFamily: 'Barlow, sans-serif',
-                  letterSpacing: 0.5, opacity: submitting ? 0.6 : 1,
-                }}
+                style={{ opacity: submitting ? 0.6 : 1 }}
               >
-                Post
+                Post Comment
               </button>
             )}
+            {/* Scroll anchor for scheduleComposerScroll — see its definition
+                above. Sits right after the button so its bottom edge marks
+                "the composer is fully clear" once scrolled past the nav/
+                keyboard clearance. */}
+            <div ref={composerEndRef} style={{ height: 1 }} />
           </div>
           {submitError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginTop: 6 }}>{submitError}</div>}
         </div>
@@ -447,16 +517,16 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
 
                 {replies.length > 0 && (
                   <>
-                    {/* Horizontal divider separates replies from the parent —
-                        no left indent, no vertical rule, per spec */}
-                    <div style={{ height: 1, background: '#E8DDD0', margin: '10px 0' }} />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {visibleReplies.map(reply => {
-                        const replyProfile = profiles[reply.user_id]
-                        const isOwnReply = user?.id === reply.user_id
-                        return (
+                    {visibleReplies.map(reply => {
+                      const replyProfile = profiles[reply.user_id]
+                      const isOwnReply = user?.id === reply.user_id
+                      return (
+                        <div key={reply.id}>
+                          {/* Horizontal divider before every reply — separates
+                              it from whatever precedes it, the parent comment
+                              for the first one, the previous reply for the rest. */}
+                          <div style={{ height: 1, background: '#E8DDD0', margin: '10px 0' }} />
                           <div
-                            key={reply.id}
                             ref={el => { commentRefs.current[reply.id] = el }}
                             style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}
                           >
@@ -484,15 +554,23 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                                 )}
                               </div>
                               <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{renderContent(reply.content)}</div>
+                              {user && (
+                                <div onClick={() => handleReplyToReplyClick(comment.id, reply)} style={{ ...inlineLinkStyle, fontSize: 10, marginTop: 4, display: 'inline-block' }}>
+                                  Reply
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )
-                      })}
-                    </div>
+                        </div>
+                      )
+                    })}
                     {hiddenCount > 0 && (
-                      <div onClick={() => toggleExpand(comment.id)} style={viewMoreStyle}>
-                        View {hiddenCount} more {hiddenCount === 1 ? 'reply' : 'replies'}
-                      </div>
+                      <>
+                        <div style={{ height: 1, background: '#E8DDD0', margin: '10px 0' }} />
+                        <div onClick={() => toggleExpand(comment.id)} style={viewMoreStyle}>
+                          View more replies ({hiddenCount})
+                        </div>
+                      </>
                     )}
                   </>
                 )}

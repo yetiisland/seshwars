@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
 import SpotCard from '../components/SpotCard'
 import Navbar from '../components/Navbar'
-import { ArrowIcon, ShareIcon, ListIcon, MapPinIcon, PlusIcon, CloseIcon, IconBox } from '../components/Icons'
+import { ArrowIcon, ShareIcon, PlusIcon, CloseIcon, IconBox } from '../components/Icons'
 import InitialsAvatar from '../components/InitialsAvatar'
 import MapView from './MapView'
 
@@ -465,14 +465,8 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
       {createPortal(
         <div ref={viewToggleTrackRef} style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
           <div ref={viewToggleThumbRef} style={{ position: 'absolute', top: 3, bottom: 3, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
-          <div ref={el => { viewToggleSegmentRefs.current.list = el }} onClick={() => setViewMode('list')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-            <ListIcon color={viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
-            LIST
-          </div>
-          <div ref={el => { viewToggleSegmentRefs.current.map = el }} onClick={() => setViewMode('map')} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 18px', borderRadius: 50, color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>
-            <MapPinIcon color={viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)'} size={12} filled />
-            MAP
-          </div>
+          <div ref={el => { viewToggleSegmentRefs.current.list = el }} onClick={() => setViewMode('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+          <div ref={el => { viewToggleSegmentRefs.current.map = el }} onClick={() => setViewMode('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
         </div>,
         document.body
       )}
