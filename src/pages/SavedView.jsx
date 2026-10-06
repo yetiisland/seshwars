@@ -129,9 +129,9 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   }
 
   useEffect(() => {
-    if (!isList || !listId) return
+    if (!isList || !listId || !isOwner) return
     fetchMembers()
-  }, [isList, listId])
+  }, [isList, listId, isOwner])
 
   // Suggestions are only useful once the owner opens the add-skaters input,
   // so fetch them on first focus instead of unconditionally on mount.
@@ -348,12 +348,14 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                 </svg>
               </div>
             )}
-            <div
-              onClick={handleShare}
-              style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: sharing ? 0.6 : 1 }}
-            >
-              <ShareIcon color="#d4785a" />
-            </div>
+            {isOwner && (
+              <div
+                onClick={handleShare}
+                style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: sharing ? 0.6 : 1 }}
+              >
+                <ShareIcon color="#d4785a" />
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ justifySelf: 'end', width: 36 }} />
@@ -530,12 +532,12 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                 </div>
               )}
 
-              {/* B) Shared-with summary — overlapping avatars + count,
-                  tappable by anyone who can see the list (owner or member) */}
-              {members.length > 0 && (
+              {/* B) Added-members summary — overlapping avatars + count.
+                  Owner only: members see no member controls on a shared list. */}
+              {isOwner && members.length > 0 && (
                 <div onClick={() => { setRemoveMemberError(''); setShowMembersSheet(true) }} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
-                    Shared with:
+                    Added:
                   </span>
                   <div style={{ display: 'flex' }}>
                     {members.map((m, i) => (
@@ -570,12 +572,52 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   const [showCreateList, setShowCreateList] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [sharedLists, setSharedLists] = useState([])
+  const [sharedListDetail, setSharedListDetail] = useState(null) // { header, spotIds: Set } | null
 
   useEffect(() => {
     if (!user?.id) return
     if (_listsUserId === user.id) return
     fetchLists()
   }, [user?.id])
+
+  // Lists a friend added this user to as a member — RLS blocks a member
+  // from reading spot_lists/saved_spots directly, so this RPC (SECURITY
+  // DEFINER, presumably) is the only way to see them. No module-level
+  // cache like fetchLists() above: membership changes aren't covered by
+  // the seshwars:lists-changed event, so this just refetches per mount.
+  useEffect(() => {
+    if (!user?.id) { setSharedLists([]); return }
+    let cancelled = false
+    supabase.rpc('get_lists_shared_with_me').then(({ data, error }) => {
+      if (cancelled) return
+      if (error) { console.error('[SavedView] get_lists_shared_with_me failed:', error); return }
+      setSharedLists(data || [])
+    })
+    return () => { cancelled = true }
+  }, [user?.id])
+
+  // Shared-list detail (member view): get_list_header + get_list_spot_ids
+  // are the only RLS-permitted paths to a shared list's contents for a
+  // member. Spot rows themselves are resolved from the existing spots
+  // cache below (not re-fetched here) — see collSpots/missingSharedSpotIds.
+  useEffect(() => {
+    if (!openCollection || openCollection.type !== 'shared') { setSharedListDetail(null); return }
+    let cancelled = false
+    ;(async () => {
+      const [{ data: headerData, error: headerErr }, { data: idsData, error: idsErr }] = await Promise.all([
+        supabase.rpc('get_list_header', { p_list_id: openCollection.id }),
+        supabase.rpc('get_list_spot_ids', { p_list_id: openCollection.id }),
+      ])
+      if (cancelled) return
+      if (headerErr) console.error('[SavedView] get_list_header failed:', headerErr)
+      if (idsErr) console.error('[SavedView] get_list_spot_ids failed:', idsErr)
+      const header = Array.isArray(headerData) ? headerData[0] : headerData
+      const rawIds = Array.isArray(idsData) ? idsData.map(r => (typeof r === 'string' ? r : r?.spot_id ?? r?.id)).filter(Boolean) : []
+      setSharedListDetail({ header: header || null, spotIds: new Set(rawIds) })
+    })()
+    return () => { cancelled = true }
+  }, [openCollection?.type, openCollection?.id])
 
   // Refetch when a list was modified externally (e.g. SaveToListModal)
   useEffect(() => {
@@ -585,10 +627,11 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   }, [user?.id])
 
   // Open a specific list by id (list_invite notification tap). Looks for
-  // it among the user's own lists first; otherwise fetches it directly —
-  // list_members-based RLS is assumed to grant a member read access to a
-  // list/its spots they don't own, the same way get_shared_list already
-  // does for public share-token links.
+  // it among the user's own lists first; otherwise this is a member opening
+  // a list they don't own — RLS blocks reading spot_lists/saved_spots
+  // directly for a member, so get_list_header is the only permitted path
+  // (spots themselves resolve via the sharedListDetail effect above, same
+  // as tapping a "Shared With You" card).
   useEffect(() => {
     if (!openListId || !user?.id) return
     let cancelled = false
@@ -599,13 +642,11 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         onOpenListIdHandled?.()
         return
       }
-      const { data: listRow } = await supabase.from('spot_lists').select('*').eq('id', openListId).maybeSingle()
+      const { data: headerData, error } = await supabase.rpc('get_list_header', { p_list_id: openListId })
       if (cancelled) return
-      if (!listRow) { onOpenListIdHandled?.(); return }
-      const { data: items } = await supabase.from('saved_spots').select('spot_id').eq('list_id', openListId)
-      if (cancelled) return
-      setListSpotIds(prev => ({ ...prev, [openListId]: new Set((items || []).map(i => i.spot_id)) }))
-      setOpenCollection({ type: 'list', id: listRow.id, name: listRow.name, shareToken: listRow.share_token, isOwner: listRow.user_id === user.id })
+      const header = Array.isArray(headerData) ? headerData[0] : headerData
+      if (error || !header) { onOpenListIdHandled?.(); return }
+      setOpenCollection({ type: 'shared', id: openListId, name: header.name, isOwner: header.owner_id === user.id })
       onOpenListIdHandled?.()
     })()
     return () => { cancelled = true }
@@ -695,22 +736,40 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   const favoritesListEntry = lists.find(l => l.is_favorites)
 
   if (openCollection) {
-    const collSpots = openCollection.type === 'favorites'
-      ? savedSpots
-      : getListSpots(openCollection.id)
+    let collSpots
+    if (openCollection.type === 'favorites') {
+      collSpots = savedSpots
+    } else if (openCollection.type === 'shared') {
+      const ids = sharedListDetail?.spotIds || new Set()
+      collSpots = spots.filter(s => ids.has(s.id))
+      // Spot IDs the shared list contains that the useSpots cache has no row
+      // for (typically a private/unlisted spot this member can't see via the
+      // spots table's own RLS select) — silently excluded from the rendered
+      // list, same as a regular owned-list spot id with no matching cache
+      // entry already is via getListSpots() above.
+      if (sharedListDetail) {
+        const missing = [...ids].filter(id => !spots.some(s => s.id === id))
+        if (missing.length > 0) console.warn('[SavedView] shared list spot ids not in useSpots cache (private/unlisted?):', missing)
+      }
+    } else {
+      collSpots = getListSpots(openCollection.id)
+    }
     const favShareToken = openCollection.type === 'favorites'
       ? (openCollection.shareToken || favoritesListEntry?.share_token)
       : openCollection.shareToken
+    const title = openCollection.type === 'shared'
+      ? (sharedListDetail?.header?.name || openCollection.name)
+      : openCollection.name
     return (
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <CollectionView
           key={openCollection.type === 'favorites' ? 'favorites' : openCollection.id}
-          title={openCollection.name}
-          isList={openCollection.type === 'list'}
+          title={title}
+          isList={openCollection.type === 'list' || openCollection.type === 'shared'}
           isFavorites={openCollection.type === 'favorites'}
           isOwner={openCollection.isOwner ?? true}
           userId={user?.id}
-          listId={openCollection.type === 'list' ? openCollection.id : favoritesListEntry?.id}
+          listId={openCollection.type === 'list' || openCollection.type === 'shared' ? openCollection.id : favoritesListEntry?.id}
           shareToken={favShareToken}
           onTokenGenerated={handleTokenGenerated}
           spots={collSpots}
@@ -821,6 +880,33 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
           )
         )}
         </div>
+
+        {/* Lists shared with this user by someone else — same card style as
+            the owner's own lists above, minus the spot count (not returned
+            by get_lists_shared_with_me()) in favor of the owner's username. */}
+        {sharedLists.length > 0 && (
+          <div style={{ padding: '0 16px' }}>
+            <div className="section-label">Shared With You</div>
+            {sharedLists.map(list => (
+              <div
+                key={list.id}
+                onClick={() => setOpenCollection({ type: 'shared', id: list.id, name: list.name, isOwner: false })}
+                style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
+              >
+                <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="20" viewBox="0 0 28 32" fill="none">
+                    <path d="M4,2 H24 V30 L14,22 L4,30 Z" fill="#d4785a" />
+                  </svg>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>@{list.owner_username || list.username || 'unknown'}</div>
+                </div>
+                <div className="arrow-btn"><ArrowIcon /></div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {!user && (
           <div style={{ padding: '40px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700, lineHeight: 1.6 }}>

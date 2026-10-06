@@ -53,6 +53,7 @@ export default function AddFriendButton({ targetUserId, friendshipStatus, isRequ
     setRequester(true)
     setFid(data.id)
     onChange?.(data.status, data)
+    window.dispatchEvent(new Event('seshwars:friends-changed'))
   }
 
   const handleAccept = async () => {
@@ -97,6 +98,7 @@ export default function AddFriendButton({ targetUserId, friendshipStatus, isRequ
     setStatus(data.status)
     setFid(data.id)
     onChange?.(data.status, data)
+    window.dispatchEvent(new Event('seshwars:friends-changed'))
   }
 
   let label, onClick, disabled, filled

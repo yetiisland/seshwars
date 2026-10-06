@@ -80,6 +80,12 @@ export function useNotifications(userId) {
       setNotifications(prev => reset ? enriched : [...prev, ...enriched])
       setHasMore(notifs.length === PAGE_SIZE)
       pageRef.current = reset ? 1 : pageRef.current + 1
+      setLoading(false)
+      // Returned so a caller (ProfileView's openNotifications) can compute
+      // which ids were unread from this exact fetch, before mark_notifications_read
+      // flips them server-side — reading back from `notifications` state
+      // afterward wouldn't work since the set() above is async.
+      return enriched
     }
     setLoading(false)
   }, [userId])

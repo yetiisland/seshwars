@@ -84,7 +84,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [friendCount, setFriendCount] = useState(0)
   const [friendReqState, setFriendReqState] = useState({})
   const [showNotifications, setShowNotifications] = useState(false)
-  const [notifsFetched, setNotifsFetched] = useState(false)
+  // Snapshot of which notification ids were unread at the moment this visit
+  // opened — captured BEFORE mark_notifications_read runs, so cards keep
+  // their unread styling/section for this visit even though the server-side
+  // read_at column gets set out from under them a moment later. Recomputed
+  // fresh on every open (see openNotifications below), so the next visit
+  // correctly shows yesterday's notifications as read while anything new
+  // since then still renders as unread.
+  const [unreadSnapshot, setUnreadSnapshot] = useState(() => new Set())
+  const [viewProfileFor, setViewProfileFor] = useState(null) // { id, username, avatar_url, friendshipStatus } | null
   // Update password modal state
   const [showEditSheet, setShowEditSheet] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -163,15 +171,21 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     return () => window.removeEventListener('seshwars:tricks-changed', handler)
   }, [user?.id])
 
-  // Any AddFriendButton anywhere (search results, Skaters Near You, a spot's
-  // "Added by" row) can accept a request without knowing this screen exists,
-  // so instead of threading onChange through every call site, refetch on the
-  // two events that reliably bracket "the user might have done that
-  // elsewhere": coming back from the Friends screen, and the app regaining
-  // focus (same visibilitychange/appStateChange signal useNotifications.js
-  // uses for the unread badge). The notification-card accept and the
-  // FriendsView Requests-section accept still call fetchFriendCount directly
-  // too, so those two update live instead of waiting for one of these.
+  // seshwars:friends-changed — same event-refresh approach as
+  // seshwars:lists-changed/seshwars:tricks-changed: every friendship add/
+  // accept/deny/cancel/remove dispatches this (AddFriendButton, FriendsView,
+  // the notification-card accept/deny below), so the count updates
+  // immediately regardless of where the action happened.
+  useEffect(() => {
+    const handler = () => fetchFriendCount()
+    window.addEventListener('seshwars:friends-changed', handler)
+    return () => window.removeEventListener('seshwars:friends-changed', handler)
+  }, [user?.id])
+
+  // Older fallback coverage for the same thing, kept alongside the event
+  // above: refetch on coming back from the Friends screen, and on the app
+  // regaining focus (same visibilitychange/appStateChange signal
+  // useNotifications.js uses for the unread badge).
   const prevShowFriendsScreenRef = useRef(false)
   useEffect(() => {
     if (prevShowFriendsScreenRef.current && !showFriendsScreen) {
@@ -397,16 +411,37 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     setTimeout(() => closePasswordModal(), 1800)
   }
 
-  const openNotifications = () => {
+  const openNotifications = async () => {
     setShowNotifications(true)
+    // Always refetch (not just on first open this session) so a notification
+    // that arrived since the last visit is actually in the list — otherwise
+    // it would never appear at all, let alone under the wrong section.
+    const fresh = await onFetchNotifications?.(true)
+    const unreadIds = (fresh || notifications).filter(n => !n.read_at).map(n => n.id)
+    setUnreadSnapshot(new Set(unreadIds))
+    // Captured the pre-read snapshot above before this fires.
     onMarkAllNotificationsRead?.()
-    if (!notifsFetched) {
-      onFetchNotifications?.(true)
-      setNotifsFetched(true)
-    }
+  }
+
+  // Minimal read-only profile preview for a friend_request/friend_accepted
+  // notification's VIEW button — no dedicated "other user's profile" page
+  // exists in the app yet, so this reuses the existing modal-sheet pattern
+  // plus AddFriendButton (which already renders whatever action is valid
+  // for the current friendship status, never one that would fail).
+  const openUserProfile = (n) => {
+    const status = n.type === 'friend_accepted' ? 'accepted'
+      : friendReqState[n.id]?.resolved === 'accepted' ? 'accepted'
+      : friendReqState[n.id]?.resolved === 'ignored' ? null
+      : 'pending'
+    setViewProfileFor({ id: n.actor_id, username: n.actorUsername, avatar_url: n.actorAvatar, friendshipStatus: status })
   }
 
   const handleNotifTap = async (notif) => {
+    if (notif.type === 'friend_request' || notif.type === 'friend_accepted') {
+      await onMarkNotificationRead?.(notif.id)
+      openUserProfile(notif)
+      return
+    }
     if (notif.type === 'list_invite') {
       if (!notif.list_id) return
       await onMarkNotificationRead?.(notif.id)
@@ -435,6 +470,47 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     return data.id
   }
 
+  // Friend-request cards must reflect the real, current friendship status —
+  // not just whether *this card* resolved it — since the same request can
+  // be accepted/denied from the Friends page (or another device) without
+  // this screen hearing about it. Bulk-checks every not-yet-checked
+  // friend_request notification's actor against the live friendships table
+  // as soon as it shows up in `notifications`, so a stale ACCEPT/DENY pair
+  // that would just fail never renders.
+  const friendReqCheckedRef = useRef(new Set())
+  const checkFriendRequestStatuses = async (notifs) => {
+    if (!user?.id) return
+    const actorIds = [...new Set(notifs.map(n => n.actor_id).filter(Boolean))]
+    if (actorIds.length === 0) return
+    const { data, error } = await supabase
+      .from('friendships')
+      .select('requester_id, status')
+      .in('requester_id', actorIds)
+      .eq('addressee_id', user.id)
+    if (error || !data) return
+    const statusByActor = {}
+    for (const row of data) statusByActor[row.requester_id] = row.status
+    setFriendReqState(s => {
+      const next = { ...s }
+      for (const n of notifs) {
+        const st = statusByActor[n.actor_id]
+        if (st === 'pending') continue // genuinely still pending — leave Accept/Deny showing
+        // Accepted elsewhere -> show "Accepted". No row (denied/cancelled)
+        // or any other status -> same "Ignored" display the Deny button
+        // already produces; never leave a now-stale Accept/Deny visible.
+        next[n.id] = { ...(next[n.id] || {}), resolved: st === 'accepted' ? 'accepted' : 'ignored' }
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    const toCheck = notifications.filter(n => n.type === 'friend_request' && n.actor_id && !friendReqCheckedRef.current.has(n.id))
+    if (toCheck.length === 0) return
+    toCheck.forEach(n => friendReqCheckedRef.current.add(n.id))
+    checkFriendRequestStatuses(toCheck)
+  }, [notifications, user?.id])
+
   const handleAcceptFriendRequestNotif = async (n) => {
     setFriendReqState(s => ({ ...s, [n.id]: { ...s[n.id], loading: true, error: '' } }))
     const rowId = await findPendingFriendshipForNotif(n)
@@ -454,6 +530,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     }
     setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: 'accepted', error: '' } }))
     fetchFriendCount()
+    window.dispatchEvent(new Event('seshwars:friends-changed'))
   }
 
   const handleIgnoreFriendRequestNotif = async (n) => {
@@ -470,6 +547,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       return
     }
     setFriendReqState(s => ({ ...s, [n.id]: { loading: false, resolved: 'ignored', error: '' } }))
+    window.dispatchEvent(new Event('seshwars:friends-changed'))
   }
 
   const handleSignOut = async () => {
@@ -1311,7 +1389,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No notifications yet</div>
             ) : (
               <>
-                {(() => { const firstReadIdx = notifications.findIndex(n => !!n.read_at); return notifications.map((n, i) => {
+                {(() => { const firstReadIdx = notifications.findIndex(n => !unreadSnapshot.has(n.id)); return notifications.map((n, i) => {
                   const actionText = n.type === 'friend_request' ? `${n.actorUsername || 'Someone'} wants to be friends`
                     : n.type === 'friend_accepted' ? `${n.actorUsername || 'Someone'} accepted your friend request`
                     : n.type === 'comment_mention' ? `${n.actorUsername || 'Someone'} tagged you in a comment`
@@ -1335,8 +1413,8 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                       style={{
                         margin: '8px 12px',
                         borderRadius: 10,
-                        background: !n.read_at ? '#FFFFFF' : 'transparent',
-                        border: `1px solid ${!n.read_at ? 'rgba(212,120,90,0.3)' : '#EAD8C8'}`,
+                        background: unreadSnapshot.has(n.id) ? '#FFFFFF' : 'transparent',
+                        border: `1px solid ${unreadSnapshot.has(n.id) ? 'rgba(212,120,90,0.3)' : '#EAD8C8'}`,
                         overflow: 'hidden',
                         display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
                       }}
@@ -1373,7 +1451,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                         {n.actorUsername && (
                           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{n.actorUsername}</div>
                         )}
-                        <div style={{ fontSize: 11, fontWeight: n.read_at ? 600 : 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{actionText}</div>
+                        <div style={{ fontSize: 11, fontWeight: unreadSnapshot.has(n.id) ? 700 : 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{actionText}</div>
                         {n.spotTitle && n.type !== 'spot_share' && (
                           <div style={{ fontSize: 11, color: '#d4785a', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.spotTitle}</div>
                         )}
@@ -1383,39 +1461,44 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                         <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>{relativeTime(n.created_at)}</div>
                       </div>
 
-                      {/* Friend request controls, or the existing View button */}
-                      {n.type === 'friend_request' ? (
-                        friendReqState[n.id]?.resolved ? (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#4a9a5a', letterSpacing: 0.5, textTransform: 'uppercase', flexShrink: 0 }}>
-                            {friendReqState[n.id].resolved === 'accepted' ? 'Accepted' : 'Ignored'}
-                          </span>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                            {friendReqState[n.id]?.error && (
-                              <span style={{ fontSize: 11, color: '#e07070', fontWeight: 700 }}>{friendReqState[n.id].error}</span>
-                            )}
-                            <div
-                              onClick={() => !friendReqState[n.id]?.loading && handleAcceptFriendRequestNotif(n)}
-                              style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: friendReqState[n.id]?.loading ? 0.6 : 1 }}
-                            >
-                              <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }}>Accept</span>
-                            </div>
-                            <div
-                              onClick={() => !friendReqState[n.id]?.loading && handleIgnoreFriendRequestNotif(n)}
-                              style={{ flexShrink: 0, border: '1px solid rgba(212,120,90,0.5)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: friendReqState[n.id]?.loading ? 0.6 : 1 }}
-                            >
-                              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--salmon)', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }}>Deny</span>
-                            </div>
+                      {/* Friend request controls (when unresolved), plus a
+                          View button on every notification — routes to the
+                          spot/list/profile per handleNotifTap/openUserProfile. */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                        {n.type === 'friend_request' && (
+                          friendReqState[n.id]?.resolved ? (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#4a9a5a', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                              {friendReqState[n.id].resolved === 'accepted' ? 'Accepted' : 'Ignored'}
+                            </span>
+                          ) : (
+                            <>
+                              {friendReqState[n.id]?.error && (
+                                <span style={{ fontSize: 11, color: '#e07070', fontWeight: 700 }}>{friendReqState[n.id].error}</span>
+                              )}
+                              <div
+                                onClick={() => !friendReqState[n.id]?.loading && handleAcceptFriendRequestNotif(n)}
+                                style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: friendReqState[n.id]?.loading ? 0.6 : 1 }}
+                              >
+                                <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }}>Accept</span>
+                              </div>
+                              <div
+                                onClick={() => !friendReqState[n.id]?.loading && handleIgnoreFriendRequestNotif(n)}
+                                style={{ flexShrink: 0, border: '1px solid rgba(212,120,90,0.5)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: friendReqState[n.id]?.loading ? 0.6 : 1 }}
+                              >
+                                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--salmon)', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }}>Deny</span>
+                              </div>
+                            </>
+                          )
+                        )}
+                        {(n.type === 'friend_request' || n.type === 'friend_accepted' || n.spotSlug || n.spot_id || n.list_id) && (
+                          <div
+                            onClick={() => handleNotifTap(n)}
+                            style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                          >
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }}>View</span>
                           </div>
-                        )
-                      ) : (n.spotSlug || n.spot_id || n.list_id) && (
-                        <div
-                          onClick={() => handleNotifTap(n)}
-                          style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                        >
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1 }}>View</span>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                     </div>
                   )
@@ -1433,6 +1516,44 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             <div style={{ height: BOTTOM_PAD }} />
           </div>
           {onTabChange && <TabBar active="profile" onChange={t => { setShowNotifications(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
+        </div>,
+        document.body
+      )}
+
+      {/* Minimal read-only profile preview — VIEW target for friend_request/
+          friend_accepted notifications. No dedicated "other user's profile"
+          page exists elsewhere in the app; reuses the existing modal-sheet
+          pattern plus AddFriendButton for a status-correct action. */}
+      {viewProfileFor && createPortal(
+        <div className="modal-overlay" onClick={() => setViewProfileFor(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 20px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#ECEDF2', border: '2px solid #C8CAD4', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                {viewProfileFor.avatar_url ? (
+                  <img src={viewProfileFor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: 22, fontWeight: 900, color: '#6a6c7a' }}>{viewProfileFor.username ? viewProfileFor.username[0].toUpperCase() : '?'}</span>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{viewProfileFor.username || 'skater'}</div>
+                <div style={{ marginTop: 8 }}>
+                  <AddFriendButton
+                    targetUserId={viewProfileFor.id}
+                    friendshipStatus={viewProfileFor.friendshipStatus}
+                    isRequester={false}
+                    friendshipId={null}
+                    onChange={(newStatus) => {
+                      fetchFriendCount()
+                      window.dispatchEvent(new Event('seshwars:friends-changed'))
+                      setViewProfileFor(p => p && { ...p, friendshipStatus: newStatus })
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>,
         document.body
       )}

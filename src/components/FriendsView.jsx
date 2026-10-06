@@ -164,6 +164,16 @@ export default function FriendsView({ user, userLocation, locationPermission, re
     loadSentPending()
   }, [user?.id])
 
+  // FRIENDS/REQUESTS/PENDING counts update immediately for any add/accept/
+  // deny/cancel/remove from anywhere in the app (notifications page, a
+  // spot's "Added by" row, search results, this screen's own actions below)
+  // — same seshwars:*-changed event-refresh approach as lists/tricks.
+  useEffect(() => {
+    const handler = () => { loadRequests(); loadFriends(); loadSentPending() }
+    window.addEventListener('seshwars:friends-changed', handler)
+    return () => window.removeEventListener('seshwars:friends-changed', handler)
+  }, [user?.id])
+
   const handleIgnoreRequest = async (friendshipId) => {
     const { data, error } = await supabase.from('friendships').delete().eq('id', friendshipId).select()
     if (error || !data || data.length === 0) {
@@ -173,11 +183,14 @@ export default function FriendsView({ user, userLocation, locationPermission, re
     }
     setRequestsError('')
     setRequests(prev => prev.filter(r => r.friendship_id !== friendshipId))
+    window.dispatchEvent(new Event('seshwars:friends-changed'))
   }
 
+  // AddFriendButton (in the REQUESTS sheet below) already dispatches
+  // seshwars:friends-changed on a successful accept, which the listener
+  // above picks up to refresh all three counts — this just covers the
+  // caller-specific bits that event can't: ProfileView's own friendCount.
   const handleRequestAccepted = () => {
-    loadRequests()
-    loadFriends()
     onFriendsChanged?.()
   }
 
@@ -194,6 +207,7 @@ export default function FriendsView({ user, userLocation, locationPermission, re
     setFriendsError('')
     setFriends(prev => prev.filter(f => f.friendship_id !== friendshipId))
     onFriendsChanged?.()
+    window.dispatchEvent(new Event('seshwars:friends-changed'))
   }
 
   const confirmCancelPending = async () => {
@@ -208,6 +222,7 @@ export default function FriendsView({ user, userLocation, locationPermission, re
     }
     setSentPendingError('')
     setSentPending(prev => prev.filter(r => r.friendship_id !== friendshipId))
+    window.dispatchEvent(new Event('seshwars:friends-changed'))
   }
 
   return (
