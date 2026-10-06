@@ -7,10 +7,7 @@ export default function DeleteAccountPage({ onClose, onDeleteClick }) {
   // account-deletion edge function itself (supabase/functions/
   // delete-account/index.ts), which separately deletes the profiles row
   // and anonymizes spots you added (added_by -> null) rather than
-  // deleting them. spot_likes is deliberately NOT claimed as deleted here
-  // — it has no confirmed cascade and the edge function never touches it,
-  // so a like row likely survives account deletion; flagged for follow-up
-  // rather than asserted either way on this page.
+  // deleting them.
   const sections = [
     {
       title: 'HOW TO DELETE IN THE APP',
