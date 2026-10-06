@@ -595,19 +595,21 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   // are the only RLS-permitted paths to a shared list's contents for a
   // member. Spot rows themselves are resolved from the existing spots
   // cache below (not re-fetched here) — see collSpots/missingSharedSpotIds.
+  // Exact shapes: get_list_header returns one row (id, name, owner_id,
+  // owner_username, is_owner), not wrapped in an array; get_list_spot_ids
+  // returns rows with a single spot_id column.
   useEffect(() => {
     if (!openCollection || openCollection.type !== 'shared') { setSharedListDetail(null); return }
     let cancelled = false
     ;(async () => {
-      const [{ data: headerData, error: headerErr }, { data: idsData, error: idsErr }] = await Promise.all([
+      const [{ data: header, error: headerErr }, { data: idsData, error: idsErr }] = await Promise.all([
         supabase.rpc('get_list_header', { p_list_id: openCollection.id }),
         supabase.rpc('get_list_spot_ids', { p_list_id: openCollection.id }),
       ])
       if (cancelled) return
       if (headerErr) console.error('[SavedView] get_list_header failed:', headerErr)
       if (idsErr) console.error('[SavedView] get_list_spot_ids failed:', idsErr)
-      const header = Array.isArray(headerData) ? headerData[0] : headerData
-      const rawIds = Array.isArray(idsData) ? idsData.map(r => (typeof r === 'string' ? r : r?.spot_id ?? r?.id)).filter(Boolean) : []
+      const rawIds = (idsData || []).map(r => r.spot_id)
       setSharedListDetail({ header: header || null, spotIds: new Set(rawIds) })
     })()
     return () => { cancelled = true }
@@ -636,11 +638,10 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         onOpenListIdHandled?.()
         return
       }
-      const { data: headerData, error } = await supabase.rpc('get_list_header', { p_list_id: openListId })
+      const { data: header, error } = await supabase.rpc('get_list_header', { p_list_id: openListId })
       if (cancelled) return
-      const header = Array.isArray(headerData) ? headerData[0] : headerData
       if (error || !header) { onOpenListIdHandled?.(); return }
-      setOpenCollection({ type: 'shared', id: openListId, name: header.name, isOwner: header.owner_id === user.id })
+      setOpenCollection({ type: 'shared', id: openListId, name: header.name, isOwner: header.is_owner })
       onOpenListIdHandled?.()
     })()
     return () => { cancelled = true }
@@ -876,8 +877,10 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         </div>
 
         {/* Lists shared with this user by someone else — same card style as
-            the owner's own lists above, minus the spot count (not returned
-            by get_lists_shared_with_me()) in favor of the owner's username. */}
+            the owner's own lists above, with the owner's username alongside
+            the same spot-count format. Exact shape from
+            get_lists_shared_with_me(): id, name, owner_id, owner_username,
+            owner_avatar_url, spot_count, added_at. */}
         {sharedLists.length > 0 && (
           <div style={{ padding: '0 16px' }}>
             <div className="section-label">Shared With You</div>
@@ -894,7 +897,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>@{list.owner_username || list.username || 'unknown'}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>{list.spot_count} spot{list.spot_count !== 1 ? 's' : ''} · @{list.owner_username}</div>
                 </div>
                 <div className="arrow-btn"><ArrowIcon /></div>
               </div>

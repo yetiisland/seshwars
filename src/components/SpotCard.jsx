@@ -54,7 +54,7 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
             width="800"
             height="450"
             loading={priority ? 'eager' : 'lazy'}
-            fetchpriority={priority ? 'high' : undefined}
+            fetchPriority={priority ? 'high' : undefined}
             decoding="async"
           />
         )}

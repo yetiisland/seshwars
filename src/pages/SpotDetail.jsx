@@ -665,7 +665,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 transition: transitioning ? 'transform 0.28s cubic-bezier(0.25,0.1,0.25,1)' : 'none',
                 willChange: 'transform',
               }}>
-                <img src={transformImageUrl(photo, 1000)} alt={spot.title} width="800" height="600" loading="eager" fetchpriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
+                <img src={transformImageUrl(photo, 1000)} alt={spot.title} width="800" height="600" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
               </div>
             ))
           ) : (

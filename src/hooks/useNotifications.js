@@ -57,13 +57,16 @@ export function useNotifications(userId) {
       for (const s of spotsRes.data || []) spotMap[s.id] = s
 
       const enriched = notifs.map(n => {
-        let actorUsername = 'Someone'
+        // null (not a placeholder string) whenever there's no real,
+        // resolvable profile — admin_update, a null actor_id (the actor's
+        // account was deleted; actor_id is cascaded to null, not the row
+        // itself), or a profile that just didn't resolve. Callers render
+        // a neutral label from this, not "@null".
+        let actorUsername = null
         let actorAvatar = null
-        if (n.type === 'admin_update') {
-          actorUsername = null
-        } else if (n.actor_id && profileMap[n.actor_id]) {
+        if (n.type !== 'admin_update' && n.actor_id && profileMap[n.actor_id]) {
           const p = profileMap[n.actor_id]
-          actorUsername = p.username || p.first_name || 'Someone'
+          actorUsername = p.username || p.first_name || null
           actorAvatar = p.avatar_url || null
         }
         const spot = n.spot_id ? spotMap[n.spot_id] : null

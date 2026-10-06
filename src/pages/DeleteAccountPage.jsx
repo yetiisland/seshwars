@@ -1,12 +1,16 @@
 export default function DeleteAccountPage({ onClose, onDeleteClick }) {
-  // Every claim below is read directly from the account-deletion code path
-  // (supabase/functions/delete-account/index.ts) — it anonymizes added
-  // spots (added_by -> null), hard-deletes spot_clips/spot_reviews/
-  // spot_comments/spot_reports/saved_spots/spot_lists/profiles rows for
-  // this user, then deletes the auth user itself. It does not touch hidden
-  // spots, trick-list entries, friend connections, or notifications, so
-  // those are deliberately not claimed here — see the PR/report for this
-  // change for that gap.
+  // Every claim below is confirmed against two sources: the live
+  // database's ON DELETE CASCADE foreign keys (hidden_spots, friendships,
+  // list_members, user_tricks, trick_lists, notifications you received,
+  // saved_spots, spot_lists, spot_comments, spot_clips, spot_reviews,
+  // spot_reports all cascade off the deleted auth user), and the
+  // account-deletion edge function itself (supabase/functions/
+  // delete-account/index.ts), which separately deletes the profiles row
+  // and anonymizes spots you added (added_by -> null) rather than
+  // deleting them. spot_likes is deliberately NOT claimed as deleted here
+  // — it has no confirmed cascade and the edge function never touches it,
+  // so a like row likely survives account deletion; flagged for follow-up
+  // rather than asserted either way on this page.
   const sections = [
     {
       title: 'HOW TO DELETE IN THE APP',
@@ -26,11 +30,16 @@ export default function DeleteAccountPage({ onClose, onDeleteClick }) {
       bullets: [
         'Your account and login credentials',
         'Your profile information (name, username, avatar)',
-        'Spots you saved, and any custom lists you created',
-        'Ratings and reviews you submitted',
+        'Your saved lists and saved spots',
+        'Spots you hid',
+        'Friends and friend requests',
+        'Shared list memberships — lists you were added to, and other people’s membership in lists you created',
+        'Your trick lists and tricks',
         'Comments you posted',
-        'Reports you filed on spots',
         'Clips you submitted',
+        'Ratings and reviews you submitted',
+        'Reports you filed on spots',
+        'Notifications you received',
       ],
     },
     {

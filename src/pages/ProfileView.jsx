@@ -523,6 +523,22 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
   useEffect(() => {
     const toCheck = notifications.filter(n => n.type === 'friend_request' && n.actor_id && !friendReqCheckedRef.current.has(n.id))
+    // friend_request notifications whose actor's account was since deleted
+    // (actor_id cascades to null, not the notification row itself) have no
+    // friendships row left to check — that table cascades away with the
+    // deleted actor too — so there's nothing to accept/deny. Resolve them
+    // locally instead of leaving a stale Accept/Deny pair that would just
+    // fail (findPendingFriendshipForNotif queries eq('requester_id', null),
+    // which never matches).
+    const orphaned = notifications.filter(n => n.type === 'friend_request' && !n.actor_id && !friendReqCheckedRef.current.has(n.id))
+    if (orphaned.length > 0) {
+      orphaned.forEach(n => friendReqCheckedRef.current.add(n.id))
+      setFriendReqState(s => {
+        const next = { ...s }
+        for (const n of orphaned) next[n.id] = { ...(next[n.id] || {}), resolved: 'ignored' }
+        return next
+      })
+    }
     if (toCheck.length === 0) return
     toCheck.forEach(n => friendReqCheckedRef.current.add(n.id))
     checkFriendRequestStatuses(toCheck)
@@ -1404,12 +1420,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             ) : (
               <>
                 {(() => { const firstReadIdx = notifications.findIndex(n => !unreadSnapshot.has(n.id)); return notifications.map((n, i) => {
-                  const actionText = n.type === 'friend_request' ? `${n.actorUsername || 'Someone'} wants to be friends`
-                    : n.type === 'friend_accepted' ? `${n.actorUsername || 'Someone'} accepted your friend request`
-                    : n.type === 'comment_mention' ? `${n.actorUsername || 'Someone'} tagged you in a comment`
-                    : n.type === 'comment_reply' ? `${n.actorUsername || 'Someone'} replied to your comment`
-                    : n.type === 'list_invite' ? `${n.actorUsername || 'Someone'} added you to a list`
-                    : n.type === 'spot_share' ? `${n.actorUsername || 'Someone'} shared ${n.spotTitle || 'a spot'} with you`
+                  const actionText = n.type === 'friend_request' ? `${n.actorUsername || 'A skater'} wants to be friends`
+                    : n.type === 'friend_accepted' ? `${n.actorUsername || 'A skater'} accepted your friend request`
+                    : n.type === 'comment_mention' ? `${n.actorUsername || 'A skater'} tagged you in a comment`
+                    : n.type === 'comment_reply' ? `${n.actorUsername || 'A skater'} replied to your comment`
+                    : n.type === 'list_invite' ? `${n.actorUsername || 'A skater'} added you to a list`
+                    : n.type === 'spot_share' ? `${n.actorUsername || 'A skater'} shared ${n.spotTitle || 'a spot'} with you`
                     : n.type === 'admin_update' ? 'Updated Your Spot'
                     : n.type === 'rating' ? 'Rated Your Spot'
                     : n.type === 'comment' ? 'Commented On Your Spot'
@@ -1504,7 +1520,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                             </>
                           )
                         )}
-                        {(n.type === 'friend_request' || n.type === 'friend_accepted' || n.spotSlug || n.spot_id || n.list_id) && (
+                        {(((n.type === 'friend_request' || n.type === 'friend_accepted') && n.actor_id) || n.spotSlug || n.spot_id || n.list_id) && (
                           <div
                             onClick={() => handleNotifTap(n)}
                             style={{ flexShrink: 0, background: '#d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
