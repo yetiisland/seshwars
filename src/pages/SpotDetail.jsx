@@ -40,7 +40,7 @@ function bustBadgeStyle(rating) {
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
 }
 
-const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, onViewTrickList, isHidden, onUnhidePress, onHidePress, sheetPad = 0, scrollToCommentId }, ref) {
+const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, isHidden, onUnhidePress, onHidePress, sheetPad = 0, scrollToCommentId }, ref) {
   // ── Photo / hero state ────────────────────────────────────────
   const [photoIndex, setPhotoIndex] = useState(0)
   const [dragX, setDragX] = useState(0)
@@ -1479,7 +1479,6 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           spot={spot}
           user={user}
           onClose={() => setShowTrickSheet(false)}
-          onViewTrickList={onViewTrickList}
           onGoProfile={onGoProfile}
         />
       )}

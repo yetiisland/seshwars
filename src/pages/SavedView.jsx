@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
 import SpotCard from '../components/SpotCard'
 import Navbar from '../components/Navbar'
-import { ArrowIcon, ShareIcon, PlusIcon, CloseIcon, IconBox } from '../components/Icons'
+import { ArrowIcon, ShareIcon, PlusIcon, CloseIcon, LeaveIcon, IconBox } from '../components/Icons'
 import InitialsAvatar from '../components/InitialsAvatar'
 import MapView from './MapView'
 
@@ -568,6 +568,11 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   const [creating, setCreating] = useState(false)
   const [sharedLists, setSharedLists] = useState([])
   const [sharedListDetail, setSharedListDetail] = useState(null) // { header, spotIds: Set } | null
+  const [shareCardToast, setShareCardToast] = useState('')
+  const [pendingLeaveList, setPendingLeaveList] = useState(null) // { id, name }
+  const [leaveClosing, setLeaveClosing] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [leaveError, setLeaveError] = useState('')
 
   useEffect(() => {
     if (!user?.id) return
@@ -700,6 +705,69 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     setCreating(false)
   }
 
+  const showShareCardToast = (msg) => {
+    setShareCardToast(msg)
+    setTimeout(() => setShareCardToast(''), 2500)
+  }
+
+  // SHARE icon on a "Shared With You" overview card — get_or_create_list_share_token
+  // works for owners and members, unlike the owner-only share_token write
+  // CollectionView.handleShare still uses for the user's own lists.
+  const handleShareSharedList = async (list) => {
+    const { data: token, error } = await supabase.rpc('get_or_create_list_share_token', { p_list_id: list.id })
+    if (error || !token) {
+      console.error('[SavedView] get_or_create_list_share_token failed:', error)
+      showShareCardToast('Could not create a share link. Try again.')
+      return
+    }
+    const url = `${siteOrigin()}/#/list/${token}`
+    let shared = false
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: list.name, url })
+        shared = true
+      } catch (err) {
+        if (err && err.name === 'AbortError') shared = true
+        else console.warn('[SavedView] navigator.share failed, falling back to clipboard:', err)
+      }
+    }
+    if (!shared) {
+      try {
+        await navigator.clipboard.writeText(url)
+        showShareCardToast('Link Copied!')
+      } catch (err) {
+        console.error('[SavedView] clipboard failed:', err)
+        window.prompt('Copy this share link:', url)
+      }
+    }
+  }
+
+  const closeLeaveConfirm = () => {
+    setLeaveClosing(true)
+    setLeaveError('')
+    setTimeout(() => { setLeaveClosing(false); setPendingLeaveList(null) }, 180)
+  }
+
+  // Existing confirm-dialog pattern — closes in both outcomes. Removes only
+  // this user's own list_members row (self-removal), then drops the card.
+  const confirmLeaveList = async () => {
+    if (!pendingLeaveList || !user?.id) return
+    const listId = pendingLeaveList.id
+    setLeaving(true)
+    const { data, error } = await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', user.id).select()
+    if (error || !data || data.length === 0) {
+      console.error('[SavedView] confirmLeaveList failed:', error)
+      setLeaving(false)
+      closeLeaveConfirm()
+      setLeaveError('Could not leave this list. Try again.')
+      setTimeout(() => setLeaveError(''), 3000)
+      return
+    }
+    setLeaving(false)
+    setSharedLists(prev => prev.filter(l => l.id !== listId))
+    closeLeaveConfirm()
+  }
+
   const handleBackFromCollection = () => {
     _savedOpenCollection = null
     _savedCollectionScrollTop = 0
@@ -729,6 +797,13 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
 
   // Find any existing favorites share token from lists data
   const favoritesListEntry = lists.find(l => l.is_favorites)
+
+  // Owned lists newest-first by created_at, shared lists newest-first by
+  // added_at, merged and interleaved by that date.
+  const combinedLists = [
+    ...lists.map(l => ({ ...l, _kind: 'own', _sortDate: l.created_at })),
+    ...sharedLists.map(l => ({ ...l, _kind: 'shared', _sortDate: l.added_at })),
+  ].sort((a, b) => new Date(b._sortDate) - new Date(a._sortDate))
 
   if (openCollection) {
     let collSpots
@@ -809,13 +884,20 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
           <div className="arrow-btn"><ArrowIcon /></div>
         </div>
 
-        {/* Custom lists */}
-        {lists.map(list => {
-          const count = listSpotIds[list.id]?.size || 0
+        {/* Custom lists — the user's own, mixed with lists shared with them
+            (merged/sorted above as combinedLists). Shared cards get SHARE
+            (get_or_create_list_share_token — works for members too, unlike
+            CollectionView.handleShare's owner-only write) and LEAVE icons
+            in the existing salmon-stroke icon box. */}
+        {combinedLists.map(list => {
+          const isShared = list._kind === 'shared'
+          const count = isShared ? list.spot_count : (listSpotIds[list.id]?.size || 0)
           return (
             <div
-              key={list.id}
-              onClick={() => setOpenCollection({ type: 'list', id: list.id, name: list.name, shareToken: list.share_token, isOwner: true })}
+              key={`${list._kind}-${list.id}`}
+              onClick={() => setOpenCollection(isShared
+                ? { type: 'shared', id: list.id, name: list.name, isOwner: false }
+                : { type: 'list', id: list.id, name: list.name, shareToken: list.share_token, isOwner: true })}
               style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
             >
               <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -823,10 +905,22 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
                   <path d="M4,2 H24 V30 L14,22 L4,30 Z" fill="#d4785a" />
                 </svg>
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>{list.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>{count} spot{count !== 1 ? 's' : ''}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.name}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>
+                  {count} spot{count !== 1 ? 's' : ''}{isShared ? ` · @${list.owner_username}` : ''}
+                </div>
               </div>
+              {isShared && (
+                <>
+                  <IconBox onClick={(e) => { e.stopPropagation(); handleShareSharedList(list) }}>
+                    <ShareIcon color="#d4785a" />
+                  </IconBox>
+                  <IconBox onClick={(e) => { e.stopPropagation(); setLeaveError(''); setPendingLeaveList({ id: list.id, name: list.name }) }}>
+                    <LeaveIcon color="#d4785a" />
+                  </IconBox>
+                </>
+              )}
               <div className="arrow-btn"><ArrowIcon /></div>
             </div>
           )
@@ -876,35 +970,6 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         )}
         </div>
 
-        {/* Lists shared with this user by someone else — same card style as
-            the owner's own lists above, with the owner's username alongside
-            the same spot-count format. Exact shape from
-            get_lists_shared_with_me(): id, name, owner_id, owner_username,
-            owner_avatar_url, spot_count, added_at. */}
-        {sharedLists.length > 0 && (
-          <div style={{ padding: '0 16px' }}>
-            <div className="section-label">Shared With You</div>
-            {sharedLists.map(list => (
-              <div
-                key={list.id}
-                onClick={() => setOpenCollection({ type: 'shared', id: list.id, name: list.name, isOwner: false })}
-                style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
-              >
-                <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg width="18" height="20" viewBox="0 0 28 32" fill="none">
-                    <path d="M4,2 H24 V30 L14,22 L4,30 Z" fill="#d4785a" />
-                  </svg>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>{list.spot_count} spot{list.spot_count !== 1 ? 's' : ''} · @{list.owner_username}</div>
-                </div>
-                <div className="arrow-btn"><ArrowIcon /></div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {!user && (
           <div style={{ padding: '40px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700, lineHeight: 1.6 }}>
             Sign in to save spots and create lists
@@ -914,6 +979,37 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         <div style={{ height: BOTTOM_PAD }} />
       </div>
       </>
+      )}
+
+      {/* Leave-list confirmation (shared cards' LEAVE icon) — existing
+          confirm-dialog pattern, closes in both outcomes. */}
+      {(pendingLeaveList || leaveClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeLeaveConfirm}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={leaveClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Leave List</div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Leave "{pendingLeaveList?.name}"? You'll need a new invite to see it again.</div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={confirmLeaveList} disabled={leaving} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: leaving ? 0.7 : 1 }}>
+                {leaving ? 'Leaving…' : 'Leave'}
+              </button>
+              <button onClick={closeLeaveConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {leaveError && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          {leaveError}
+        </div>,
+        document.body
+      )}
+      {shareCardToast && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          {shareCardToast}
+        </div>,
+        document.body
       )}
     </>
   )

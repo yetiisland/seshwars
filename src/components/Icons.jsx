@@ -260,6 +260,31 @@ export function SendToFriendsIcon({ color = '#d4785a' }) {
   )
 }
 
+// Verbatim copy of the gear glyph already inline in ProfileView.jsx's own
+// Settings button (~line 745-748), extracted so other screens (the
+// individual trick list page) can reuse the same icon.
+export function SettingsIcon({ color = '#d4785a', size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="3" stroke={color} strokeWidth="1.8" />
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// New glyph (door + outward arrow) — no existing "leave/exit" icon in this
+// file to reuse. Same simple-line-icon weight (~1.4 stroke) as ShareIcon/
+// SendToFriendsIcon/PencilIcon above.
+export function LeaveIcon({ color = '#d4785a', size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+      <path d="M6 1H2.5C2.22 1 2 1.22 2 1.5V12.5C2 12.78 2.22 13 2.5 13H6" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.5 4.5L12 7L8.5 9.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="11.7" y1="7" x2="5" y2="7" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function CloseIcon({ color = '#fff' }) {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">

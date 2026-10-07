@@ -54,16 +54,20 @@ what it's used for.
 | `bustChipActiveStyle('Medium Bust'/'Weekends Only'/'Weekdays Only')` | bg `#c8a020` / border `#b08818` / text `#ffffff` | same files | Caution-tier active chip (gold/yellow) |
 | `PALETTE` (InitialsAvatar) | `#d4785a`, `#5a85c4`, `#6ab87a`, `#c45a7a`, `#8a6ac4`, `#c4a05a`, `#5ab0c4` | `components/InitialsAvatar.jsx` | Hash-assigned avatar background palette (7 colors, salmon + 6 others) |
 
-### Trick checkmark (approved exception)
+### Trick checkmark
 
-These two colors were explicitly approved for the trick-landed checkmark
-control and are not derived from anything else already in this file —
-listed here so they don't get rediscovered as "unapproved" later.
+A 32px rounded square (radius 6). Every color here already exists
+elsewhere in the design system — reused as named tokens below, or
+(`#DFEEDF`/`#4E9A51`) already approved for this exact control in an
+earlier pass, so none of this is a fresh exception anymore.
 
 | Hex | Used for | Files |
 |---|---|---|
-| `#DFEEDF` | Trick checkmark — unchecked circle fill | `components/TrickCheckmark.jsx` |
-| `#4E9A51` | Trick checkmark — unchecked circle stroke (1.7px); checked circle fill (no stroke) | `components/TrickCheckmark.jsx` |
+| `#FFFFFF` (`--bg-secondary`) | Unchecked fill | `components/TrickCheckmark.jsx` |
+| `#EAD8C8` (`--border-primary`) | Unchecked stroke (1.7px) | `components/TrickCheckmark.jsx` |
+| `#DFEEDF` | Checked fill | `components/TrickCheckmark.jsx` |
+| `#4E9A51` | Checked stroke (2px) | `components/TrickCheckmark.jsx` |
+| `#3d6830` (also see bust chip) | Checked check-path stroke (3.4px) | `components/TrickCheckmark.jsx` |
 
 ### Other colors in use (no existing name — described by usage)
 

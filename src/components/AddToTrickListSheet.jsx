@@ -16,14 +16,17 @@ function formatLandedDate(iso) {
   return new Date(iso).toLocaleDateString()
 }
 
-// Replaces the old inline "Your Tricks" section on the spot page (see
-// SpotDetail.jsx) — same spot-scoped trick management, but across every
-// list the user has, in one bottom sheet opened from ADD TO TRICK LIST.
-export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickList, onGoProfile }) {
+// Trick lists are now collections of spots (trick_list_spots), and tricks
+// belong to the user+spot, not to a list (user_tricks.list_id is
+// deprecated — never read or written here). So this sheet does two
+// separate things: manage the tricks landed at this spot, and toggle
+// which of the user's own trick lists this spot belongs to.
+export default function AddToTrickListSheet({ spot, user, onClose, onGoProfile }) {
   const [trickLists, setTrickLists] = useState([])
-  const [spotTricks, setSpotTricks] = useState([]) // this user's tricks at this spot, any list
+  const [memberListIds, setMemberListIds] = useState(new Set()) // this user's own lists that already contain this spot
+  const [spotTricks, setSpotTricks] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedListId, setSelectedListId] = useState(null)
+  const [listError, setListError] = useState('')
 
   const [showCreateList, setShowCreateList] = useState(false)
   const [newListName, setNewListName] = useState('')
@@ -47,36 +50,72 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
   const fetchData = async () => {
     if (!user?.id || !spot?.id) { setLoading(false); return }
     setLoading(true)
-    const [listsRes, tricksRes] = await Promise.all([
-      supabase.from('trick_lists').select('*').eq('user_id', user.id).order('created_at'),
+    // trick_list_spots is owner-only RLS, so this select naturally returns
+    // only rows for lists this user owns — no client-side filtering needed.
+    const [listsRes, membershipRes, tricksRes] = await Promise.all([
+      supabase.from('trick_lists').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('trick_list_spots').select('list_id').eq('spot_id', spot.id),
       supabase.from('user_tricks').select('*').eq('user_id', user.id).eq('spot_id', spot.id),
     ])
-    const lists = listsRes.data || []
-    setTrickLists(lists)
-    const listMap = {}
-    for (const l of lists) listMap[l.id] = l.name
-    setSpotTricks((tricksRes.data || []).map(t => ({ ...t, listName: listMap[t.list_id] || '' })))
-    setSelectedListId(prev => prev && lists.some(l => l.id === prev) ? prev : (lists[0]?.id || null))
+    setTrickLists(listsRes.data || [])
+    setMemberListIds(new Set((membershipRes.data || []).map(r => r.list_id)))
+    setSpotTricks(tricksRes.data || [])
     setLoading(false)
   }
 
   useEffect(() => { fetchData() }, [user?.id, spot?.id])
 
+  const toggleListMembership = async (list) => {
+    setListError('')
+    const inList = memberListIds.has(list.id)
+    if (inList) {
+      // Targeted delete — row is known to exist (memberListIds has it), so
+      // an empty result means the delete was blocked, not that there was
+      // nothing to remove.
+      const { data, error } = await supabase.from('trick_list_spots').delete().eq('list_id', list.id).eq('spot_id', spot.id).select()
+      if (error || !data || data.length === 0) {
+        console.error('[AddToTrickListSheet] remove spot from list failed:', error)
+        setListError('Could not remove this spot from the list. Try again.')
+        return
+      }
+      setMemberListIds(prev => { const s = new Set(prev); s.delete(list.id); return s })
+    } else {
+      const { data, error } = await supabase.from('trick_list_spots').insert({ list_id: list.id, spot_id: spot.id }).select().single()
+      if (error || !data) {
+        console.error('[AddToTrickListSheet] add spot to list failed:', error)
+        setListError(error?.code === '23505' ? 'This spot is already in that list.' : 'Could not add this spot to the list. Try again.')
+        return
+      }
+      setMemberListIds(prev => new Set([...prev, list.id]))
+    }
+    notifyTricksChanged()
+  }
+
   const handleCreateList = async () => {
     if (!newListName.trim() || !user?.id || creatingList) return
     setCreatingList(true)
-    setAddError('')
+    setListError('')
     const { data, error } = await supabase.from('trick_lists').insert({ user_id: user.id, name: newListName.trim() }).select()
-    setCreatingList(false)
     if (error || !data || data.length === 0) {
       console.error('[AddToTrickListSheet] handleCreateList failed:', error)
-      setAddError('Could not create this list. Try again.')
+      setCreatingList(false)
+      setListError('Could not create this list. Try again.')
       return
     }
-    setTrickLists(prev => [...prev, data[0]])
-    setSelectedListId(data[0].id)
+    const newList = data[0]
+    // Create-and-add in one action, same shape as SaveToListModal.jsx's own createList.
+    const { data: spotRow, error: spotError } = await supabase.from('trick_list_spots').insert({ list_id: newList.id, spot_id: spot.id }).select().single()
+    setCreatingList(false)
+    setTrickLists(prev => [newList, ...prev])
+    if (!spotError && spotRow) {
+      setMemberListIds(prev => new Set([...prev, newList.id]))
+    } else {
+      console.error('[AddToTrickListSheet] add spot to new list failed:', spotError)
+      setListError('List created, but the spot could not be added to it. Try again.')
+    }
     setNewListName('')
     setShowCreateList(false)
+    notifyTricksChanged()
   }
 
   const addPendingName = () => {
@@ -90,25 +129,25 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
   const removePendingName = (name) => setPendingNames(prev => prev.filter(n => n !== name))
 
   // Inserted as one batch — "in one go" — so a single 23505 (one of these
-  // names already exists at this spot in this list) rolls the whole insert
-  // back; the specific duplicate isn't worth identifying here since the
-  // user can just re-add the rest individually.
+  // names already exists at this spot) rolls the whole insert back; the
+  // specific duplicate isn't worth identifying here since the user can
+  // just re-add the rest individually. No list_id — user_tricks is unique
+  // on (user_id, spot_id, name) only now.
   const handleAddTricks = async () => {
-    if (!selectedListId || pendingNames.length === 0 || adding || !user?.id) return
+    if (pendingNames.length === 0 || adding || !user?.id) return
     setAdding(true)
     setAddError('')
     const { data, error } = await supabase
       .from('user_tricks')
-      .insert(pendingNames.map(name => ({ user_id: user.id, spot_id: spot.id, list_id: selectedListId, name })))
+      .insert(pendingNames.map(name => ({ user_id: user.id, spot_id: spot.id, name })))
       .select()
     setAdding(false)
     if (error || !data || data.length === 0) {
       console.error('[AddToTrickListSheet] handleAddTricks failed:', error)
-      setAddError(error?.code === '23505' ? 'One of those tricks already exists at this spot in that list.' : 'Could not add these tricks. Try again.')
+      setAddError(error?.code === '23505' ? 'One of those tricks already exists at this spot.' : 'Could not add these tricks. Try again.')
       return
     }
-    const listName = trickLists.find(l => l.id === selectedListId)?.name || ''
-    setSpotTricks(prev => [...prev, ...data.map(t => ({ ...t, listName }))])
+    setSpotTricks(prev => [...prev, ...data])
     setPendingNames([])
     notifyTricksChanged()
   }
@@ -127,7 +166,7 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
     setEditing(false)
     if (error || !data) {
       console.error('[AddToTrickListSheet] handleEditSave failed:', error)
-      setEditError(error?.code === '23505' ? 'A trick with that name already exists in that list.' : 'Could not rename this trick. Try again.')
+      setEditError(error?.code === '23505' ? 'A trick with that name already exists at this spot.' : 'Could not rename this trick. Try again.')
       return
     }
     setSpotTricks(prev => prev.map(t => (t.id === editingTrick.id ? { ...t, name: data.name } : t)))
@@ -136,8 +175,7 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
   }
 
   // Existing confirm-dialog pattern — closes (with the slide-out animation)
-  // in both outcomes, same as SavedView.jsx's "Delete List" and
-  // TrickListPage.jsx's "Delete List".
+  // in both outcomes.
   const closeDeleteConfirm = () => {
     setDeleteClosing(true)
     setDeleteError('')
@@ -161,12 +199,6 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
     setSpotTricks(prev => prev.filter(t => t.id !== id))
     notifyTricksChanged()
     closeDeleteConfirm()
-  }
-
-  const handleViewList = () => {
-    if (!selectedListId) return
-    onClose?.()
-    onViewTrickList?.(selectedListId)
   }
 
   if (!user) {
@@ -196,7 +228,8 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
         <div className="modal-title" style={{ padding: '0 20px' }}>Add To Trick List</div>
 
         <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          {/* Tricks already at this spot, across every list */}
+          {/* Tricks already at this spot — these are the user's, not tied
+              to any one list, so no per-trick list label anymore. */}
           {!loading && sortedSpotTricks.length > 0 && (
             <div style={{ padding: '0 20px 14px' }}>
               <div className="section-label">Your Tricks Here</div>
@@ -207,9 +240,6 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {trick.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
-                        {trick.listName}
                       </div>
                       {trick.landed && (
                         <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 1 }}>
@@ -231,22 +261,31 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
 
           <div className="divider" style={{ margin: '0 20px 14px' }} />
 
-          {/* Choose or create a list */}
+          {/* Which of the user's own trick lists this spot belongs to —
+              multi-select (a spot can be in any number of lists), toggled
+              via trick_list_spots. */}
           <div style={{ padding: '0 20px 14px' }}>
-            <div className="section-label">Add To</div>
+            <div className="section-label">Add This Spot To</div>
             {!loading && trickLists.map(list => {
-              const selected = selectedListId === list.id
+              const selected = memberListIds.has(list.id)
               return (
                 <div
                   key={list.id}
-                  onClick={() => setSelectedListId(list.id)}
+                  onClick={() => toggleListMembership(list)}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: selected ? '1.5px solid #d4785a' : '1px solid #EAD8C8', background: selected ? '#f5e6e0' : '#fff', cursor: 'pointer', marginBottom: 8 }}
                 >
                   <ListIcon color="#d4785a" size={16} filled />
                   <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.name}</span>
+                  {selected && (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M2.5 7L5.5 10.5L11.5 3.5" stroke="#d4785a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
                 </div>
               )
             })}
+
+            {listError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 8 }}>{listError}</div>}
 
             {showCreateList ? (
               <div style={{ border: '1.5px solid #d4785a', borderRadius: 8, padding: 12 }}>
@@ -320,8 +359,8 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
             <button
               className="btn-salmon"
               onClick={handleAddTricks}
-              disabled={!selectedListId || pendingNames.length === 0 || adding}
-              style={{ marginTop: 10, opacity: !selectedListId || pendingNames.length === 0 || adding ? 0.5 : 1 }}
+              disabled={pendingNames.length === 0 || adding}
+              style={{ marginTop: 10, opacity: pendingNames.length === 0 || adding ? 0.5 : 1 }}
             >
               {adding
                 ? 'Adding...'
@@ -330,16 +369,6 @@ export default function AddToTrickListSheet({ spot, user, onClose, onViewTrickLi
                   : `Add ${pendingNames.length} Trick${pendingNames.length === 1 ? '' : 's'}`}
             </button>
           </div>
-        </div>
-
-        <div style={{ padding: '4px 16px 0' }}>
-          <button
-            onClick={handleViewList}
-            disabled={!selectedListId}
-            style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: !selectedListId ? 0.5 : 1 }}
-          >
-            View Trick List
-          </button>
         </div>
 
         {/* Edit trick name */}
