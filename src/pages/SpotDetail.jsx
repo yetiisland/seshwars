@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
-import { ShareIcon, BookmarkIcon, PencilIcon, SendToFriendsIcon } from '../components/Icons'
+import { ShareIcon, BookmarkIcon, PencilIcon, SendToFriendsIcon, ListIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import SpotFormFields from '../components/SpotFormFields'
 import ClipsSection from '../components/ClipsSection'
@@ -806,17 +806,6 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             </div>
           </div>
 
-          {/* Add To Trick List */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-            <button
-              className="btn-salmon"
-              onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
-              style={{ width: 'auto', padding: '10px 18px' }}
-            >
-              Add To Trick List
-            </button>
-          </div>
-
           {/* Feature chips — above publisher */}
           {((spot.features || []).length > 0 || spot.lighting) && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', marginBottom: 8 }}>
@@ -824,34 +813,45 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             </div>
           )}
 
-          {/* Publisher row — white card, hugs its contents (inline-flex)
-              rather than spanning the full page width */}
-          {(publisherAvatar || publisherUsername || spot.added_by === null) && (
-            <div style={{ display: 'inline-flex', maxWidth: '100%', alignItems: 'center', gap: 10, marginBottom: 12, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '10px 12px' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
-                {publisherAvatar ? (
-                  <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: 12, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial || '?'}</span>
+          {/* Publisher row + Trick List button, same row — button always
+              right-aligned via marginLeft:auto regardless of whether the
+              publisher card renders */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            {(publisherAvatar || publisherUsername || spot.added_by === null) && (
+              <div style={{ display: 'inline-flex', maxWidth: '100%', minWidth: 0, alignItems: 'center', gap: 10, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '10px 12px' }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
+                  {publisherAvatar ? (
+                    <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: 12, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial || '?'}</span>
+                  )}
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3 }}>Added by</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+                    {spot.added_by === null ? 'Anonymous' : publisherUsername ? `@${publisherUsername}` : ''}
+                  </div>
+                </div>
+                {publisherFriendship && publisherFriendship.status !== 'accepted' && (
+                  <AddFriendButton
+                    targetUserId={spot.added_by}
+                    friendshipStatus={publisherFriendship.status}
+                    isRequester={publisherFriendship.isRequester}
+                    friendshipId={publisherFriendship.friendshipId}
+                    onChange={(status, row) => setPublisherFriendship(prev => ({ ...prev, status, friendshipId: row?.id ?? prev.friendshipId }))}
+                  />
                 )}
               </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3 }}>Added by</div>
-                <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
-                  {spot.added_by === null ? 'Anonymous' : publisherUsername ? `@${publisherUsername}` : ''}
-                </div>
-              </div>
-              {publisherFriendship && publisherFriendship.status !== 'accepted' && (
-                <AddFriendButton
-                  targetUserId={spot.added_by}
-                  friendshipStatus={publisherFriendship.status}
-                  isRequester={publisherFriendship.isRequester}
-                  friendshipId={publisherFriendship.friendshipId}
-                  onChange={(status, row) => setPublisherFriendship(prev => ({ ...prev, status, friendshipId: row?.id ?? prev.friendshipId }))}
-                />
-              )}
-            </div>
-          )}
+            )}
+            <button
+              className="btn-salmon"
+              onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
+              style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexShrink: 0 }}
+            >
+              <ListIcon color="#fff" size={14} filled />
+              Trick List
+            </button>
+          </div>
 
           {/* Moderation banners */}
           {modStatus === 'pending' && isAdmin && (
