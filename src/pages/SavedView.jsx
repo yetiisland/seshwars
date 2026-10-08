@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
@@ -197,6 +197,8 @@ function ShareSavedListFriends({ listId, userId, onBack, onShared }) {
 }
 
 function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, onFavoritesListCreated, onLeft, spots, saved, onSavePress, onSpotClick, onBack, onListDeleted, initialScrollTop, onSaveScrollTop }) {
+  // PERF-COUNTER (temporary, remove before final commit)
+  if (typeof window !== 'undefined') { window.__renderCounts = window.__renderCounts || {}; window.__renderCounts.CollectionView = (window.__renderCounts.CollectionView || 0) + 1 }
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteClosing, setDeleteClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -364,10 +366,10 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
     }
   }, [spots.length, initialScrollTop])
 
-  const handleSpotClick = (spot) => {
+  const handleSpotClick = useCallback((spot) => {
     if (scrollRef.current) onSaveScrollTop?.(scrollRef.current.scrollTop)
     onSpotClick(spot)
-  }
+  }, [onSpotClick, onSaveScrollTop])
 
   const closeDeleteConfirm = () => {
     setDeleteClosing(true)
@@ -817,6 +819,8 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
 }
 
 export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user, openListId, onOpenListIdHandled }) {
+  // PERF-COUNTER (temporary, remove before final commit)
+  if (typeof window !== 'undefined') { window.__renderCounts = window.__renderCounts || {}; window.__renderCounts.SavedView = (window.__renderCounts.SavedView || 0) + 1 }
   const [lists, setLists] = useState(() => _listsUserId === user?.id ? _cachedLists : [])
   const [listSpotIds, setListSpotIds] = useState(() => _listsUserId === user?.id ? _cachedListSpotIds : {})
   const [openCollection, setOpenCollection] = useState(_savedOpenCollection)
@@ -931,12 +935,12 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     setListSpotIds(_cachedListSpotIds)
   }
 
-  const savedSpots = spots.filter(s => saved.has(s.id))
+  const savedSpots = useMemo(() => spots.filter(s => saved.has(s.id)), [spots, saved])
 
-  const getListSpots = (listId) => {
+  const getListSpots = useCallback((listId) => {
     const ids = listSpotIds[listId] || new Set()
     return spots.filter(s => ids.has(s.id))
-  }
+  }, [spots, listSpotIds])
 
   const handleCreateList = async () => {
     if (!newListName.trim() || !user?.id) return

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { BookmarkIcon, ArrowIcon } from './Icons'
 import TagsRow from './TagsRow'
 import { transformImageUrl } from '../utils/imageUrl'
@@ -20,7 +21,9 @@ function bustStyle(rating) {
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344', borderRadius: 6 }
 }
 
-export default function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress, onUnhidePress, priority = false }) {
+function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress, onUnhidePress, priority = false }) {
+  // PERF-COUNTER (temporary, remove before final commit)
+  if (typeof window !== 'undefined') { window.__renderCounts = window.__renderCounts || {}; window.__renderCounts.SpotCard = (window.__renderCounts.SpotCard || 0) + 1 }
   const handleSave = (e) => {
     e.stopPropagation()
     onSavePress?.(spot)
@@ -151,3 +154,5 @@ export default function SpotCard({ spot, saved, onSavePress, onClick, highlighte
     </div>
   )
 }
+
+export default memo(SpotCard)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
@@ -517,27 +517,32 @@ export default function App() {
     return () => window.removeEventListener('seshwars:spots-changed', handler)
   }, [refetch])
 
-  const handleFiltersChange = (f) => { _cachedFilters = f; setFilters(f) }
-  const handleDistanceChange = (d) => { _cachedDistance = d; setDistanceRadius(d) }
-  const handleSortModeChange = (m) => { _cachedSortMode = m; setSortMode(m) }
+  const handleFiltersChange = useCallback((f) => { _cachedFilters = f; setFilters(f) }, [])
+  const handleDistanceChange = useCallback((d) => { _cachedDistance = d; setDistanceRadius(d) }, [])
+  const handleSortModeChange = useCallback((m) => { _cachedSortMode = m; setSortMode(m) }, [])
 
-  const openSearch = () => setShowSearch(s => !s)
+  const openSearch = useCallback(() => setShowSearch(s => !s), [])
   const closeSearch = () => setShowSearch(false)
   // Always land on the Spots tab after a search — searching from Saved/Profile
   // previously left the user stranded there while results loaded into the
   // (unseen) Spots view. handleTabChange('spots') also closes search and is a
   // no-op if already on Spots, and leaves spotsView (list/map) untouched.
   const handleSelectLocation = (entry) => { setSearchLocation(entry); handleTabChange('spots') }
-  const handleClearSearch = () => setSearchLocation(null)
-  const handleSavePress = (spot) => { if (!user) { setShowAuth(true); return } setSaveModalSpot(spot) }
+  const handleClearSearch = useCallback(() => setSearchLocation(null), [])
+  // useCallback here isn't about these functions' own cost — it's so that
+  // ListView/MapView/SpotCard (wrapped in React.memo) can actually skip
+  // re-rendering when App re-renders for unrelated reasons: a prop that's a
+  // new function identity every render defeats memo regardless of how
+  // cheap the function itself is.
+  const handleSavePress = useCallback((spot) => { if (!user) { setShowAuth(true); return } setSaveModalSpot(spot) }, [user])
   const handleAddSuccess = () => { setShowAdd(false); refetch() }
-  const openAdd = () => { if (!user) { setShowAuth(true); return } setShowAdd(true); closeSearch() }
+  const openAdd = useCallback(() => { if (!user) { setShowAuth(true); return } setShowAdd(true); closeSearch() }, [user])
 
-  const handleHidePress = (spot) => {
+  const handleHidePress = useCallback((spot) => {
     if (!user) { setShowAuth(true); return }
     setHideTarget(spot)
     setShowHideConfirm(true)
-  }
+  }, [user])
 
   const closeHideConfirm = () => {
     setHideConfirmClosing(true)
@@ -555,12 +560,12 @@ export default function App() {
     closeHideConfirm()
   }
 
-  const handleSpotClick = (spot, extra = {}) => {
+  const handleSpotClick = useCallback((spot, extra = {}) => {
     const id = spot.slug || spot.id
     sessionStorage.setItem('activeTab', tab)
     sessionStorage.setItem('spotsView', spotsView)
     navigate(`/spots/${id}`, { state: { spot, prevTab: tab, ...extra } })
-  }
+  }, [tab, spotsView, navigate])
 
   // list_invite notification tap — opens the Saved tab with that list's
   // collection pre-opened, same in-app destination a member or owner
@@ -666,6 +671,7 @@ export default function App() {
           <div className={`desktop-content${isMapActive ? '' : ' desktop-content-constrained'}`}>
             <div style={{ display: effectiveTab === 'spots' && spotsView === 'list' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <ListView
+                isActive={effectiveTab === 'spots' && spotsView === 'list'}
                 spots={filteredByDistance}
                 loading={loading}
                 saved={saved}
@@ -804,6 +810,7 @@ export default function App() {
             <>
               <div style={{ display: effectiveTab === 'spots' && spotsView === 'list' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <ListView
+                  isActive={effectiveTab === 'spots' && spotsView === 'list'}
                   spots={filteredByDistance}
                   loading={loading}
                   saved={saved}
