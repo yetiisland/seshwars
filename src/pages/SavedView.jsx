@@ -4,8 +4,9 @@ import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
 import SpotCard from '../components/SpotCard'
 import Navbar from '../components/Navbar'
-import { ArrowIcon, ShareIcon, PlusIcon, CloseIcon, LeaveIcon, IconBox } from '../components/Icons'
+import { ArrowIcon, ShareIcon, PlusIcon, CloseIcon, SettingsIcon, ProfileIcon, IconBox } from '../components/Icons'
 import InitialsAvatar from '../components/InitialsAvatar'
+import { getProfiles } from '../utils/profileCache'
 import MapView from './MapView'
 
 // Inline suggestion dropdown — copied verbatim from the geocoder address
@@ -58,16 +59,144 @@ if (typeof window !== 'undefined') {
   window.addEventListener('seshwars:lists-changed', invalidateListsCache)
 }
 
-// 20 bytes of crypto.getRandomValues() output, one char each — well above the
-// RPCs' 16-character minimum, with margin.
-function generateShareToken() {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-  const arr = new Uint8Array(20)
-  crypto.getRandomValues(arr)
-  return Array.from(arr).map(n => chars[n % chars.length]).join('')
+// Matches SaveToListModal.jsx's SquareToggle exactly — duplicated locally,
+// same pattern already repeated in TrickListPage.jsx / AddToTrickListSheet.jsx.
+function SquareToggle({ selected }) {
+  if (selected) {
+    return (
+      <div style={{ width: 30, height: 30, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2.5 7L5.5 10.5L11.5 3.5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+    )
+  }
+  return (
+    <div style={{ width: 30, height: 30, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <line x1="6" y1="2" x2="6" y2="10" stroke="#d4785a" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="2" y1="6" x2="10" y2="6" stroke="#d4785a" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    </div>
+  )
 }
 
-function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, shareToken, onTokenGenerated, spots, saved, onSavePress, onSpotClick, onBack, onListDeleted, initialScrollTop, onSaveScrollTop }) {
+// Content-only (no portal/overlay/handle) — swapped into the SAME sheet as
+// the Share Link choice, same shape as TrickListPage.jsx's own
+// ShareTrickListFriends. Inserts into list_members directly, skipping
+// friends who are already members. Owner only (caller gates the choice row).
+function ShareSavedListFriends({ listId, userId, onBack, onShared }) {
+  const [friends, setFriends] = useState([])
+  const [currentMemberIds, setCurrentMemberIds] = useState(new Set())
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState(new Set())
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      const [friendsRes, membersRes] = await Promise.all([
+        supabase.rpc('get_friends'),
+        supabase.rpc('get_list_members', { p_list_id: listId }),
+      ])
+      if (cancelled) return
+      const rows = friendsRes.data || []
+      const profileMap = await getProfiles(rows.map(f => f.id))
+      if (cancelled) return
+      setFriends(rows.map(f => ({ ...f, first_name: profileMap[f.id]?.first_name || null })))
+      setCurrentMemberIds(new Set((membersRes.data || []).map(m => m.id)))
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [listId])
+
+  const toggleFriend = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleSend = async () => {
+    if (selected.size === 0 || sending) return
+    setSending(true)
+    setError('')
+    const toAdd = [...selected].filter(id => !currentMemberIds.has(id))
+    if (toAdd.length === 0) { setSending(false); onShared?.('Already shared with everyone selected.'); return }
+    const { data, error: err } = await supabase
+      .from('list_members')
+      .insert(toAdd.map(memberId => ({ list_id: listId, user_id: memberId, added_by: userId })))
+      .select()
+    setSending(false)
+    if (err || !data || data.length === 0) {
+      console.error('[SavedView] ShareSavedListFriends handleSend failed:', err)
+      setError('Could not share. Try again.')
+      return
+    }
+    onShared?.('List shared!')
+  }
+
+  return (
+    <>
+      <div className="modal-title" style={{ padding: '0 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        {onBack && (
+          <div onClick={onBack} style={{ width: 28, height: 28, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+              <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        )}
+        <span>Share With Friends</span>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: '0 20px 20px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>Loading...</div>
+      ) : friends.length === 0 ? (
+        <div style={{ padding: '0 20px 20px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          You don't have any friends yet. Add some from the Friends page first.
+        </div>
+      ) : (
+        <>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+            {friends.map(f => {
+              const already = currentMemberIds.has(f.id)
+              return (
+                <div key={f.id} className="modal-row" onClick={() => !already && toggleFriend(f.id)} style={already ? { opacity: 0.5, cursor: 'default' } : undefined}>
+                  <MemberAvatar profile={f} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {f.first_name || f.username}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>@{f.username}</div>
+                  </div>
+                  {already ? (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Added</span>
+                  ) : (
+                    <SquareToggle selected={selected.has(f.id)} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {error && (
+            <div style={{ padding: '8px 20px 0', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{error}</div>
+          )}
+          <div style={{ padding: '10px 14px 0' }}>
+            <button className="btn-salmon" onClick={handleSend} disabled={selected.size === 0 || sending} style={{ opacity: selected.size === 0 || sending ? 0.5 : 1 }}>
+              {sending ? 'Sharing...' : 'Share'}
+            </button>
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, onFavoritesListCreated, onLeft, spots, saved, onSavePress, onSpotClick, onBack, onListDeleted, initialScrollTop, onSaveScrollTop }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteClosing, setDeleteClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -98,6 +227,46 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const [shareError, setShareError] = useState('')
   const scrollRef = useRef(null)
   const scrollRestoredRef = useRef(false)
+
+  // Settings sheet (owner sees Delete List, member sees Leave List).
+  const [showSettingsSheet, setShowSettingsSheet] = useState(false)
+
+  // Share sheet — ONE sheet; friend content swaps in place, never a second
+  // sheet. Share With Friends is owner-only; Share Link works for both.
+  const [showShareSheet, setShowShareSheet] = useState(false)
+  const [shareSheetMode, setShareSheetMode] = useState('choice') // 'choice' | 'friends'
+  const [shareToast, setShareToast] = useState('')
+  const closeShareSheet = () => { setShowShareSheet(false); setShareSheetMode('choice') }
+  const showShareToast = (msg) => { setShareToast(msg); setTimeout(() => setShareToast(''), 2500) }
+
+  // Leave list (members only) — existing confirm-dialog pattern, closes in
+  // both outcomes, then removes this user's own list_members row.
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [leaveClosing, setLeaveClosing] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [leaveError, setLeaveError] = useState('')
+  const closeLeaveConfirm = () => {
+    setLeaveClosing(true)
+    setLeaveError('')
+    setTimeout(() => { setLeaveClosing(false); setShowLeaveConfirm(false) }, 180)
+  }
+  const handleLeave = async () => {
+    if (!userId) return
+    setLeaving(true)
+    const { data, error } = await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', userId).select()
+    if (error || !data || data.length === 0) {
+      console.error('[SavedView] handleLeave failed:', error)
+      setLeaving(false)
+      closeLeaveConfirm()
+      setLeaveError('Could not leave this list. Try again.')
+      setTimeout(() => setLeaveError(''), 3000)
+      return
+    }
+    setLeaving(false)
+    closeLeaveConfirm()
+    onLeft?.()
+    onBack()
+  }
 
   // ── List members (Section A/B/C) ──────────────────────────────
   const [members, setMembers] = useState([])
@@ -240,40 +409,39 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
     onBack()
   }
 
-  const handleShare = async () => {
+  // Share Link — get_or_create_list_share_token works for owners and
+  // members alike, so this one path covers both (same shape as
+  // TrickListPage.jsx's own handleShareLink). Saved Spots ("favorites")
+  // has no backing spot_lists row until first shared — create it (without
+  // a token; the RPC owns that) before resolving a token for it.
+  const handleShareLink = async () => {
     if (sharing) return
     setSharing(true)
     setShareError('')
     try {
-      let token = shareToken
-      if (!token) {
-        token = generateShareToken()
-        if (isFavorites) {
-          const { data, error } = await supabase
-            .from('spot_lists')
-            .insert({ user_id: userId, name: 'Saved Spots', is_favorites: true, share_token: token })
-            .select('id')
-            .single()
-          if (error) {
-            console.error('[share] failed to create share token:', error)
-            alert('Could not create a share link: ' + error.message)
-            return
-          }
-          onTokenGenerated?.(token, data?.id)
-        } else {
-          const { data, error } = await supabase
-            .from('spot_lists')
-            .update({ share_token: token })
-            .eq('id', listId)
-            .select()
-          if (error || !data || data.length === 0) {
-            console.error('[share] failed to save share token:', error)
-            setShareError('Could not create a share link. Try again.')
-            setTimeout(() => setShareError(''), 3000)
-            return
-          }
-          onTokenGenerated?.(token)
+      let targetListId = listId
+      if (isFavorites && !targetListId) {
+        const { data, error } = await supabase
+          .from('spot_lists')
+          .insert({ user_id: userId, name: 'Saved Spots', is_favorites: true })
+          .select('id')
+          .single()
+        if (error || !data) {
+          console.error('[SavedView] create favorites list failed:', error)
+          setShareError('Could not create a share link. Try again.')
+          setTimeout(() => setShareError(''), 3000)
+          return
         }
+        targetListId = data.id
+        onFavoritesListCreated?.(data.id)
+      }
+
+      const { data: token, error } = await supabase.rpc('get_or_create_list_share_token', { p_list_id: targetListId })
+      if (error || !token) {
+        console.error('[SavedView] get_or_create_list_share_token failed:', error)
+        setShareError('Could not create a share link. Try again.')
+        setTimeout(() => setShareError(''), 3000)
+        return
       }
 
       const url = `${siteOrigin()}/#/list/${token}`
@@ -290,7 +458,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           if (err && err.name === 'AbortError') {
             shared = true
           } else {
-            console.warn('[share] navigator.share failed, falling back to clipboard:', err)
+            console.warn('[SavedView] navigator.share failed, falling back to clipboard:', err)
           }
         }
       }
@@ -301,7 +469,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           setCopied(true)
           setTimeout(() => setCopied(false), 2500)
         } catch (err) {
-          console.error('[share] clipboard failed:', err)
+          console.error('[SavedView] clipboard failed:', err)
           // Last resort so the user still gets the link.
           window.prompt('Copy this share link:', url)
         }
@@ -338,24 +506,20 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
         </div>
         {(isList || isFavorites) ? (
           <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
-            {isList && isOwner && (
+            {isList && (
               <div
-                onClick={() => { setDeleteError(''); setShowDeleteConfirm(true) }}
+                onClick={() => setShowSettingsSheet(true)}
                 style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
               >
-                <svg width="14" height="16" viewBox="0 0 14 16" fill="none">
-                  <path d="M1 4H13M5 4V2H9V4M2 4L3 14H11L12 4" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <SettingsIcon color="#d4785a" size={17} />
               </div>
             )}
-            {isOwner && (
-              <div
-                onClick={handleShare}
-                style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: sharing ? 0.6 : 1 }}
-              >
-                <ShareIcon color="#d4785a" />
-              </div>
-            )}
+            <div
+              onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
+              style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <ShareIcon color="#d4785a" />
+            </div>
           </div>
         ) : (
           <div style={{ justifySelf: 'end', width: 36 }} />
@@ -410,6 +574,100 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
               </button>
             </div>
           </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Settings sheet — owner sees Delete List, member sees Leave List.
+          Both destructive buttons use the outline salmon stroke style. */}
+      {showSettingsSheet && createPortal(
+        <div className="modal-overlay" onClick={() => setShowSettingsSheet(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div className="modal-title" style={{ padding: '0 20px' }}>List Settings</div>
+            <div style={{ padding: '0 20px 28px' }}>
+              {isOwner ? (
+                <button
+                  onClick={() => { setShowSettingsSheet(false); setDeleteError(''); setShowDeleteConfirm(true) }}
+                  style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+                >
+                  Delete List
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setShowSettingsSheet(false); setLeaveError(''); setShowLeaveConfirm(true) }}
+                  style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+                >
+                  Leave List
+                </button>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Leave-list confirmation (members only) — existing confirm-dialog
+          pattern, closes in both outcomes. */}
+      {(showLeaveConfirm || leaveClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeLeaveConfirm}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={leaveClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Leave List</div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Leave this shared list?</div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={handleLeave} disabled={leaving} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: leaving ? 0.7 : 1 }}>
+                {leaving ? 'Leaving…' : 'Leave'}
+              </button>
+              <button onClick={closeLeaveConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {leaveError && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          {leaveError}
+        </div>,
+        document.body
+      )}
+
+      {/* Share sheet — ONE sheet; friend content swaps in place, never a
+          second sheet. Share With Friends is owner-only; Share Link works
+          for both owners and members. */}
+      {showShareSheet && createPortal(
+        <div className="modal-overlay" onClick={closeShareSheet}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-handle" />
+            {shareSheetMode === 'choice' ? (
+              <>
+                <div className="modal-title" style={{ padding: '0 20px' }}>Share</div>
+                {isOwner && (
+                  <div className="modal-row" onClick={() => setShareSheetMode('friends')}>
+                    <ProfileIcon color="#d4785a" size={16} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share With Friends</span>
+                  </div>
+                )}
+                <div className="modal-row" onClick={() => { closeShareSheet(); handleShareLink() }}>
+                  <ShareIcon color="#d4785a" />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share Link</span>
+                </div>
+              </>
+            ) : (
+              <ShareSavedListFriends
+                listId={listId}
+                userId={userId}
+                onBack={() => setShareSheetMode('choice')}
+                onShared={(msg) => { closeShareSheet(); showShareToast(msg) }}
+              />
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+      {shareToast && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          {shareToast}
         </div>,
         document.body
       )}
@@ -568,11 +826,6 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   const [creating, setCreating] = useState(false)
   const [sharedLists, setSharedLists] = useState([])
   const [sharedListDetail, setSharedListDetail] = useState(null) // { header, spotIds: Set } | null
-  const [shareCardToast, setShareCardToast] = useState('')
-  const [pendingLeaveList, setPendingLeaveList] = useState(null) // { id, name }
-  const [leaveClosing, setLeaveClosing] = useState(false)
-  const [leaving, setLeaving] = useState(false)
-  const [leaveError, setLeaveError] = useState('')
 
   useEffect(() => {
     if (!user?.id) return
@@ -639,7 +892,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     ;(async () => {
       const ownList = lists.find(l => l.id === openListId)
       if (ownList) {
-        setOpenCollection({ type: 'list', id: ownList.id, name: ownList.name, shareToken: ownList.share_token, isOwner: true })
+        setOpenCollection({ type: 'list', id: ownList.id, name: ownList.name, isOwner: true })
         onOpenListIdHandled?.()
         return
       }
@@ -705,69 +958,6 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     setCreating(false)
   }
 
-  const showShareCardToast = (msg) => {
-    setShareCardToast(msg)
-    setTimeout(() => setShareCardToast(''), 2500)
-  }
-
-  // SHARE icon on a "Shared With You" overview card — get_or_create_list_share_token
-  // works for owners and members, unlike the owner-only share_token write
-  // CollectionView.handleShare still uses for the user's own lists.
-  const handleShareSharedList = async (list) => {
-    const { data: token, error } = await supabase.rpc('get_or_create_list_share_token', { p_list_id: list.id })
-    if (error || !token) {
-      console.error('[SavedView] get_or_create_list_share_token failed:', error)
-      showShareCardToast('Could not create a share link. Try again.')
-      return
-    }
-    const url = `${siteOrigin()}/#/list/${token}`
-    let shared = false
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: list.name, url })
-        shared = true
-      } catch (err) {
-        if (err && err.name === 'AbortError') shared = true
-        else console.warn('[SavedView] navigator.share failed, falling back to clipboard:', err)
-      }
-    }
-    if (!shared) {
-      try {
-        await navigator.clipboard.writeText(url)
-        showShareCardToast('Link Copied!')
-      } catch (err) {
-        console.error('[SavedView] clipboard failed:', err)
-        window.prompt('Copy this share link:', url)
-      }
-    }
-  }
-
-  const closeLeaveConfirm = () => {
-    setLeaveClosing(true)
-    setLeaveError('')
-    setTimeout(() => { setLeaveClosing(false); setPendingLeaveList(null) }, 180)
-  }
-
-  // Existing confirm-dialog pattern — closes in both outcomes. Removes only
-  // this user's own list_members row (self-removal), then drops the card.
-  const confirmLeaveList = async () => {
-    if (!pendingLeaveList || !user?.id) return
-    const listId = pendingLeaveList.id
-    setLeaving(true)
-    const { data, error } = await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', user.id).select()
-    if (error || !data || data.length === 0) {
-      console.error('[SavedView] confirmLeaveList failed:', error)
-      setLeaving(false)
-      closeLeaveConfirm()
-      setLeaveError('Could not leave this list. Try again.')
-      setTimeout(() => setLeaveError(''), 3000)
-      return
-    }
-    setLeaving(false)
-    setSharedLists(prev => prev.filter(l => l.id !== listId))
-    closeLeaveConfirm()
-  }
-
   const handleBackFromCollection = () => {
     _savedOpenCollection = null
     _savedCollectionScrollTop = 0
@@ -779,23 +969,14 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     onSpotClick(spot)
   }
 
-  const handleTokenGenerated = (token, newListId) => {
-    if (openCollection.type === 'favorites') {
-      // A new spot_lists row was created for Saved Spots; update local state
-      if (newListId) {
-        const newEntry = { id: newListId, name: 'Saved Spots', is_favorites: true, share_token: token }
-        setLists(prev => [...prev, newEntry])
-      }
-      setOpenCollection(prev => ({ ...prev, shareToken: token }))
-      _savedOpenCollection = { ..._savedOpenCollection, shareToken: token }
-    } else {
-      setLists(prev => prev.map(l => l.id === openCollection.id ? { ...l, share_token: token } : l))
-      setOpenCollection(prev => ({ ...prev, shareToken: token }))
-      _savedOpenCollection = { ..._savedOpenCollection, shareToken: token }
-    }
+  // Saved Spots ("favorites") has no backing spot_lists row until the first
+  // time it's shared — CollectionView creates it lazily and tells us the
+  // new id so later opens find it via favoritesListEntry.
+  const handleFavoritesListCreated = (newListId) => {
+    setLists(prev => [...prev, { id: newListId, name: 'Saved Spots', is_favorites: true }])
   }
 
-  // Find any existing favorites share token from lists data
+  // Find any existing favorites list row from lists data
   const favoritesListEntry = lists.find(l => l.is_favorites)
 
   // Owned lists newest-first by created_at, shared lists newest-first by
@@ -824,9 +1005,6 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     } else {
       collSpots = getListSpots(openCollection.id)
     }
-    const favShareToken = openCollection.type === 'favorites'
-      ? (openCollection.shareToken || favoritesListEntry?.share_token)
-      : openCollection.shareToken
     const title = openCollection.type === 'shared'
       ? (sharedListDetail?.header?.name || openCollection.name)
       : openCollection.name
@@ -840,8 +1018,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
           isOwner={openCollection.isOwner ?? true}
           userId={user?.id}
           listId={openCollection.type === 'list' || openCollection.type === 'shared' ? openCollection.id : favoritesListEntry?.id}
-          shareToken={favShareToken}
-          onTokenGenerated={handleTokenGenerated}
+          onFavoritesListCreated={handleFavoritesListCreated}
           spots={collSpots}
           saved={saved}
           onSavePress={onSavePress}
@@ -854,6 +1031,11 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
             _savedCollectionScrollTop = 0
             setLists(prev => prev.filter(l => l.id !== openCollection.id))
             setListSpotIds(prev => { const n = {...prev}; delete n[openCollection.id]; return n })
+          }}
+          onLeft={() => {
+            _savedOpenCollection = null
+            _savedCollectionScrollTop = 0
+            setSharedLists(prev => prev.filter(l => l.id !== openCollection.id))
           }}
         />
       </div>
@@ -885,10 +1067,9 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         </div>
 
         {/* Custom lists — the user's own, mixed with lists shared with them
-            (merged/sorted above as combinedLists). Shared cards get SHARE
-            (get_or_create_list_share_token — works for members too, unlike
-            CollectionView.handleShare's owner-only write) and LEAVE icons
-            in the existing salmon-stroke icon box. */}
+            (merged/sorted above as combinedLists). Shared cards look like
+            any other list card — no icons of their own; settings/sharing
+            for a shared list live inside it, reached after opening it. */}
         {combinedLists.map(list => {
           const isShared = list._kind === 'shared'
           const count = isShared ? list.spot_count : (listSpotIds[list.id]?.size || 0)
@@ -897,7 +1078,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
               key={`${list._kind}-${list.id}`}
               onClick={() => setOpenCollection(isShared
                 ? { type: 'shared', id: list.id, name: list.name, isOwner: false }
-                : { type: 'list', id: list.id, name: list.name, shareToken: list.share_token, isOwner: true })}
+                : { type: 'list', id: list.id, name: list.name, isOwner: true })}
               style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
             >
               <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -911,16 +1092,6 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
                   {count} spot{count !== 1 ? 's' : ''}{isShared ? ` · @${list.owner_username}` : ''}
                 </div>
               </div>
-              {isShared && (
-                <>
-                  <IconBox onClick={(e) => { e.stopPropagation(); handleShareSharedList(list) }}>
-                    <ShareIcon color="#d4785a" />
-                  </IconBox>
-                  <IconBox onClick={(e) => { e.stopPropagation(); setLeaveError(''); setPendingLeaveList({ id: list.id, name: list.name }) }}>
-                    <LeaveIcon color="#d4785a" />
-                  </IconBox>
-                </>
-              )}
               <div className="arrow-btn"><ArrowIcon /></div>
             </div>
           )
@@ -981,36 +1152,6 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
       </>
       )}
 
-      {/* Leave-list confirmation (shared cards' LEAVE icon) — existing
-          confirm-dialog pattern, closes in both outcomes. */}
-      {(pendingLeaveList || leaveClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeLeaveConfirm}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={leaveClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
-            <div className="modal-handle" />
-            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Leave List</div>
-            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Leave "{pendingLeaveList?.name}"? You'll need a new invite to see it again.</div>
-            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button onClick={confirmLeaveList} disabled={leaving} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: leaving ? 0.7 : 1 }}>
-                {leaving ? 'Leaving…' : 'Leave'}
-              </button>
-              <button onClick={closeLeaveConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-      {leaveError && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-          {leaveError}
-        </div>,
-        document.body
-      )}
-      {shareCardToast && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-          {shareCardToast}
-        </div>,
-        document.body
-      )}
     </>
   )
 }

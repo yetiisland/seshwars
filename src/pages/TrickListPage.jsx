@@ -5,17 +5,14 @@ import { siteOrigin } from '../lib/siteUrl'
 import { transformImageUrl } from '../utils/imageUrl'
 import { getProfiles } from '../utils/profileCache'
 import { sortTricks } from '../lib/trickSort'
+import { notifyTricksChanged, cascadeDeleteOrphanedSpot } from '../lib/trickWrites'
 import TrickCheckmark from '../components/TrickCheckmark'
+import TrickEditPanel from '../components/TrickEditPanel'
 import TabBar from '../components/TabBar'
 import InitialsAvatar from '../components/InitialsAvatar'
-import { ArrowIcon, TrickListIcon, SettingsIcon, ShareIcon, LeaveIcon, SendToFriendsIcon, MoreIcon, IconBox } from '../components/Icons'
+import { ArrowIcon, SettingsIcon, ShareIcon, LeaveIcon, SendToFriendsIcon, PencilIcon, IconBox } from '../components/Icons'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
-const NAME_MAX = 60
-
-function notifyTricksChanged() {
-  window.dispatchEvent(new Event('seshwars:tricks-changed'))
-}
 
 function formatLandedDate(iso) {
   if (!iso) return ''
@@ -232,69 +229,34 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
   // its own bottom sheet (not a nested pane — this page already opens
   // separate sheets for settings/share rather than swapping panes in
   // place). RENAME and DELETE TRICK write immediately and verified, per
-  // docs/supabase-writes.md, then dispatch seshwars:tricks-changed.
-  const [optionsTrick, setOptionsTrick] = useState(null) // { id, name }
-  const [optionsMode, setOptionsMode] = useState('menu') // 'menu' | 'rename'
-  const [renameValue, setRenameValue] = useState('')
-  const [renaming, setRenaming] = useState(false)
-  const [renameError, setRenameError] = useState('')
-  const openTrickOptions = (trick) => {
-    setOptionsMode('menu')
-    setRenameError('')
-    setOptionsTrick({ id: trick.id, name: trick.name })
-  }
-  const closeTrickOptions = () => {
-    setOptionsTrick(null)
-    setOptionsMode('menu')
-    setRenameValue('')
-    setRenameError('')
-  }
-  const commitRenameTrick = async () => {
-    if (!optionsTrick || renaming) return
-    const trimmed = renameValue.trim().slice(0, NAME_MAX)
-    if (!trimmed) return
-    setRenaming(true)
-    setRenameError('')
-    const { data, error } = await supabase.from('user_tricks').update({ name: trimmed }).eq('id', optionsTrick.id).select().single()
-    setRenaming(false)
+  // docs/supabase-writes.md, then dispatch seshwars:tricks-changed — same
+  // shared TrickEditPanel used by the spot-page trick list sheet for its
+  // own existing (already-saved) tricks.
+  const [optionsTrick, setOptionsTrick] = useState(null) // { id, name, spotId }
+  const openTrickOptions = (trick, spotId) => setOptionsTrick({ id: trick.id, name: trick.name, spotId })
+  const closeTrickOptions = () => setOptionsTrick(null)
+
+  const trickOnRename = async (newName) => {
+    const { data, error } = await supabase.from('user_tricks').update({ name: newName }).eq('id', optionsTrick.id).select().single()
     if (error || !data) {
-      console.error('[TrickListPage] commitRenameTrick failed:', error)
-      setRenameError(error?.code === '23505' ? 'A trick with that name already exists at this spot.' : 'Could not rename this trick. Try again.')
-      return
+      console.error('[TrickListPage] rename trick failed:', error)
+      return { ok: false, error: error?.code === '23505' ? 'A trick with that name already exists at this spot.' : 'Could not rename this trick. Try again.' }
     }
     setRows(prev => prev.map(r => (r.trick_id === optionsTrick.id ? { ...r, trick_name: data.name } : r)))
     notifyTricksChanged()
-    closeTrickOptions()
+    return { ok: true }
   }
 
-  // Delete trick — existing confirm-dialog pattern, closes in both outcomes.
-  const [pendingDeleteTrick, setPendingDeleteTrick] = useState(null) // { id, name }
-  const [deleteTrickClosing, setDeleteTrickClosing] = useState(false)
-  const [deletingTrick, setDeletingTrick] = useState(false)
-  const [deleteTrickError, setDeleteTrickError] = useState('')
-  const closeDeleteTrickConfirm = () => {
-    setDeleteTrickClosing(true)
-    setDeleteTrickError('')
-    setTimeout(() => { setDeleteTrickClosing(false); setPendingDeleteTrick(null) }, 180)
-  }
-  const confirmDeleteTrick = async () => {
-    if (!pendingDeleteTrick) return
-    const id = pendingDeleteTrick.id
-    setDeletingTrick(true)
-    const { data, error } = await supabase.from('user_tricks').delete().eq('id', id).select()
+  const trickOnDelete = async () => {
+    const { data, error } = await supabase.from('user_tricks').delete().eq('id', optionsTrick.id).select()
     if (error || !data || data.length === 0) {
-      console.error('[TrickListPage] confirmDeleteTrick failed:', error)
-      setDeletingTrick(false)
-      closeDeleteTrickConfirm()
-      setDeleteTrickError('Could not delete this trick. Try again.')
-      setTimeout(() => setDeleteTrickError(''), 3000)
-      return
+      console.error('[TrickListPage] delete trick failed:', error)
+      return { ok: false, error: 'Could not delete this trick. Try again.' }
     }
-    setDeletingTrick(false)
-    setRows(prev => prev.filter(r => r.trick_id !== id))
+    await cascadeDeleteOrphanedSpot(user.id, optionsTrick.spotId)
+    setRows(prev => prev.filter(r => r.trick_id !== optionsTrick.id))
     notifyTricksChanged()
-    closeDeleteTrickConfirm()
-    closeTrickOptions()
+    return { ok: true }
   }
 
   // Settings sheet (owner only): rename + delete list.
@@ -459,11 +421,8 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
             <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <TrickListIcon color="#d4785a" size={16} filled />
-          <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase', overflowWrap: 'break-word' }}>
-            {listName}
-          </span>
+        <div style={{ minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase', overflowWrap: 'break-word' }}>
+          {listName}
         </div>
         <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
           {isOwner ? (
@@ -505,12 +464,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
                         {detail?.title || 'Spot'}
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleCardClick(group.spotId)}
-                      style={{ flexShrink: 0, background: 'transparent', border: '1px solid #d4785a', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', fontSize: 10, fontWeight: 700, color: '#d4785a', letterSpacing: 0.5, textTransform: 'uppercase' }}
-                    >
-                      View Spot
-                    </button>
+                    <div className="arrow-btn" onClick={() => handleCardClick(group.spotId)}><ArrowIcon /></div>
                   </div>
                   <div>
                     {group.tricks.length === 0 ? (
@@ -529,8 +483,8 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
                           )}
                         </div>
                         {isOwner && (
-                          <IconBox size={30} onClick={() => openTrickOptions(trick)}>
-                            <MoreIcon color="#d4785a" />
+                          <IconBox size={30} onClick={() => openTrickOptions(trick, group.spotId)}>
+                            <PencilIcon color="#d4785a" />
                           </IconBox>
                         )}
                       </div>
@@ -598,67 +552,19 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
         document.body
       )}
 
-      {/* Trick options — three-dot menu, opened in its own bottom sheet
-          (owner only; members never see the three dots that trigger this). */}
+      {/* Trick options — pencil icon, opened in its own bottom sheet (owner
+          only; members never see the pencil icon that triggers this). Same
+          shared TrickEditPanel the spot-page trick list sheet uses for its
+          own existing (already-saved) tricks. */}
       {optionsTrick && createPortal(
         <div className="modal-overlay" onClick={closeTrickOptions}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-title" style={{ padding: '0 20px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{optionsTrick.name}</div>
-            {optionsMode === 'menu' ? (
-              <>
-                <div className="modal-row" onClick={() => { setRenameValue(optionsTrick.name); setRenameError(''); setOptionsMode('rename') }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Rename</span>
-                </div>
-                <div className="modal-row" onClick={() => { setDeleteTrickError(''); setPendingDeleteTrick({ id: optionsTrick.id, name: optionsTrick.name }) }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Trick</span>
-                </div>
-              </>
-            ) : (
-              <div style={{ padding: '0 20px 20px' }}>
-                <input
-                  className="form-input"
-                  value={renameValue}
-                  onChange={e => setRenameValue(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') commitRenameTrick() }}
-                  autoFocus
-                  maxLength={NAME_MAX}
-                  style={{ marginBottom: 8 }}
-                />
-                {renameError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 8 }}>{renameError}</div>}
-                <button className="btn-salmon" onClick={commitRenameTrick} disabled={renaming || !renameValue.trim()} style={{ opacity: renaming || !renameValue.trim() ? 0.5 : 1 }}>
-                  {renaming ? 'Saving…' : 'Save'}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Delete trick confirmation — existing confirm-dialog pattern,
-          closes via closeDeleteTrickConfirm in both outcomes. */}
-      {(pendingDeleteTrick || deleteTrickClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeDeleteTrickConfirm}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteTrickClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
-            <div className="modal-handle" />
-            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Trick</div>
-            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              Delete "{pendingDeleteTrick?.name}"? This cannot be undone.
-            </div>
-            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button onClick={confirmDeleteTrick} disabled={deletingTrick} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif', opacity: deletingTrick ? 0.7 : 1 }}>
-                {deletingTrick ? 'Deleting…' : 'Delete'}
-              </button>
-              <button onClick={closeDeleteTrickConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
+            <div style={{ padding: '0 20px 20px' }}>
+              <TrickEditPanel trick={optionsTrick} onRename={trickOnRename} onDelete={trickOnDelete} onClose={closeTrickOptions} />
             </div>
           </div>
-        </div>,
-        document.body
-      )}
-      {deleteTrickError && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-          {deleteTrickError}
         </div>,
         document.body
       )}
@@ -867,11 +773,8 @@ export default function TrickListPage({ user, spots, onSpotClick, onClose, openL
             <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <TrickListIcon color="#d4785a" size={16} filled />
-          <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-            Trick Lists
-          </span>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+          Trick Lists
         </div>
         <div style={{ width: 36 }} />
       </div>
@@ -886,9 +789,6 @@ export default function TrickListPage({ user, spots, onSpotClick, onClose, openL
                 onClick={() => setOpenList({ id: list.id, name: list.name, isOwner: !isShared })}
                 style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
               >
-                <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <TrickListIcon color="#d4785a" size={18} filled />
-                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.name}</div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>

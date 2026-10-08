@@ -105,20 +105,6 @@ export function TrickListIcon({ color = '#ffffff', size = 22, filled = false }) 
   )
 }
 
-// Horizontal three-dot "options" trigger — no existing kebab/ellipsis icon
-// in this file to reuse. Filled dots (no stroke icons in this set use a
-// bare-dot look elsewhere either), sized to sit comfortably inside the
-// existing 30px IconBox alongside PencilIcon/CloseIcon-style row actions.
-export function MoreIcon({ color = '#6a6c7a', size = 16 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <circle cx="3" cy="8" r="1.6" fill={color} />
-      <circle cx="8" cy="8" r="1.6" fill={color} />
-      <circle cx="13" cy="8" r="1.6" fill={color} />
-    </svg>
-  )
-}
-
 export function MapPinIcon({ color = '#ffffff', size = 22, filled = false }) {
   const clipId = useId()
   if (filled) {
