@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
-import { ShareIcon, BookmarkIcon, PencilIcon, SendToFriendsIcon, ListIcon } from '../components/Icons'
+import { ShareIcon, BookmarkIcon, PencilIcon, SendToFriendsIcon, TrickListIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import SpotFormFields from '../components/SpotFormFields'
 import ClipsSection from '../components/ClipsSection'
@@ -172,6 +172,34 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         }
       })
     }
+  }, [spot.id, user?.id])
+
+  // ── Trick list sheet data — fetched as soon as the spot page loads
+  // (not when the sheet opens), so AddToTrickListSheet can derive its
+  // initial draft state synchronously at mount and the sheet opens at its
+  // final height instead of growing mid-animation once a fetch resolves.
+  // Also refetched on seshwars:tricks-changed so the next open reflects any
+  // save made elsewhere (or by this sheet itself).
+  const [trickSheetData, setTrickSheetData] = useState({ trickLists: [], memberListIds: new Set(), tricks: [] })
+  useEffect(() => {
+    let cancelled = false
+    const fetchTrickSheetData = async () => {
+      if (!user?.id || !spot.id) { setTrickSheetData({ trickLists: [], memberListIds: new Set(), tricks: [] }); return }
+      const [listsRes, membershipRes, tricksRes] = await Promise.all([
+        supabase.from('trick_lists').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('trick_list_spots').select('list_id').eq('spot_id', spot.id),
+        supabase.from('user_tricks').select('*').eq('user_id', user.id).eq('spot_id', spot.id),
+      ])
+      if (cancelled) return
+      setTrickSheetData({
+        trickLists: listsRes.data || [],
+        memberListIds: new Set((membershipRes.data || []).map(r => r.list_id)),
+        tricks: tricksRes.data || [],
+      })
+    }
+    fetchTrickSheetData()
+    window.addEventListener('seshwars:tricks-changed', fetchTrickSheetData)
+    return () => { cancelled = true; window.removeEventListener('seshwars:tricks-changed', fetchTrickSheetData) }
   }, [spot.id, user?.id])
 
   // ── Friendship status for the publisher (for AddFriendButton) ──
@@ -848,7 +876,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
               style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexShrink: 0 }}
             >
-              <ListIcon color="#fff" size={14} filled />
+              <TrickListIcon color="#fff" size={14} filled />
               Trick List
             </button>
           </div>
@@ -1478,6 +1506,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         <AddToTrickListSheet
           spot={spot}
           user={user}
+          initialData={trickSheetData}
           onClose={() => setShowTrickSheet(false)}
           onGoProfile={onGoProfile}
         />

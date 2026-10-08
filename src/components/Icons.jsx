@@ -75,6 +75,50 @@ export function ListIcon({ color = '#ffffff', size = 22, filled = false }) {
   )
 }
 
+// Trick list icon: ListIcon's own three-bar geometry (same 48x48 viewBox,
+// same row centers 12/26/40, same strokeWidth 3 for the unfilled bars),
+// with each bar shortened and shifted right to make room for a small
+// checkmark to its left — reuses SquareToggle's existing checkmark stroke
+// recipe (round cap/join) at the bars' own strokeWidth (3) for a consistent
+// weight with the rest of this glyph.
+export function TrickListIcon({ color = '#ffffff', size = 22, filled = false }) {
+  const checks = [12, 26, 40]
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      {checks.map(cy => (
+        <path key={cy} d={`M5 ${cy}L8 ${cy + 3}L15 ${cy - 8}`} stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      ))}
+      {filled ? (
+        <>
+          <rect x="20" y="9" width="24" height="6" rx="2" fill={color} />
+          <rect x="20" y="23" width="24" height="6" rx="2" fill={color} />
+          <rect x="20" y="37" width="24" height="6" rx="2" fill={color} />
+        </>
+      ) : (
+        <>
+          <rect x="21.5" y="8.5" width="21" height="7" rx="1.5" stroke={color} strokeWidth="3" fill="none" />
+          <rect x="21.5" y="22.5" width="21" height="7" rx="1.5" stroke={color} strokeWidth="3" fill="none" />
+          <rect x="21.5" y="36.5" width="21" height="7" rx="1.5" stroke={color} strokeWidth="3" fill="none" />
+        </>
+      )}
+    </svg>
+  )
+}
+
+// Horizontal three-dot "options" trigger — no existing kebab/ellipsis icon
+// in this file to reuse. Filled dots (no stroke icons in this set use a
+// bare-dot look elsewhere either), sized to sit comfortably inside the
+// existing 30px IconBox alongside PencilIcon/CloseIcon-style row actions.
+export function MoreIcon({ color = '#6a6c7a', size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <circle cx="3" cy="8" r="1.6" fill={color} />
+      <circle cx="8" cy="8" r="1.6" fill={color} />
+      <circle cx="13" cy="8" r="1.6" fill={color} />
+    </svg>
+  )
+}
+
 export function MapPinIcon({ color = '#ffffff', size = 22, filled = false }) {
   const clipId = useId()
   if (filled) {

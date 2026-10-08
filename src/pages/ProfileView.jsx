@@ -16,7 +16,7 @@ import ImageCropModal from '../components/ImageCropModal'
 import FriendsView from '../components/FriendsView'
 import TrickListPage from './TrickListPage'
 import AddFriendButton from '../components/AddFriendButton'
-import { ListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
+import { TrickListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
 import { transformImageUrl } from '../utils/imageUrl'
 import { openLocationSettings } from '../lib/locationSettings'
 
@@ -823,7 +823,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <ListIcon color="#d4785a" size={18} filled />
+                <TrickListIcon color="#d4785a" size={18} filled />
                 <div>
                   <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--salmon)' }}>{trickCounts.landed}/{trickCounts.total}</div>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Trick List</div>
