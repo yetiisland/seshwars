@@ -633,8 +633,9 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
       )}
 
       {/* Share sheet — ONE sheet; friend content swaps in place, never a
-          second sheet. Share With Friends is owner-only; Share Link works
-          for both owners and members. */}
+          second sheet. Share With Friends and Share Link both work for
+          owners and members — the database now allows a member to add
+          their own friends to a list they belong to. */}
       {showShareSheet && createPortal(
         <div className="modal-overlay" onClick={closeShareSheet}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
@@ -642,12 +643,10 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
             {shareSheetMode === 'choice' ? (
               <>
                 <div className="modal-title" style={{ padding: '0 20px' }}>Share</div>
-                {isOwner && (
-                  <div className="modal-row" onClick={() => setShareSheetMode('friends')}>
-                    <ProfileIcon color="#d4785a" size={16} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share With Friends</span>
-                  </div>
-                )}
+                <div className="modal-row" onClick={() => setShareSheetMode('friends')}>
+                  <ProfileIcon color="#d4785a" size={16} filled />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share With Friends</span>
+                </div>
                 <div className="modal-row" onClick={() => { closeShareSheet(); handleShareLink() }}>
                   <ShareIcon color="#d4785a" />
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share Link</span>

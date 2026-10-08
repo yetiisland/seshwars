@@ -825,12 +825,14 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
               )}
               {spot.distance != null && <span className="dist-text">{spot.distance} mi</span>}
-              <div
+              <button
+                className="btn-salmon"
                 onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
-                style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 2 }}
+                style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 2 }}
               >
-                <TrickListIcon color="#d4785a" size={16} filled />
-              </div>
+                <TrickListIcon color="#fff" size={14} filled />
+                Trick List
+              </button>
               <div
                 onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
                 style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}

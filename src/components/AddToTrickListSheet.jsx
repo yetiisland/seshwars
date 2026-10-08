@@ -40,22 +40,25 @@ function SquareToggle({ selected }) {
   )
 }
 
-// Matches SaveToListModal.jsx's BookmarkSVG icon-box exactly (same 34x34
-// box, same salmon tint/border), with the bookmark glyph swapped for the
-// trick list icon since these rows are trick lists, not saved-spot lists.
-function TrickListIconBox({ filled }) {
+// Exact same icon box used on the trick lists overview card (TrickListPage.jsx)
+// — same component, size, and container, per the consistency rule.
+function TrickListIconBox() {
   return (
-    <div style={{ width: 34, height: 34, borderRadius: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <TrickListIcon color="#d4785a" size={14} filled={filled} />
+    <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <TrickListIcon color="#d4785a" size={18} filled />
     </div>
   )
 }
 
-function BackArrow() {
+// Exact same solid salmon rounded-square back button used in page headers
+// across the app (SpotDetail/TrickListPage/SavedView headers, etc.).
+function HeaderBackButton({ onClick }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <path d="M9 2L4 7L9 12" stroke="#d4785a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    </svg>
+    <div onClick={onClick} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
   )
 }
 
@@ -115,6 +118,30 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+
+  // Dismissing the sheet (tapping outside — the only exit this sheet
+  // exposes; there's no swipe-to-dismiss gesture anywhere in this app) with
+  // an unsaved new trick or list change pending shows a confirm first,
+  // using the existing confirm-dialog pattern, stacked on top of the sheet.
+  const [pendingExit, setPendingExit] = useState(false)
+  const [exitClosing, setExitClosing] = useState(false)
+  const closeExitConfirm = () => {
+    setExitClosing(true)
+    setTimeout(() => { setExitClosing(false); setPendingExit(false) }, 180)
+  }
+  const hasUnsavedChanges = () => {
+    if (draftTricks.some(t => t.isNew)) return true
+    if (draftNewLists.length > 0) return true
+    if (existingListChecked.size !== originalMemberListIds.size) return true
+    for (const id of existingListChecked) {
+      if (!originalMemberListIds.has(id)) return true
+    }
+    return false
+  }
+  const requestClose = () => {
+    if (hasUnsavedChanges()) { setPendingExit(true); return }
+    onClose()
+  }
 
   // Pre-existing tricks render in their captured open-time order; any
   // trick added during this session is appended after them, in creation
@@ -346,7 +373,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
   const addDisabled = !nameInput.trim()
 
   return createPortal(
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-handle" />
 
@@ -428,12 +455,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                     arrow always returns to the tricks pane. */}
                 <div style={{ width: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 12 }}>
-                    <div
-                      onClick={closeOptions}
-                      style={{ cursor: 'pointer', width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <BackArrow />
-                    </div>
+                    <HeaderBackButton onClick={closeOptions} />
                     <div style={{ fontSize: 18, color: 'var(--text-primary)', fontWeight: 900, letterSpacing: 0.5, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {optionsTrick?.name}
                     </div>
@@ -447,19 +469,15 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
               </div>
             </div>
 
-            {/* Step 2 — Add To Lists. Matches SaveToListModal.jsx exactly:
-                same modal-row layout/spacing, list icon box, selected-row
-                highlight (icon box fill + SquareToggle), Create New List
-                row style, and Save button recipe — only the icon (trick
-                list, not bookmark) and the Save button's hard-disable differ. */}
+            {/* Step 2 — Add To Lists. Matches SaveToListModal.jsx's row
+                layout/spacing, Create New List row style, and Save button
+                recipe; the icon box is the exact one from the trick lists
+                overview card (not SaveToListModal's bookmark) and stays
+                static — SquareToggle alone carries the selected state. The
+                Save button's hard-disable also differs from SaveToListModal. */}
             <div style={{ width: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px', marginBottom: 12 }}>
-                <div
-                  onClick={() => setStep(1)}
-                  style={{ cursor: 'pointer', width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <BackArrow />
-                </div>
+                <HeaderBackButton onClick={() => setStep(1)} />
                 <div style={{ fontSize: 18, color: 'var(--text-primary)', fontWeight: 900, letterSpacing: 0.5, textTransform: 'uppercase' }}>
                   Add To Lists
                 </div>
@@ -470,7 +488,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                   const isIn = existingListChecked.has(list.id)
                   return (
                     <div key={list.id} className="modal-row" onClick={() => toggleExistingList(list.id)} style={{ borderTop: '1px solid #EAD8C8' }}>
-                      <TrickListIconBox filled={isIn} />
+                      <TrickListIconBox />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{list.name}</div>
                       </div>
@@ -480,7 +498,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                 })}
                 {draftNewLists.map(list => (
                   <div key={list.id} className="modal-row" onClick={() => toggleNewList(list.id)} style={{ borderTop: '1px solid #EAD8C8' }}>
-                    <TrickListIconBox filled={list.checked} />
+                    <TrickListIconBox />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{list.name}</div>
                     </div>
@@ -551,6 +569,29 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
       {landedError && createPortal(
         <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {landedError}
+        </div>,
+        document.body
+      )}
+
+      {/* Unsaved-changes exit confirmation — existing confirm-dialog
+          pattern, stacked on top of the sheet, closes in both outcomes. */}
+      {(pendingExit || exitClosing) && createPortal(
+        <div className="modal-overlay" onClick={closeExitConfirm}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={exitClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
+            <div className="modal-handle" />
+            <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Unsaved Changes</div>
+            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              Your trick hasn't been saved. Exit anyway?
+            </div>
+            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={onClose} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                Exit
+              </button>
+              <button onClick={closeExitConfirm} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
+                Keep Editing
+              </button>
+            </div>
+          </div>
         </div>,
         document.body
       )}

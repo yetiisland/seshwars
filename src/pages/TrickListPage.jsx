@@ -10,7 +10,7 @@ import TrickCheckmark from '../components/TrickCheckmark'
 import TrickEditPanel from '../components/TrickEditPanel'
 import TabBar from '../components/TabBar'
 import InitialsAvatar from '../components/InitialsAvatar'
-import { ArrowIcon, SettingsIcon, ShareIcon, LeaveIcon, SendToFriendsIcon, PencilIcon, IconBox } from '../components/Icons'
+import { ArrowIcon, TrickListIcon, SettingsIcon, ShareIcon, LeaveIcon, SendToFriendsIcon, PencilIcon, IconBox } from '../components/Icons'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -178,12 +178,27 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
   const [listName, setListName] = useState(list.name)
   const [isOwner, setIsOwner] = useState(list.isOwner ?? true)
   const [spotDetails, setSpotDetails] = useState({}) // spot_id -> { title, slug, photos }
+  // Per-spot trick order, frozen at fetch time — checking/unchecking a
+  // trick must never reorder it while this screen stays open (it would
+  // visibly jump); only a fresh fetch (reopening this list) re-sorts.
+  const [orderIdsBySpot, setOrderIdsBySpot] = useState({})
 
   const fetchView = async () => {
     setLoading(true)
     const { data, error } = await supabase.rpc('get_trick_list_view', { p_list_id: list.id })
     if (error || !data) { setLoading(false); return }
     setRows(data)
+    const bySpot = {}
+    for (const r of data) {
+      if (!r.spot_id || !r.trick_id) continue
+      if (!bySpot[r.spot_id]) bySpot[r.spot_id] = []
+      bySpot[r.spot_id].push({ id: r.trick_id, landed: r.landed, landed_at: r.landed_at, created_at: r.created_at })
+    }
+    const frozen = {}
+    for (const spotId of Object.keys(bySpot)) {
+      frozen[spotId] = sortTricks(bySpot[spotId]).map(t => t.id)
+    }
+    setOrderIdsBySpot(frozen)
     if (data.length > 0) {
       setListName(data[0].list_name || list.name)
       setIsOwner(!!data[0].is_owner)
@@ -403,10 +418,24 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
       if (!map.has(r.spot_id)) { map.set(r.spot_id, []); order.push(r.spot_id) }
       if (r.trick_id) map.get(r.spot_id).push(r)
     }
-    return order.map(spotId => ({
-      spotId,
-      tricks: sortTricks(map.get(spotId).map(t => ({ id: t.trick_id, name: t.trick_name, landed: t.landed, landed_at: t.landed_at, created_at: t.created_at }))),
-    }))
+    return order.map(spotId => {
+      const tricksById = new Map(map.get(spotId).map(t => [t.trick_id, t]))
+      const frozenOrder = orderIdsBySpot[spotId] || []
+      const ordered = []
+      for (const id of frozenOrder) {
+        if (tricksById.has(id)) { ordered.push(tricksById.get(id)); tricksById.delete(id) }
+      }
+      // A trick not in the frozen order (shouldn't normally happen within
+      // a single open session) — append in fetch order, same fallback
+      // AddToTrickListSheet.jsx uses for its own frozen ordering.
+      for (const t of map.get(spotId)) {
+        if (tricksById.has(t.trick_id)) ordered.push(t)
+      }
+      return {
+        spotId,
+        tricks: ordered.map(t => ({ id: t.trick_id, name: t.trick_name, landed: t.landed, landed_at: t.landed_at, created_at: t.created_at })),
+      }
+    })
   })()
 
   return (
@@ -789,6 +818,9 @@ export default function TrickListPage({ user, spots, onSpotClick, onClose, openL
                 onClick={() => setOpenList({ id: list.id, name: list.name, isOwner: !isShared })}
                 style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
               >
+                <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <TrickListIcon color="#d4785a" size={18} filled />
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.name}</div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>
