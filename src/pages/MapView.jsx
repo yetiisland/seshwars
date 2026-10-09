@@ -29,6 +29,46 @@ function getSpotPinColors(spot) {
   return { fill: '#d4785a', stroke: '#FFFFFF' }
 }
 
+// Pixel-identical rasterized version of the unselected SpotPin SVG below,
+// registered once per unique (fill,stroke) combo as a Mapbox GL icon image
+// so hundreds of spots can render as a single native symbol layer instead
+// of one React <Marker> DOM node each (see MapView's pinVariants/
+// ensurePinIcons). The selected/highlighted pin stays a real <Marker> with
+// the actual SpotPin SVG — only that one ever needs the bigger glow style.
+const PIN_VIEWBOX_W = 20
+const PIN_VIEWBOX_H = 24
+const PIN_DISPLAY_H = 28 // matches SpotPin's unselected `size`
+const PIN_SHARPNESS = 3 // retina-sharp raster at normal map zoom
+const PIN_PATH = 'M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z'
+
+function pinVariantId(fill, stroke) {
+  return `pin_${fill.replace('#', '')}_${stroke.replace('#', '')}`
+}
+
+function makePinIconData(fill, stroke) {
+  const scale = (PIN_DISPLAY_H / PIN_VIEWBOX_H) * PIN_SHARPNESS
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(PIN_VIEWBOX_W * scale)
+  canvas.height = Math.round(PIN_VIEWBOX_H * scale)
+  const ctx = canvas.getContext('2d')
+  ctx.scale(scale, scale)
+  const body = new Path2D(PIN_PATH)
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'
+  ctx.shadowBlur = 6
+  ctx.shadowOffsetY = 2
+  ctx.fillStyle = fill
+  ctx.fill(body)
+  ctx.shadowColor = 'transparent' // avoid doubling the shadow on the stroke/dot pass
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = stroke
+  ctx.stroke(body)
+  ctx.fillStyle = stroke
+  ctx.beginPath()
+  ctx.arc(10, 10, 4, 0, Math.PI * 2)
+  ctx.fill()
+  return ctx.getImageData(0, 0, canvas.width, canvas.height)
+}
+
 function SpotPin({ fill, stroke, selected = false }) {
   const size = selected ? 36 : 28
   const strokeW = selected ? 2.5 : 1.5
@@ -84,12 +124,25 @@ const clusterCountLayer = {
   paint: { 'text-color': '#ffffff' },
 }
 
-const unclusteredPointLayer = {
-  id: 'unclustered-points',
-  type: 'circle',
-  source: 'spots',
-  filter: ['!', ['has', 'point_count']],
-  paint: { 'circle-radius': 0, 'circle-opacity': 0 },
+// Base filter for individually-visible (unclustered) spots — the selected/
+// highlighted spot id(s) are excluded per-render below (that one spot stays
+// a React <Marker> instead) so the layer icon doesn't show underneath it.
+function spotPinsLayer(excludedIds) {
+  return {
+    id: 'spot-pins',
+    type: 'symbol',
+    source: 'spots',
+    filter: excludedIds.length === 0
+      ? ['!', ['has', 'point_count']]
+      : ['all', ['!', ['has', 'point_count']], ['!', ['in', ['get', 'id'], ['literal', excludedIds]]]],
+    layout: {
+      'icon-image': ['get', 'pinVariant'],
+      'icon-size': 1,
+      'icon-anchor': 'bottom',
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+    },
+  }
 }
 
 function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, sortMode, onSortModeChange, searchLocation, onClearSearch, highlightedSpotId, onSearch, searchOverlay, fitOnMount = false, onHidePress, isActive = true }) {
@@ -100,7 +153,6 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
   const [viewState, setViewState] = useState(_savedViewState ?? FALLBACK)
   const [satellite, setSatellite] = useState(false)
   const [baseStyle, setBaseStyle] = useState(STYLE_CUSTOM)
-  const [unclusteredIds, setUnclusteredIds] = useState(() => new Set())
   const [mapReady, setMapReady] = useState(false)
   const [fitDone, setFitDone] = useState(false)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
@@ -284,21 +336,56 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
     }
   }, [filtered, selected])
 
+  // Plain objects, not `Map` (react-map-gl's default export shadows the
+  // global Map constructor in this file's scope).
+  const spotsById = useMemo(() => {
+    const m = {}
+    for (const s of filtered) m[String(s.id)] = s
+    return m
+  }, [filtered])
+
+  // One Mapbox icon image per unique (fill,stroke) combo actually in use —
+  // typically ~5 (default/skatepark/shop/reported/closed), never one per spot.
+  const pinVariants = useMemo(() => {
+    const m = {}
+    for (const s of filtered) {
+      const { fill, stroke } = getSpotPinColors(s)
+      const id = pinVariantId(fill, stroke)
+      if (!m[id]) m[id] = { fill, stroke }
+    }
+    return m
+  }, [filtered])
+
   const geojson = useMemo(() => ({
     type: 'FeatureCollection',
     features: filtered
       .filter(s => s.latitude && s.longitude)
-      .map(s => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [s.longitude, s.latitude] },
-        properties: { id: String(s.id), saved: saved.has(s.id) ? 1 : 0 },
-      })),
+      .map(s => {
+        const { fill, stroke } = getSpotPinColors(s)
+        return {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [s.longitude, s.latitude] },
+          properties: { id: String(s.id), saved: saved.has(s.id) ? 1 : 0, pinVariant: pinVariantId(fill, stroke) },
+        }
+      }),
   }), [filtered, saved])
+
+  // Registers any pin icon variant not already on the current style — called
+  // after load and after every idle (idle also fires post style-reload, e.g.
+  // the satellite toggle, which wipes all custom images and needs them back).
+  const ensurePinIcons = useCallback((map) => {
+    for (const id of Object.keys(pinVariants)) {
+      if (!map.hasImage(id)) {
+        const { fill, stroke } = pinVariants[id]
+        map.addImage(id, makePinIconData(fill, stroke))
+      }
+    }
+  }, [pinVariants])
 
   const updateUnclusteredIds = useCallback(() => {
     if (!mapRef.current) return
     const map = mapRef.current.getMap()
-    if (!map.isStyleLoaded() || !map.getLayer('unclustered-points')) return
+    if (!map.isStyleLoaded()) return
     // Hide POI / transit labels — keep place names and road labels only
     const style = map.getStyle()
     if (style) {
@@ -309,10 +396,17 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
         }
       })
     }
-    const features = map.queryRenderedFeatures({ layers: ['unclustered-points'] })
-    setUnclusteredIds(new Set(features.map(f => String(f.properties.id))))
+    ensurePinIcons(map)
     setMapReady(true)
-  }, [])
+  }, [ensurePinIcons])
+
+  // Covers a variant appearing after the initial load (e.g. spots data
+  // changes, revealing a new report-status color) without waiting for the
+  // next idle event.
+  useEffect(() => {
+    const map = mapRef.current?.getMap()
+    if (map && map.isStyleLoaded()) ensurePinIcons(map)
+  }, [ensurePinIcons])
 
   // Mapbox GL JS v3+ defaults to the 'globe' projection and auto-switches
   // between globe/mercator by zoom level — force mercator permanently. The
@@ -372,9 +466,13 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
         })
         return
       }
+      if (feature.properties?.id != null) {
+        const spot = spotsById[String(feature.properties.id)]
+        if (spot) { handlePinClick(spot); return }
+      }
     }
     setSelected(null)
-  }, [])
+  }, [spotsById, handlePinClick])
 
   const handleClusterMouseEnter = useCallback(() => {
     const map = mapRef.current?.getMap()
@@ -387,6 +485,18 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
   }, [])
 
   const mapStyle = satellite ? STYLE_SAT : baseStyle
+
+  // Spot(s) that stay a real <Marker> (selected peek-card pin, and/or a
+  // separately highlighted one e.g. from a notification deep link) instead
+  // of the native layer icon — deduped, so the layer filter below excludes
+  // both the layer rendering the icon AND the Marker double-rendering it.
+  const excludedPinIds = []
+  if (selected?.id != null) excludedPinIds.push(String(selected.id))
+  if (highlightedSpotId != null && String(highlightedSpotId) !== excludedPinIds[0]) excludedPinIds.push(String(highlightedSpotId))
+
+  const spotPinsLayerSpec = spotPinsLayer(excludedPinIds)
+
+  const excludedPinSpots = filtered.filter(s => excludedPinIds.includes(String(s.id)))
 
   const btnStyle = (active) => ({
     display: 'flex', alignItems: 'center', gap: 5,
@@ -417,14 +527,14 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
           mapStyle={mapStyle}
           mapboxAccessToken={MAPBOX_TOKEN}
           style={{ width: '100%', height: '100%' }}
-          interactiveLayerIds={['clusters']}
+          interactiveLayerIds={['clusters', 'spot-pins']}
           onError={() => { if (!satellite) setBaseStyle(STYLE_LIGHT) }}
           minZoom={2}
         >
           <Source id="spots" type="geojson" data={geojson} cluster={true} clusterMaxZoom={9} clusterRadius={50}>
             <Layer {...clusterCircleLayer} />
             <Layer {...clusterCountLayer} />
-            <Layer {...unclusteredPointLayer} />
+            <Layer {...spotPinsLayerSpec} />
           </Source>
 
           {userLocation && (
@@ -433,25 +543,24 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
             </Marker>
           )}
 
-          {/* Skip reconciling the (potentially hundreds of) spot markers
-              entirely while this tab isn't visible — the <Map>/<Source>
-              above stays alive regardless (that's the point of keeping
-              MapView mounted), only this expensive per-spot marker list is
-              gated. Re-renders again the moment isActive flips back true. */}
-          {isActive && filtered.map(spot =>
-            spot.longitude && spot.latitude && (!mapReady || unclusteredIds.has(String(spot.id))) ? (
-              <Marker
-                key={spot.id}
-                longitude={spot.longitude}
-                latitude={spot.latitude}
-                anchor="bottom"
-                onClick={e => { e.originalEvent.stopPropagation(); handlePinClick(spot) }}
-                style={{ overflow: 'visible' }}
-              >
-                <SpotPin {...getSpotPinColors(spot)} selected={selected?.id === spot.id || highlightedSpotId === spot.id} />
-              </Marker>
-            ) : null
-          )}
+          {/* Every unclustered spot pin renders natively via the spot-pins
+              symbol layer above (one GeoJSON source, no per-spot DOM) — the
+              only pin(s) still a real <Marker> are the selected/highlighted
+              one(s), which need the bigger SpotPin SVG glow style a static
+              icon image can't do. isActive still gates this (cheap — at
+              most 2 markers, but matches MapView staying idle while hidden). */}
+          {isActive && excludedPinSpots.map(spot => spot.longitude && spot.latitude ? (
+            <Marker
+              key={spot.id}
+              longitude={spot.longitude}
+              latitude={spot.latitude}
+              anchor="bottom"
+              onClick={e => { e.originalEvent.stopPropagation(); handlePinClick(spot) }}
+              style={{ overflow: 'visible' }}
+            >
+              <SpotPin {...getSpotPinColors(spot)} selected />
+            </Marker>
+          ) : null)}
         </Map>
 
         {/* Filters row — top */}
