@@ -5,7 +5,6 @@ import { Capacitor } from '@capacitor/core'
 import { Analytics } from '@vercel/analytics/react'
 import './index.css'
 import App from './App.jsx'
-import SpotPage from './pages/SpotPage.jsx'
 import SharedListPage from './pages/SharedListPage.jsx'
 import SharedTrickListPage from './pages/SharedTrickListPage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
@@ -28,8 +27,12 @@ createRoot(document.getElementById('root')).render(
     <Router>
       <DeepLinkHandler />
       <Routes>
-        <Route path="/spot/:slug" element={<SpotPage />} />
-        <Route path="/spots/:slug" element={<SpotPage />} />
+        {/* /spot/:slug and /spots/:slug are intentionally NOT their own
+            Route — they fall through to the "*" route below, the same
+            <App/> every other path renders, so opening a spot never
+            unmounts App (and its kept-alive ListView/MapView) — App itself
+            detects the match (useMatch) and renders the spot as an overlay
+            on top. See App.jsx's spotMatch/SpotOverlay usage. */}
         <Route path="/list/:shareToken" element={<SharedListPage />} />
         <Route path="/trick-list/:shareToken" element={<SharedTrickListPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />

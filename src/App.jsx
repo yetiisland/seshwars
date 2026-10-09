@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, useMatch } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { loadProfile, clearProfile, useProfileStore } from './lib/profileStore'
 import { isAdminUser } from './lib/admin'
@@ -21,6 +21,7 @@ import SavedView from './pages/SavedView'
 import ProfileView from './pages/ProfileView'
 import AddSpot from './pages/AddSpot'
 import SearchPage from './pages/SearchPage'
+import SpotOverlay from './pages/SpotOverlay'
 
 // Module-level auth cache — survives App unmount/remount so there's no loading flash
 // when navigating back from a spot page.
@@ -284,10 +285,37 @@ function matchesFilters(s, filters) {
 }
 
 export default function App() {
-  // Mark that the user arrived via in-app navigation so OpenInAppSheet skips itself
-  sessionStorage.setItem('seshwars:appMounted', '1')
-
   const navigate = useNavigate()
+  const location = useLocation()
+  // /spot/:slug and /spots/:slug are no longer their own Route — main.jsx
+  // falls them through to this same catch-all App route (see main.jsx),
+  // so opening a spot never unmounts App, its kept-alive ListView/MapView,
+  // or any already-loaded data. The spot overlay renders on top instead.
+  const spotsMatch = useMatch('/spots/:slug')
+  const spotMatchSingular = useMatch('/spot/:slug')
+  const spotMatch = spotsMatch || spotMatchSingular
+  const spotSlug = spotMatch?.params?.slug
+  // Captured once per App mount — lets the overlay's back button tell "this
+  // spot route was the very first thing this tab ever loaded" (a cold
+  // direct/shared link — Back should land on '/', there's no in-app history
+  // to pop) apart from "the user navigated here from elsewhere in the app"
+  // (Back should pop real history, landing exactly back where they were).
+  const initialPathnameRef = useRef(location.pathname)
+
+  // Mark that the user has been on a real in-app (non-spot) route so
+  // OpenInAppSheet knows to skip itself — only once we're sure this isn't a
+  // cold direct link that happened to land straight on a spot, which should
+  // still see that prompt, exactly as it did when spot pages were a fully
+  // separate, un-mounted-App route.
+  useEffect(() => {
+    if (!spotMatch) sessionStorage.setItem('seshwars:appMounted', '1')
+  }, [spotMatch])
+
+  const handleSpotBack = () => {
+    if (location.pathname === initialPathnameRef.current) navigate('/')
+    else navigate(-1)
+  }
+
   const [tab, setTab] = useState(() => normalizeTab(sessionStorage.getItem('activeTab') || 'spots'))
   const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')
   const [openListId, setOpenListId] = useState(null)
@@ -341,6 +369,7 @@ export default function App() {
   const [showHideConfirm, setShowHideConfirm] = useState(false)
   const [hideConfirmClosing, setHideConfirmClosing] = useState(false)
   const [saveModalSpot, setSaveModalSpot] = useState(null)
+  const [spotSheetPad, setSpotSheetPad] = useState(0)
   const { location: userLocation, permissionState: locationPermission, requestLocation } = useGeolocation()
   // Map is the one place that needs location to do its core job (centering
   // on you); opening it is the "explicit action" that requests location
@@ -560,12 +589,30 @@ export default function App() {
     closeHideConfirm()
   }
 
+  // tab/spotsView read via refs (kept current below, each render) instead of
+  // as useCallback deps — this callback flows down to every SpotCard's
+  // onClick, and including them as deps would mint a new function identity
+  // on every tab switch, breaking SpotCard's React.memo for the whole grid
+  // at once (500+ forced re-renders) exactly when switching tabs.
+  const tabRef = useRef(tab)
+  const spotsViewRef = useRef(spotsView)
+  // navigate() from react-router can mint a new identity across some
+  // navigations — reading it via a ref (rather than as a dep) keeps this
+  // callback's own identity permanently stable too; calling a slightly
+  // "stale" navigate is safe since it dispatches to the router singleton,
+  // unlike a stale closure over actual component state.
+  const navigateRef = useRef(navigate)
+  useEffect(() => {
+    tabRef.current = tab
+    spotsViewRef.current = spotsView
+    navigateRef.current = navigate
+  }, [tab, spotsView, navigate])
   const handleSpotClick = useCallback((spot, extra = {}) => {
     const id = spot.slug || spot.id
-    sessionStorage.setItem('activeTab', tab)
-    sessionStorage.setItem('spotsView', spotsView)
-    navigate(`/spots/${id}`, { state: { spot, prevTab: tab, ...extra } })
-  }, [tab, spotsView, navigate])
+    sessionStorage.setItem('activeTab', tabRef.current)
+    sessionStorage.setItem('spotsView', spotsViewRef.current)
+    navigateRef.current(`/spots/${id}`, { state: { spot, prevTab: tabRef.current, ...extra } })
+  }, [])
 
   // list_invite notification tap — opens the Saved tab with that list's
   // collection pre-opened, same in-app destination a member or owner
@@ -594,6 +641,10 @@ export default function App() {
     setTab(normalized)
     sessionStorage.setItem('activeTab', normalized)
     closeSearch()
+    // Tapping a tab while the spot overlay is open exits it, revealing the
+    // tab content underneath — already mounted/intact, so this is just a
+    // URL change, not a reload.
+    if (spotMatch) navigate('/')
   }
 
   const handleSpotsViewChange = (v) => {
@@ -671,7 +722,6 @@ export default function App() {
           <div className={`desktop-content${isMapActive ? '' : ' desktop-content-constrained'}`}>
             <div style={{ display: effectiveTab === 'spots' && spotsView === 'list' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <ListView
-                isActive={effectiveTab === 'spots' && spotsView === 'list'}
                 spots={filteredByDistance}
                 loading={loading}
                 saved={saved}
@@ -810,7 +860,6 @@ export default function App() {
             <>
               <div style={{ display: effectiveTab === 'spots' && spotsView === 'list' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <ListView
-                  isActive={effectiveTab === 'spots' && spotsView === 'list'}
                   spots={filteredByDistance}
                   loading={loading}
                   saved={saved}
@@ -936,6 +985,30 @@ export default function App() {
             />
           )}
         </>
+      )}
+
+      {/* Spot overlay — renders on top of whichever tab is showing underneath
+          instead of replacing App (see main.jsx: /spot/:slug and /spots/:slug
+          both fall through to this same route, so App, its kept-alive
+          ListView/MapView, and all already-loaded data stay mounted the
+          entire time). A full-screen takeover, same as the old standalone
+          SpotPage route looked, just layered instead of swapped. */}
+      {spotMatch && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#FDF8F0' }}>
+          <SpotOverlay
+            slug={spotSlug}
+            user={user}
+            saved={saved}
+            hiddenIds={hiddenIds}
+            unhideSpot={unhideSpot}
+            onBack={handleSpotBack}
+            onGoProfile={() => { goToProfile(); if (user) navigate('/') }}
+            onGoAuth={() => setShowAuth(true)}
+            onSavePress={handleSavePress}
+            sheetPad={spotSheetPad}
+            onSheetPad={setSpotSheetPad}
+          />
+        </div>
       )}
 
       {/* AddSpot — single portal instance outside the isDesktop branch; React identity

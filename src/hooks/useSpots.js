@@ -4,7 +4,10 @@ import { supabase } from '../lib/supabase'
 const LS_SAVED_KEY = 'seshwars_saved_spots'
 const STALE_MS = 30_000
 
-// Module-level cache so spots survive App unmount/remount (e.g. navigating back from SpotPage)
+// Module-level cache so spots survive an actual App unmount/remount (a hard
+// page reload) — opening a spot no longer unmounts App (it renders on top
+// instead, see App.jsx's spotMatch/SpotOverlay), but this still matters for
+// a real refresh/reload.
 let _cachedSpots = []
 let _spotsReady = false
 let _lastFetched = 0
