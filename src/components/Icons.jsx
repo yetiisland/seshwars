@@ -229,6 +229,24 @@ export function PersonPlusIcon({ color = '#d4785a', size = 18 }) {
   )
 }
 
+// Solid two-person "friends" icon — two PROFILE_PATH silhouettes offset and
+// scaled (same compositing approach as PersonPlusIcon above), front person
+// drawn last so their silhouette reads clearly against the back one. Used
+// for every "Share With Friends" option, replacing the single-person
+// ProfileIcon that previously stood in for it there.
+export function FriendsIcon({ color = '#d4785a', size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <g transform="translate(-3,-2) scale(0.62)">
+        <path d={PROFILE_PATH} fill={color} />
+      </g>
+      <g transform="translate(13,8) scale(0.72)">
+        <path d={PROFILE_PATH} fill={color} />
+      </g>
+    </svg>
+  )
+}
+
 // Shared icon container (shared icon spec): rounded box, radius 6, salmon
 // stroke, transparent fill, salmon icon inside. Used for the add-person
 // icon and every standalone plus/X next to a username, across every
@@ -281,15 +299,6 @@ export function ShareIcon({ color = '#6a6c7a' }) {
   )
 }
 
-export function SendToFriendsIcon({ color = '#d4785a' }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <path d="M12.5 1.5L1 6L5.5 8L7.5 12.5L12.5 1.5Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
-      <path d="M5.5 8L12.5 1.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 // Verbatim copy of the gear glyph already inline in ProfileView.jsx's own
 // Settings button (~line 745-748), extracted so other screens (the
 // individual trick list page) can reuse the same icon.
@@ -304,7 +313,7 @@ export function SettingsIcon({ color = '#d4785a', size = 18 }) {
 
 // New glyph (door + outward arrow) — no existing "leave/exit" icon in this
 // file to reuse. Same simple-line-icon weight (~1.4 stroke) as ShareIcon/
-// SendToFriendsIcon/PencilIcon above.
+// PencilIcon above.
 export function LeaveIcon({ color = '#d4785a', size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 14 14" fill="none">

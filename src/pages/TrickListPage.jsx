@@ -10,7 +10,7 @@ import TrickCheckmark from '../components/TrickCheckmark'
 import TrickEditPanel from '../components/TrickEditPanel'
 import TabBar from '../components/TabBar'
 import InitialsAvatar from '../components/InitialsAvatar'
-import { ArrowIcon, TrickListIcon, SettingsIcon, ShareIcon, LeaveIcon, SendToFriendsIcon, PencilIcon, IconBox } from '../components/Icons'
+import { ArrowIcon, TrickListIcon, SettingsIcon, ShareIcon, LeaveIcon, FriendsIcon, PencilIcon, IconBox } from '../components/Icons'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -613,7 +613,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
               <>
                 <div className="modal-title" style={{ padding: '0 20px' }}>Share</div>
                 <div className="modal-row" onClick={() => { if (!user) { closeShareSheet(); onGoProfile?.(); return } setShareSheetMode('friends') }}>
-                  <SendToFriendsIcon color="#d4785a" />
+                  <FriendsIcon color="#d4785a" size={16} />
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share With Friends</span>
                 </div>
                 <div className="modal-row" onClick={() => { closeShareSheet(); handleShareLink() }}>

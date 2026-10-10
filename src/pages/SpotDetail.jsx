@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
-import { ShareIcon, BookmarkIcon, PencilIcon, ProfileIcon, TrickListIcon } from '../components/Icons'
+import { ShareIcon, BookmarkIcon, PencilIcon, FriendsIcon, TrickListIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import SpotFormFields from '../components/SpotFormFields'
 import ClipsSection from '../components/ClipsSection'
@@ -1469,7 +1469,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   className="modal-row"
                   onClick={() => { if (!user) { closeShareSheet(); onGoProfile?.(); return } setShareSheetMode('friends') }}
                 >
-                  <ProfileIcon color="#d4785a" size={16} />
+                  <FriendsIcon color="#d4785a" size={16} />
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share With Friends</span>
                 </div>
                 <div

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
 import SpotCard from '../components/SpotCard'
 import Navbar from '../components/Navbar'
-import { ArrowIcon, ShareIcon, PlusIcon, CloseIcon, SettingsIcon, ProfileIcon, IconBox } from '../components/Icons'
+import { ArrowIcon, ShareIcon, PlusIcon, CloseIcon, SettingsIcon, FriendsIcon, IconBox } from '../components/Icons'
 import InitialsAvatar from '../components/InitialsAvatar'
 import { getProfiles } from '../utils/profileCache'
 import MapView from './MapView'
@@ -646,7 +646,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
               <>
                 <div className="modal-title" style={{ padding: '0 20px' }}>Share</div>
                 <div className="modal-row" onClick={() => setShareSheetMode('friends')}>
-                  <ProfileIcon color="#d4785a" size={16} filled />
+                  <FriendsIcon color="#d4785a" size={16} />
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Share With Friends</span>
                 </div>
                 <div className="modal-row" onClick={() => { closeShareSheet(); handleShareLink() }}>
