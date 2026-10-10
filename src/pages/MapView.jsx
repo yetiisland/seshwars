@@ -146,8 +146,6 @@ function spotPinsLayer(excludedIds) {
 }
 
 function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocation, showNav = true, showFilterChips = true, showSatelliteToggle = true, showPeekCard = true, externalFilters, filters: propFilters, onFiltersChange, distance: propDistance, onDistanceChange, sortMode, onSortModeChange, searchLocation, onClearSearch, highlightedSpotId, onSearch, searchOverlay, fitOnMount = false, onHidePress, isActive = true }) {
-  // PERF-COUNTER (temporary, remove before final commit)
-  if (typeof window !== 'undefined') { window.__renderCounts = window.__renderCounts || {}; window.__renderCounts.MapView = (window.__renderCounts.MapView || 0) + 1 }
   const [localFilters, setLocalFilters] = useState(['All'])
   const [selected, setSelected] = useState(null)
   const [viewState, setViewState] = useState(_savedViewState ?? FALLBACK)

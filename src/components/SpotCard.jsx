@@ -22,8 +22,6 @@ function bustStyle(rating) {
 }
 
 function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress, onUnhidePress, priority = false }) {
-  // PERF-COUNTER (temporary, remove before final commit)
-  if (typeof window !== 'undefined') { window.__renderCounts = window.__renderCounts || {}; window.__renderCounts.SpotCard = (window.__renderCounts.SpotCard || 0) + 1 }
   const handleSave = (e) => {
     e.stopPropagation()
     onSavePress?.(spot)

@@ -11,8 +11,6 @@ let _savedScrollTop = 0
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
 function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress, sortMode, onSortModeChange, locationPermission }) {
-  // PERF-COUNTER (temporary, remove before final commit)
-  if (typeof window !== 'undefined') { window.__renderCounts = window.__renderCounts || {}; window.__renderCounts.ListView = (window.__renderCounts.ListView || 0) + 1 }
   const [localFilters, setLocalFilters] = useState(['All'])
   const filters = propFilters ?? localFilters
   const handleFiltersChange = onFiltersChange ?? setLocalFilters

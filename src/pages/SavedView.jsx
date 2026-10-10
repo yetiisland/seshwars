@@ -197,8 +197,6 @@ function ShareSavedListFriends({ listId, userId, onBack, onShared }) {
 }
 
 function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, onFavoritesListCreated, onLeft, spots, saved, onSavePress, onSpotClick, onBack, onListDeleted, initialScrollTop, onSaveScrollTop }) {
-  // PERF-COUNTER (temporary, remove before final commit)
-  if (typeof window !== 'undefined') { window.__renderCounts = window.__renderCounts || {}; window.__renderCounts.CollectionView = (window.__renderCounts.CollectionView || 0) + 1 }
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteClosing, setDeleteClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -819,8 +817,6 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
 }
 
 export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user, openListId, onOpenListIdHandled }) {
-  // PERF-COUNTER (temporary, remove before final commit)
-  if (typeof window !== 'undefined') { window.__renderCounts = window.__renderCounts || {}; window.__renderCounts.SavedView = (window.__renderCounts.SavedView || 0) + 1 }
   const [lists, setLists] = useState(() => _listsUserId === user?.id ? _cachedLists : [])
   const [listSpotIds, setListSpotIds] = useState(() => _listsUserId === user?.id ? _cachedListSpotIds : {})
   const [openCollection, setOpenCollection] = useState(_savedOpenCollection)
