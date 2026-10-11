@@ -769,6 +769,7 @@ export default function App() {
                 mobile branch's SavedView for why. */}
             <div className="desktop-page-root" style={{ width: '100%', display: effectiveTab === 'saved' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <SavedView
+                isActive={effectiveTab === 'saved'}
                 spots={visibleSpots}
                 saved={saved}
                 onSavePress={handleSavePress}
@@ -781,37 +782,38 @@ export default function App() {
                 onOpenListIdHandled={() => setOpenListId(null)}
               />
             </div>
-            {effectiveTab === 'profile' && (
-              <div className="desktop-page-root" style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                <ProfileView
-                  user={user}
-                  spots={spots}
-                  onAddSpot={openAdd}
-                  onSearch={openSearch}
-                  showNav={false}
-                  userLocation={userLocation}
-                  locationPermission={locationPermission}
-                  requestLocation={requestLocation}
-                  saved={saved}
-                  onSavePress={handleSavePress}
-                  onSpotClick={handleSpotClick}
-                  onListClick={handleListClick}
-                  notifications={notifications}
-                  unreadCount={unreadCount}
-                  notifLoading={notifLoading}
-                  notifHasMore={notifHasMore}
-                  onFetchNotifications={fetchNotifications}
-                  onMarkNotificationRead={markRead}
-                  onMarkAllNotificationsRead={markAllRead}
-                  onTabChange={handleTabChange}
-                  hiddenIds={hiddenIds}
-                  onUnhideSpot={unhideSpot}
-                  openTrickListId={openTrickListId}
-                  onOpenTrickListIdHandled={() => setOpenTrickListId(null)}
-                  onTrickListClick={handleTrickListClick}
-                />
-              </div>
-            )}
+            {/* Kept mounted (hidden) like ListView/MapView/SavedView above —
+                see the mobile branch's ProfileView for why. */}
+            <div className="desktop-page-root" style={{ width: '100%', display: effectiveTab === 'profile' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <ProfileView
+                isActive={effectiveTab === 'profile'}
+                user={user}
+                spots={spots}
+                onAddSpot={openAdd}
+                onSearch={openSearch}
+                showNav={false}
+                userLocation={userLocation}
+                locationPermission={locationPermission}
+                requestLocation={requestLocation}
+                saved={saved}
+                onSavePress={handleSavePress}
+                onSpotClick={handleSpotClick}
+                onListClick={handleListClick}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                notifLoading={notifLoading}
+                notifHasMore={notifHasMore}
+                onFetchNotifications={fetchNotifications}
+                onMarkNotificationRead={markRead}
+                onMarkAllNotificationsRead={markAllRead}
+                onTabChange={handleTabChange}
+                hiddenIds={hiddenIds}
+                onUnhideSpot={unhideSpot}
+                openTrickListId={openTrickListId}
+                onOpenTrickListIdHandled={() => setOpenTrickListId(null)}
+                onTrickListClick={handleTrickListClick}
+              />
+            </div>
           </div>
 
           {/* Spots view toggle pill for desktop */}
@@ -888,6 +890,7 @@ export default function App() {
                   render-count/memoization concern. */}
               <div style={{ display: effectiveTab === 'saved' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <SavedView
+                  isActive={effectiveTab === 'saved'}
                   spots={visibleSpots}
                   saved={saved}
                   onSavePress={handleSavePress}
@@ -900,8 +903,15 @@ export default function App() {
                   onOpenListIdHandled={() => setOpenListId(null)}
                 />
               </div>
-              {effectiveTab === 'profile' && (
+              {/* Kept mounted (hidden) like ListView/MapView/SavedView
+                  above — unmounting and remounting Profile on every tab
+                  switch discards and rebuilds its DOM/listeners for no
+                  reason; its own fetches are cached and isActive-gated
+                  (see ProfileView.jsx) so staying mounted does no
+                  background work while hidden. */}
+              <div style={{ display: effectiveTab === 'profile' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <ProfileView
+                  isActive={effectiveTab === 'profile'}
                   user={user}
                   spots={spots}
                   onAddSpot={openAdd}
@@ -928,7 +938,7 @@ export default function App() {
                   onOpenTrickListIdHandled={() => setOpenTrickListId(null)}
                   onTrickListClick={handleTrickListClick}
                 />
-              )}
+              </div>
             </>
           )}
 

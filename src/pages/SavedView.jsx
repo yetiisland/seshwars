@@ -33,7 +33,14 @@ const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 let _savedOpenCollection = null
 let _savedCollectionScrollTop = 0
 
-// Module-level list cache: prevents refetch on every tab switch
+// Module-level caches — same "show the cached value immediately, then
+// refresh in the background and only re-render if it actually changed"
+// pattern already used for trick counts and friend counts (ProfileView.jsx).
+// SavedView now stays mounted behind display:none (like ListView/MapView),
+// so these are seeded once on first mount and kept fresh by always
+// refetching whenever the Saved tab becomes active again, rather than by
+// a fresh component mount re-running an effect — see the isActive-keyed
+// refresh effect below.
 let _cachedLists = []
 let _cachedListSpotIds = {}
 let _listsUserId = null
@@ -45,8 +52,24 @@ let _listsUserId = null
 // which is why it didn't show up until a hard refresh re-fetched from scratch.
 let _listsFetchSeq = 0
 
+let _cachedSharedLists = []
+let _sharedListsUserId = null
+
+// Keyed by list id — members are per-list, not per-user.
+let _cachedMembersByListId = {}
+
 export function invalidateListsCache() {
   _listsUserId = null
+  _sharedListsUserId = null
+  _cachedMembersByListId = {}
+}
+
+// Canonical, comparable string for a listId -> Set<spotId> map — Sets
+// don't JSON.stringify meaningfully, and key/Set iteration order isn't
+// guaranteed to match between two independently-built maps of the same
+// content, so this sorts both before comparing.
+function snapshotSpotIdsMap(map) {
+  return JSON.stringify(Object.keys(map).sort().map(k => [k, [...map[k]].sort()]))
 }
 
 // Always-on, module-scope listener — not tied to SavedView's own mount
@@ -55,7 +78,10 @@ export function invalidateListsCache() {
 // itself is unmounted and has no listener to hear the event; without this,
 // _listsUserId never gets invalidated, and the next mount's "already fresh
 // for this user" check (below) skips refetching, serving the stale cache
-// until a hard reload resets the module state from scratch.
+// until a hard reload resets the module state from scratch. Shared lists
+// and members have no event of their own, so they ride along on this same
+// one — the only cross-cutting "something about a list changed" signal
+// that exists.
 if (typeof window !== 'undefined') {
   window.addEventListener('seshwars:lists-changed', invalidateListsCache)
 }
@@ -270,7 +296,10 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   }
 
   // ── List members (Section A/B/C) ──────────────────────────────
-  const [members, setMembers] = useState([])
+  // Seeded from the module-level cache (keyed by list, not by user — see
+  // _cachedMembersByListId) so reopening a list already shows its members
+  // immediately instead of an empty row before the fetch below resolves.
+  const [members, setMembers] = useState(() => _cachedMembersByListId[listId] || [])
   const [memberQuery, setMemberQuery] = useState('')
   const [memberSuggestions, setMemberSuggestions] = useState([])
   const [memberSearchResults, setMemberSearchResults] = useState([])
@@ -286,7 +315,9 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const fetchMembers = async () => {
     if (!listId) return
     const { data } = await supabase.rpc('get_list_members', { p_list_id: listId })
-    setMembers(data || [])
+    const next = data || []
+    _cachedMembersByListId[listId] = next
+    setMembers(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next)
   }
 
   const fetchMemberSuggestions = async () => {
@@ -753,37 +784,45 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   )
 }
 
-export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user, openListId, onOpenListIdHandled }) {
+export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user, openListId, onOpenListIdHandled, isActive = true }) {
   const [lists, setLists] = useState(() => _listsUserId === user?.id ? _cachedLists : [])
   const [listSpotIds, setListSpotIds] = useState(() => _listsUserId === user?.id ? _cachedListSpotIds : {})
   const [openCollection, setOpenCollection] = useState(_savedOpenCollection)
   const [showCreateList, setShowCreateList] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [creating, setCreating] = useState(false)
-  const [sharedLists, setSharedLists] = useState([])
+  const [sharedLists, setSharedLists] = useState(() => _sharedListsUserId === user?.id ? _cachedSharedLists : [])
   const [sharedListDetail, setSharedListDetail] = useState(null) // { header, spotIds: Set } | null
-
-  useEffect(() => {
-    if (!user?.id) return
-    if (_listsUserId === user.id) return
-    fetchLists()
-  }, [user?.id])
 
   // Lists a friend added this user to as a member — RLS blocks a member
   // from reading spot_lists/saved_spots directly, so this RPC (SECURITY
-  // DEFINER, presumably) is the only way to see them. No module-level
-  // cache like fetchLists() above: membership changes aren't covered by
-  // the seshwars:lists-changed event, so this just refetches per mount.
-  useEffect(() => {
+  // DEFINER, presumably) is the only way to see them.
+  const fetchSharedLists = useCallback(async () => {
     if (!user?.id) { setSharedLists([]); return }
-    let cancelled = false
-    supabase.rpc('get_lists_shared_with_me').then(({ data, error }) => {
-      if (cancelled) return
-      if (error) { console.error('[SavedView] get_lists_shared_with_me failed:', error); return }
-      setSharedLists(data || [])
-    })
-    return () => { cancelled = true }
+    const { data, error } = await supabase.rpc('get_lists_shared_with_me')
+    if (error) { console.error('[SavedView] get_lists_shared_with_me failed:', error); return }
+    const next = data || []
+    _cachedSharedLists = next
+    _sharedListsUserId = user.id
+    setSharedLists(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next)
+  }, [user])
+
+  useEffect(() => {
+    if (!user?.id) return
+    fetchLists()
+    fetchSharedLists()
   }, [user?.id])
+
+  // Reruns both fetches whenever the Saved tab becomes active again —
+  // SavedView now stays mounted behind display:none (like ListView/MapView/
+  // ProfileView), so a plain mount effect only fires once per session and
+  // can no longer be the thing that keeps this fresh on return. Cheap when
+  // nothing changed: both setters above bail out of a re-render already.
+  useEffect(() => {
+    if (!isActive || !user?.id) return
+    fetchLists()
+    fetchSharedLists()
+  }, [isActive, user?.id, fetchSharedLists])
 
   // Shared-list detail (member view): get_list_header + get_list_spot_ids
   // are the only RLS-permitted paths to a shared list's contents for a
@@ -811,10 +850,10 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
 
   // Refetch when a list was modified externally (e.g. SaveToListModal)
   useEffect(() => {
-    const handler = () => fetchLists()
+    const handler = () => { fetchLists(); fetchSharedLists() }
     window.addEventListener('seshwars:lists-changed', handler)
     return () => window.removeEventListener('seshwars:lists-changed', handler)
-  }, [user?.id])
+  }, [user?.id, fetchSharedLists])
 
   // Open a specific list by id (list_invite notification tap). Looks for
   // it among the user's own lists first; otherwise this is a member opening
@@ -861,11 +900,14 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     // A create/delete (or a newer fetch) landed while this one was in
     // flight — applying this now would silently revert that newer change.
     if (seq !== _listsFetchSeq) return
-    _cachedLists = listsData || []
+    const nextLists = listsData || []
+    const listsChanged = JSON.stringify(nextLists) !== JSON.stringify(_cachedLists)
+    const spotIdsChanged = snapshotSpotIdsMap(map) !== snapshotSpotIdsMap(_cachedListSpotIds)
+    _cachedLists = nextLists
     _cachedListSpotIds = map
     _listsUserId = user.id
-    setLists(_cachedLists)
-    setListSpotIds(_cachedListSpotIds)
+    if (listsChanged) setLists(nextLists)
+    if (spotIdsChanged) setListSpotIds(map)
   }
 
   const savedSpots = useMemo(() => spots.filter(s => saved.has(s.id)), [spots, saved])

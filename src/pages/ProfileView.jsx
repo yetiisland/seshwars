@@ -79,7 +79,14 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled, isActive = true }) {
+  // Read via a ref inside event listeners below (not as a dep — these
+  // listeners stay registered for the component's whole lifetime now that
+  // it's kept mounted) so a friends/tricks-changed event or the app
+  // regaining focus while a *different* tab is active skips the actual
+  // fetch instead of doing background work for a card nobody can see.
+  const isActiveRef = useRef(isActive)
+  useEffect(() => { isActiveRef.current = isActive }, [isActive])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -190,12 +197,28 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     fetchTrickCounts()
   }, [user?.id])
 
+  // Catches up both counts whenever this tab becomes active again — the
+  // listeners below skip their fetch entirely while hidden, so this is what
+  // "anything that should refresh on return still does" relies on. Cheap
+  // even when nothing changed: both setters bail out of a re-render on an
+  // unchanged value already.
+  useEffect(() => {
+    if (!isActive || !user?.id) return
+    fetchFriendCount()
+    fetchTrickCounts()
+  }, [isActive, user?.id])
+
   // Live refresh while mounted — mirrors SavedView.jsx's dual-listener
   // approach: the module-scope listener above keeps the cache correct for
   // the next mount, this one updates the number on screen immediately if
-  // ProfileView happens to already be open when a trick changes.
+  // ProfileView happens to already be open when a trick changes. Now that
+  // ProfileView stays mounted behind display:none like SavedView/ListView/
+  // MapView, this listener is always registered — skip the actual fetch
+  // while hidden (isActiveRef) so a trick change on another tab doesn't do
+  // background work for a card nobody can see; the reactivation effect
+  // below catches it up when the user returns to this tab.
   useEffect(() => {
-    const handler = () => fetchTrickCounts()
+    const handler = () => { if (isActiveRef.current) fetchTrickCounts() }
     window.addEventListener('seshwars:tricks-changed', handler)
     return () => window.removeEventListener('seshwars:tricks-changed', handler)
   }, [user?.id])
@@ -204,9 +227,10 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   // seshwars:lists-changed/seshwars:tricks-changed: every friendship add/
   // accept/deny/cancel/remove dispatches this (AddFriendButton, FriendsView,
   // the notification-card accept/deny below), so the count updates
-  // immediately regardless of where the action happened.
+  // immediately regardless of where the action happened. Same isActive
+  // skip-while-hidden reasoning as the trick-count listener above.
   useEffect(() => {
-    const handler = () => fetchFriendCount()
+    const handler = () => { if (isActiveRef.current) fetchFriendCount() }
     window.addEventListener('seshwars:friends-changed', handler)
     return () => window.removeEventListener('seshwars:friends-changed', handler)
   }, [user?.id])
@@ -226,13 +250,13 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   useEffect(() => {
     if (!user?.id) return
     const handleVisibility = () => {
-      if (!document.hidden) fetchFriendCount()
+      if (!document.hidden && isActiveRef.current) fetchFriendCount()
     }
     document.addEventListener('visibilitychange', handleVisibility)
     let capSub
     if (Capacitor.isNativePlatform()) {
-      CapApp.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) fetchFriendCount()
+      CapApp.addListener('appStateChange', ({ isActive: appIsActive }) => {
+        if (appIsActive && isActiveRef.current) fetchFriendCount()
       }).then(s => { capSub = s }).catch(() => {})
     }
     return () => {
