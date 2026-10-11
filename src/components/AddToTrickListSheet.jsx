@@ -3,16 +3,12 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { sortTricks } from '../lib/trickSort'
 import { notifyTricksChanged, cascadeDeleteOrphanedSpot } from '../lib/trickWrites'
+import { formatTrickDates } from '../lib/trickDates'
 import TrickCheckmark from './TrickCheckmark'
 import TrickEditPanel from './TrickEditPanel'
 import { PlusIcon, IconBox, PencilIcon, TrickListIcon } from './Icons'
 
 const NAME_MAX = 60
-
-function formatLandedDate(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString()
-}
 
 function tempId() {
   return `new-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -382,90 +378,71 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
         <div style={{ overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', width: '200%', flex: 1, minHeight: 0, transform: `translateX(${step === 1 ? '0%' : '-50%'})`, transition: 'transform 250ms ease' }}>
 
-            {/* Step 1 — Trick List (itself a nested two-pane slide: tricks <-> trick options) */}
+            {/* Step 1 — Trick List. Trick options (rename/delete) open in
+                their own stacked bottom sheet via the shared TrickEditPanel,
+                identical to the one on individual trick list pages — not a
+                nested slide pane here, since this pane sits inside the
+                step1<->step2 transform already, and a transformed ancestor
+                breaks its own absolutely/fixed-positioned content and the
+                keyboard-open resize. */}
             <div style={{ width: '50%', flexShrink: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <div style={{ display: 'flex', width: '200%', flex: 1, minHeight: 0, transform: `translateX(${optionsTrick ? '-50%' : '0%'})`, transition: 'transform 250ms ease' }}>
+              <div className="modal-title" style={{ padding: '0 20px' }}>Trick List</div>
 
-                {/* Tricks pane */}
-                <div style={{ width: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                  <div className="modal-title" style={{ padding: '0 20px' }}>Trick List</div>
-
-                  <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px' }}>
-                    <div className="section-label">Tricks at this spot</div>
-                    {noTricksYet ? (
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>No tricks at this spot yet.</div>
-                    ) : (
-                      <div style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6 }}>
-                        {orderedTricks.map((trick, i) => (
-                          <div key={trick.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderTop: i > 0 ? '1px solid #EAD8C8' : 'none' }}>
-                            <TrickCheckmark landed={trick.landed} onClick={() => toggleLanded(trick)} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {trick.name}
-                              </div>
-                              {trick.landed && (
-                                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 1 }}>
-                                  Landed {formatLandedDate(trick.landed_at)}
-                                </div>
-                              )}
-                            </div>
-                            <IconBox size={30} onClick={() => openOptions(trick)}>
-                              <PencilIcon color="#d4785a" />
-                            </IconBox>
+              <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px' }}>
+                <div className="section-label">Tricks at this spot</div>
+                {noTricksYet ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>No tricks at this spot yet.</div>
+                ) : (
+                  <div style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6 }}>
+                    {orderedTricks.map((trick, i) => (
+                      <div key={trick.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderTop: i > 0 ? '1px solid #EAD8C8' : 'none' }}>
+                        <TrickCheckmark landed={trick.landed} onClick={() => toggleLanded(trick)} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {trick.name}
                           </div>
-                        ))}
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 1 }}>
+                            {formatTrickDates(trick)}
+                          </div>
+                        </div>
+                        <IconBox size={30} onClick={() => openOptions(trick)}>
+                          <PencilIcon color="#d4785a" />
+                        </IconBox>
                       </div>
-                    )}
+                    ))}
                   </div>
+                )}
+              </div>
 
-                  <div style={{ padding: '0 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'stretch', border: '1.5px solid var(--salmon)', borderRadius: 6, overflow: 'hidden', background: '#FFFFFF' }}>
-                      <input
-                        ref={addInputRef}
-                        value={nameInput}
-                        onChange={e => setNameInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDraftTrick() } }}
-                        placeholder="Add a trick"
-                        maxLength={NAME_MAX}
-                        style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', padding: '10px 12px', fontSize: 16, fontFamily: 'Barlow, sans-serif', color: 'var(--text-primary)', background: 'transparent' }}
-                      />
-                      <button
-                        onMouseDown={e => e.preventDefault()}
-                        onClick={addDraftTrick}
-                        disabled={addDisabled}
-                        style={{ width: 44, flexShrink: 0, border: 'none', background: 'var(--salmon)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: addDisabled ? 0.5 : 1 }}
-                      >
-                        <PlusIcon color="#fff" />
-                      </button>
-                    </div>
-                  </div>
-                  {addError && (
-                    <div style={{ padding: '8px 20px 0', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{addError}</div>
-                  )}
-
-                  <div style={{ padding: '14px 20px 0' }}>
-                    <button className="btn-salmon" onClick={() => setStep(2)} disabled={!hasNewTrick} style={{ opacity: !hasNewTrick ? 0.5 : 1 }}>
-                      Save Tricks To List
-                    </button>
-                  </div>
+              <div style={{ padding: '0 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'stretch', border: '1.5px solid var(--salmon)', borderRadius: 6, overflow: 'hidden', background: '#FFFFFF' }}>
+                  <input
+                    ref={addInputRef}
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDraftTrick() } }}
+                    placeholder="Add a trick"
+                    maxLength={NAME_MAX}
+                    style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', padding: '10px 12px', fontSize: 16, fontFamily: 'Barlow, sans-serif', color: 'var(--text-primary)', background: 'transparent' }}
+                  />
+                  <button
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={addDraftTrick}
+                    disabled={addDisabled}
+                    style={{ width: 44, flexShrink: 0, border: 'none', background: 'var(--salmon)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: addDisabled ? 0.5 : 1 }}
+                  >
+                    <PlusIcon color="#fff" />
+                  </button>
                 </div>
+              </div>
+              {addError && (
+                <div style={{ padding: '8px 20px 0', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{addError}</div>
+              )}
 
-                {/* Trick options pane — rename / delete via the shared
-                    TrickEditPanel, reached via each row's pencil icon; back
-                    arrow always returns to the tricks pane. */}
-                <div style={{ width: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 12 }}>
-                    <HeaderBackButton onClick={closeOptions} />
-                    <div style={{ fontSize: 18, color: 'var(--text-primary)', fontWeight: 900, letterSpacing: 0.5, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {optionsTrick?.name}
-                    </div>
-                  </div>
-                  <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px' }}>
-                    {optionsTrick && (
-                      <TrickEditPanel trick={optionsTrick} onRename={trickOnRename} onDelete={trickOnDelete} onClose={closeOptions} />
-                    )}
-                  </div>
-                </div>
+              <div style={{ padding: '14px 20px 0' }}>
+                <button className="btn-salmon" onClick={() => setStep(2)} disabled={!hasNewTrick} style={{ opacity: !hasNewTrick ? 0.5 : 1 }}>
+                  Save Tricks To List
+                </button>
               </div>
             </div>
 
@@ -565,6 +542,22 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
           </div>
         </div>
       </div>
+
+      {/* Trick options — pencil icon, opened in its own bottom sheet. Same
+          shared TrickEditPanel, same stacked-sheet structure, trick list
+          pages use for theirs. */}
+      {optionsTrick && createPortal(
+        <div className="modal-overlay" onClick={closeOptions}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div className="modal-title" style={{ padding: '0 20px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{optionsTrick.name}</div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <TrickEditPanel trick={optionsTrick} onRename={trickOnRename} onDelete={trickOnDelete} onClose={closeOptions} />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {landedError && createPortal(
         <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>

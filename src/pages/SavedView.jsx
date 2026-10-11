@@ -4,10 +4,11 @@ import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
 import SpotCard from '../components/SpotCard'
 import Navbar from '../components/Navbar'
-import { ArrowIcon, ShareIcon, PlusIcon, CloseIcon, SettingsIcon, FriendsIcon, IconBox } from '../components/Icons'
+import { ArrowIcon, ShareIcon, PlusIcon, SettingsIcon, FriendsIcon, IconBox } from '../components/Icons'
 import InitialsAvatar from '../components/InitialsAvatar'
 import { getProfiles } from '../utils/profileCache'
 import MapView from './MapView'
+import MembersSummary from '../components/MembersSummary'
 
 // Inline suggestion dropdown — copied verbatim from the geocoder address
 // dropdown in AddSpot.jsx (same pattern CommentsSection.jsx's @mention
@@ -274,9 +275,6 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const [memberSuggestions, setMemberSuggestions] = useState([])
   const [memberSearchResults, setMemberSearchResults] = useState([])
   const [memberInputFocused, setMemberInputFocused] = useState(false)
-  const [showMembersSheet, setShowMembersSheet] = useState(false)
-  const [pendingRemoveMember, setPendingRemoveMember] = useState(null) // { id, username }
-  const [removeMemberError, setRemoveMemberError] = useState('')
   const [addMemberError, setAddMemberError] = useState('')
   const memberInputRef = useRef(null)
   // Guards against refetching suggestions on every refocus of the add-
@@ -337,20 +335,16 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
     setMemberSearchResults(prev => prev.filter(p => p.id !== profile.id))
   }
 
-  const confirmRemoveMember = async () => {
-    if (!pendingRemoveMember) return
-    const memberId = pendingRemoveMember.id
-    setPendingRemoveMember(null)
+  const handleRemoveMember = async (memberId) => {
     const { data, error } = await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', memberId).select()
     if (error || !data || data.length === 0) {
-      console.error('[SavedView] confirmRemoveMember failed:', error)
-      setRemoveMemberError('Could not remove this member. Try again.')
-      return
+      console.error('[SavedView] handleRemoveMember failed:', error)
+      return { ok: false, error: 'Could not remove this member. Try again.' }
     }
-    setRemoveMemberError('')
     setMembers(prev => prev.filter(m => m.id !== memberId))
     suggestionsFetchedRef.current = true
     fetchMemberSuggestions()
+    return { ok: true }
   }
 
   const memberResults = memberQuery.trim() ? memberSearchResults : memberSuggestions
@@ -671,52 +665,6 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
         document.body
       )}
 
-      {/* C) Members sheet — every member as a full-width row. X controls
-          (remove) only render for the list owner. */}
-      {showMembersSheet && createPortal(
-        <div className="modal-overlay" onClick={() => setShowMembersSheet(false)}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-            <div className="modal-handle" />
-            <div className="modal-title" style={{ padding: '0 20px' }}>Members</div>
-            {removeMemberError && <div style={{ padding: '0 20px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{removeMemberError}</div>}
-            {members.map(m => (
-              <div key={m.id} className="modal-row">
-                <MemberAvatar profile={m} size={38} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {[m.first_name, m.last_name].filter(Boolean).join(' ') || m.username}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>@{m.username}</div>
-                </div>
-                {isOwner && (
-                  <IconBox onClick={() => { setRemoveMemberError(''); setPendingRemoveMember({ id: m.id, username: m.username }) }}>
-                    <CloseIcon color="#d4785a" />
-                  </IconBox>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Remove-member confirmation — existing confirm-dialog pattern
-          (modal-overlay/modal-sheet, solid-salmon action + outline cancel)
-          copied verbatim from ReviewsSection.jsx's "Delete Rating" modal. */}
-      {pendingRemoveMember && createPortal(
-        <div className="modal-overlay" onClick={() => setPendingRemoveMember(null)}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-            <div className="modal-handle" />
-            <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Member</div>
-            <div style={{ padding: '0 16px 16px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Remove @{pendingRemoveMember.username} from this list?</div>
-            <div style={{ padding: '0 16px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button onClick={confirmRemoveMember} style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Remove</button>
-              <button onClick={() => setPendingRemoveMember(null)} style={{ width: '100%', padding: 13, borderRadius: 6, background: 'transparent', border: '1px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>Cancel</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* Fixed bottom toggle */}
       {createPortal(
@@ -785,19 +733,8 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
 
               {/* B) Added-members summary — overlapping avatars + count.
                   Owner only: members see no member controls on a shared list. */}
-              {isOwner && members.length > 0 && (
-                <div onClick={() => { setRemoveMemberError(''); setShowMembersSheet(true) }} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
-                    Added:
-                  </span>
-                  <div style={{ display: 'flex' }}>
-                    {members.map((m, i) => (
-                      <div key={m.id} style={{ marginLeft: i === 0 ? 0 : -12, zIndex: members.length - i }}>
-                        <MemberAvatar profile={m} size={32} border="2px solid #FDF8F0" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {isOwner && (
+                <MembersSummary members={members} isOwner={isOwner} onRemove={handleRemoveMember} />
               )}
             </div>
           )}
@@ -963,10 +900,20 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     setOpenCollection(null)
   }
 
-  const handleSpotClickInCollection = (spot) => {
+  // Stable across unrelated SavedView re-renders (lists/members refetch,
+  // etc.) — only changes identity when openCollection itself changes.
+  // CollectionView's own handleSpotClick wraps this one in a useCallback
+  // keyed on it, which in turn is every SpotCard's onClick — an unstable
+  // reference here defeats SpotCard's React.memo for the whole grid on
+  // every SavedView render, not just actual navigation.
+  const handleSpotClickInCollection = useCallback((spot) => {
     _savedOpenCollection = openCollection
     onSpotClick(spot)
-  }
+  }, [openCollection, onSpotClick])
+
+  // Same reasoning as handleSpotClickInCollection above — writes to a
+  // module-level var only, so it never actually needs to change identity.
+  const handleSaveScrollTop = useCallback((v) => { _savedCollectionScrollTop = v }, [])
 
   // Saved Spots ("favorites") has no backing spot_lists row until the first
   // time it's shared — CollectionView creates it lazily and tells us the
@@ -985,25 +932,34 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     ...sharedLists.map(l => ({ ...l, _kind: 'shared', _sortDate: l.added_at })),
   ].sort((a, b) => new Date(b._sortDate) - new Date(a._sortDate))
 
-  if (openCollection) {
-    let collSpots
-    if (openCollection.type === 'favorites') {
-      collSpots = savedSpots
-    } else if (openCollection.type === 'shared') {
+  // Filters the full `spots` prop (every spot in the app, not just this
+  // collection's) — was recomputed on every SavedView render regardless of
+  // whether the open collection actually changed, scaling with total spots
+  // rather than the handful actually shown. Memoized so it only re-filters
+  // when the collection, its membership, or the underlying spots actually
+  // change.
+  const openCollectionSpots = useMemo(() => {
+    if (!openCollection) return null
+    if (openCollection.type === 'favorites') return savedSpots
+    if (openCollection.type === 'shared') {
       const ids = sharedListDetail?.spotIds || new Set()
-      collSpots = spots.filter(s => ids.has(s.id))
+      const result = spots.filter(s => ids.has(s.id))
       // Spot IDs the shared list contains that the useSpots cache has no row
       // for (typically a private/unlisted spot this member can't see via the
       // spots table's own RLS select) — silently excluded from the rendered
       // list, same as a regular owned-list spot id with no matching cache
-      // entry already is via getListSpots() above.
+      // entry already is via getListSpots() below.
       if (sharedListDetail) {
         const missing = [...ids].filter(id => !spots.some(s => s.id === id))
         if (missing.length > 0) console.warn('[SavedView] shared list spot ids not in useSpots cache (private/unlisted?):', missing)
       }
-    } else {
-      collSpots = getListSpots(openCollection.id)
+      return result
     }
+    return getListSpots(openCollection.id)
+  }, [openCollection, savedSpots, sharedListDetail, spots, getListSpots])
+
+  if (openCollection) {
+    const collSpots = openCollectionSpots
     const title = openCollection.type === 'shared'
       ? (sharedListDetail?.header?.name || openCollection.name)
       : openCollection.name
@@ -1024,7 +980,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
           onSpotClick={handleSpotClickInCollection}
           onBack={handleBackFromCollection}
           initialScrollTop={_savedCollectionScrollTop}
-          onSaveScrollTop={(v) => { _savedCollectionScrollTop = v }}
+          onSaveScrollTop={handleSaveScrollTop}
           onListDeleted={() => {
             _savedOpenCollection = null
             _savedCollectionScrollTop = 0

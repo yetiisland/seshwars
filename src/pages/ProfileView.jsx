@@ -43,6 +43,16 @@ if (typeof window !== 'undefined') {
   window.addEventListener('seshwars:tricks-changed', invalidateTrickCounts)
 }
 
+// Module-level friend-count cache — same reason as trick counts above: this
+// card otherwise shows 0 and flashes to the real number on every re-open
+// (ProfileView unmounts on tab switch, same as SavedView). Seeded from
+// cache on mount for an instant correct number, then always refetched in
+// the background (not skipped like trick counts — friend count already has
+// several live-refresh triggers below) and only applied if it actually
+// changed, so an unchanged count never re-renders the card.
+let _cachedFriendCount = 0
+let _friendCountUserId = null
+
 function relativeTime(iso) {
   const diff = Date.now() - new Date(iso).getTime()
   const m = Math.floor(diff / 60000)
@@ -90,7 +100,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     if (openTrickListId) setShowTrickList(true)
   }, [openTrickListId])
   const [trickCounts, setTrickCounts] = useState(() => _trickCountsUserId === user?.id ? _cachedTrickCounts : { landed: 0, total: 0 })
-  const [friendCount, setFriendCount] = useState(0)
+  const [friendCount, setFriendCount] = useState(() => _friendCountUserId === user?.id ? _cachedFriendCount : 0)
   const [friendReqState, setFriendReqState] = useState({})
   const [showNotifications, setShowNotifications] = useState(false)
   // Snapshot of which notification ids were unread at the moment this visit
@@ -154,7 +164,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     supabase.rpc('get_friend_count').then(({ data, error }) => {
       if (error) return
       const count = typeof data === 'number' ? data : (data?.[0]?.count ?? data?.count ?? 0)
-      setFriendCount(count)
+      _cachedFriendCount = count
+      _friendCountUserId = user.id
+      setFriendCount(prev => prev === count ? prev : count)
     })
   }
 

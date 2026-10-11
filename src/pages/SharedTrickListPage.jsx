@@ -3,15 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { transformImageUrl } from '../utils/imageUrl'
 import { sortTricks } from '../lib/trickSort'
+import { formatTrickDates } from '../lib/trickDates'
 import TrickCheckmark from '../components/TrickCheckmark'
 import TabBar from '../components/TabBar'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
-
-function formatLandedDate(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString()
-}
 
 // Public, read-only trick list share link — modelled on SharedListPage.jsx
 // (the saved-list equivalent), loaded through get_shared_trick_list, the
@@ -161,11 +157,9 @@ export default function SharedTrickListPage() {
                           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {trick.name}
                           </div>
-                          {trick.landed && (
-                            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 1 }}>
-                              Landed {formatLandedDate(trick.landed_at)}
-                            </div>
-                          )}
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 1 }}>
+                            {formatTrickDates(trick)}
+                          </div>
                         </div>
                       </div>
                     ))}

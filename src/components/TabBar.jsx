@@ -6,11 +6,11 @@ function formatCount(n) {
   return String(n)
 }
 
-export default function TabBar({ active, onChange, user, profileAvatar, profileInitials, notificationCount = 0 }) {
+export default function TabBar({ active, onChange, user, profileAvatar, profileInitials, notificationCount = 0, zIndex }) {
   const [avatarError, setAvatarError] = useState(false)
 
   return (
-    <div className="tab-bar">
+    <div className="tab-bar" style={zIndex != null ? { zIndex } : undefined}>
       {NAV_TABS.map(({ id, label, Icon }) => (
         <div
           key={id}

@@ -765,22 +765,22 @@ export default function App() {
                 />
               </div>
             )}
-            {effectiveTab === 'saved' && (
-              <div className="desktop-page-root" style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                <SavedView
-                  spots={visibleSpots}
-                  saved={saved}
-                  onSavePress={handleSavePress}
-                  onSpotClick={handleSpotClick}
-                  onAddSpot={openAdd}
-                  onSearch={openSearch}
-                  showNav={false}
-                  user={user}
-                  openListId={openListId}
-                  onOpenListIdHandled={() => setOpenListId(null)}
-                />
-              </div>
-            )}
+            {/* Kept mounted (hidden) like ListView/MapView above — see the
+                mobile branch's SavedView for why. */}
+            <div className="desktop-page-root" style={{ width: '100%', display: effectiveTab === 'saved' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <SavedView
+                spots={visibleSpots}
+                saved={saved}
+                onSavePress={handleSavePress}
+                onSpotClick={handleSpotClick}
+                onAddSpot={openAdd}
+                onSearch={openSearch}
+                showNav={false}
+                user={user}
+                openListId={openListId}
+                onOpenListIdHandled={() => setOpenListId(null)}
+              />
+            </div>
             {effectiveTab === 'profile' && (
               <div className="desktop-page-root" style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <ProfileView
@@ -880,7 +880,13 @@ export default function App() {
                   locationPermission={locationPermission}
                 />
               </div>
-              {effectiveTab === 'saved' && (
+              {/* Kept mounted (hidden via display:none) like ListView/MapView
+                  above, instead of conditionally rendered — unmounting and
+                  remounting the whole Saved tab on every switch (teardown +
+                  rebuild of its DOM, listeners, fetches) measured as real
+                  cost on a real account's data, independent of any React
+                  render-count/memoization concern. */}
+              <div style={{ display: effectiveTab === 'saved' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <SavedView
                   spots={visibleSpots}
                   saved={saved}
@@ -893,7 +899,7 @@ export default function App() {
                   openListId={openListId}
                   onOpenListIdHandled={() => setOpenListId(null)}
                 />
-              )}
+              </div>
               {effectiveTab === 'profile' && (
                 <ProfileView
                   user={user}
@@ -969,7 +975,10 @@ export default function App() {
             </div>
           )}
 
-          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} />}
+          {/* Above the spot overlay (zIndex 2000) while a spot is open, so
+              the nav stays visible/tappable on top of it — same as the old
+              standalone SpotPage.jsx, which rendered its own TabBar. */}
+          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} zIndex={spotMatch ? 2100 : undefined} />}
 
           {toast && (
             <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, right: 16, zIndex: 2001, background: '#2a1e14', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, textAlign: 'center', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', letterSpacing: 0.3 }}>

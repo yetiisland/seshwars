@@ -6,18 +6,15 @@ import { transformImageUrl } from '../utils/imageUrl'
 import { getProfiles } from '../utils/profileCache'
 import { sortTricks } from '../lib/trickSort'
 import { notifyTricksChanged, cascadeDeleteOrphanedSpot } from '../lib/trickWrites'
+import { formatTrickDates } from '../lib/trickDates'
 import TrickCheckmark from '../components/TrickCheckmark'
 import TrickEditPanel from '../components/TrickEditPanel'
+import MembersSummary from '../components/MembersSummary'
 import TabBar from '../components/TabBar'
 import InitialsAvatar from '../components/InitialsAvatar'
 import { ArrowIcon, TrickListIcon, SettingsIcon, ShareIcon, LeaveIcon, FriendsIcon, PencilIcon, IconBox } from '../components/Icons'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
-
-function formatLandedDate(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString()
-}
 
 // Same avatar-with-initials-fallback pattern as SendToFriendsSheet.jsx's
 // own FriendAvatar / FriendsView.jsx's Avatar.
@@ -182,6 +179,26 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
   // trick must never reorder it while this screen stays open (it would
   // visibly jump); only a fresh fetch (reopening this list) re-sorts.
   const [orderIdsBySpot, setOrderIdsBySpot] = useState({})
+
+  // Added-members summary (same MembersSummary component/position saved
+  // list pages use) — callable by the owner or a member, so this is fetched
+  // unconditionally on mount rather than gated behind isOwner.
+  const [members, setMembers] = useState([])
+  const fetchMembers = async () => {
+    const { data } = await supabase.rpc('get_trick_list_members', { p_list_id: list.id })
+    setMembers(data || [])
+  }
+  useEffect(() => { fetchMembers() }, [list.id])
+
+  const handleRemoveMember = async (memberId) => {
+    const { data, error } = await supabase.from('trick_list_members').delete().eq('list_id', list.id).eq('user_id', memberId).select()
+    if (error || !data || data.length === 0) {
+      console.error('[TrickListPage] handleRemoveMember failed:', error)
+      return { ok: false, error: 'Could not remove this member. Try again.' }
+    }
+    setMembers(prev => prev.filter(m => m.id !== memberId))
+    return { ok: true }
+  }
 
   const fetchView = async () => {
     setLoading(true)
@@ -473,6 +490,11 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
 
       <div className="scroll-area">
         <div style={{ padding: '10px 14px 0', maxWidth: 480, margin: '0 auto' }}>
+          {members.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <MembersSummary members={members} isOwner={isOwner} onRemove={handleRemoveMember} />
+            </div>
+          )}
           {!loading && grouped.length === 0 ? (
             <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>
               No spots in this list yet.
@@ -505,11 +527,9 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
                           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {trick.name}
                           </div>
-                          {trick.landed && (
-                            <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 1 }}>
-                              Landed {formatLandedDate(trick.landed_at)}
-                            </div>
-                          )}
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 1 }}>
+                            {formatTrickDates(trick)}
+                          </div>
                         </div>
                         {isOwner && (
                           <IconBox size={30} onClick={() => openTrickOptions(trick, group.spotId)}>
