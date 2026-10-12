@@ -22,6 +22,8 @@ import ProfileView from './pages/ProfileView'
 import AddSpot from './pages/AddSpot'
 import SearchPage from './pages/SearchPage'
 import SpotOverlay from './pages/SpotOverlay'
+import PerfPanel from './components/PerfPanel'
+import { isPerfActive, perfBeginNav, perfEndNav } from './lib/perfReadout'
 
 // Module-level auth cache — survives App unmount/remount so there's no loading flash
 // when navigating back from a spot page.
@@ -312,8 +314,10 @@ export default function App() {
   }, [spotMatch])
 
   const handleSpotBack = () => {
+    const perfHandle = perfBeginNav('close spot')
     if (location.pathname === initialPathnameRef.current) navigate('/')
     else navigate(-1)
+    perfEndNav(perfHandle)
   }
 
   const [tab, setTab] = useState(() => normalizeTab(sessionStorage.getItem('activeTab') || 'spots'))
@@ -608,10 +612,12 @@ export default function App() {
     navigateRef.current = navigate
   }, [tab, spotsView, navigate])
   const handleSpotClick = useCallback((spot, extra = {}) => {
+    const perfHandle = perfBeginNav('open spot')
     const id = spot.slug || spot.id
     sessionStorage.setItem('activeTab', tabRef.current)
     sessionStorage.setItem('spotsView', spotsViewRef.current)
     navigateRef.current(`/spots/${id}`, { state: { spot, prevTab: tabRef.current, ...extra } })
+    perfEndNav(perfHandle)
   }, [])
 
   // list_invite notification tap — opens the Saved tab with that list's
@@ -638,6 +644,7 @@ export default function App() {
       setShowAuth(true)
       return
     }
+    const perfHandle = perfBeginNav(`tab: ${normalized}`)
     setTab(normalized)
     sessionStorage.setItem('activeTab', normalized)
     closeSearch()
@@ -645,6 +652,7 @@ export default function App() {
     // tab content underneath — already mounted/intact, so this is just a
     // URL change, not a reload.
     if (spotMatch) navigate('/')
+    perfEndNav(perfHandle)
   }
 
   const handleSpotsViewChange = (v) => {
@@ -1064,6 +1072,8 @@ export default function App() {
       {hideConfirmModal}
 
       {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
+
+      {isPerfActive() && <PerfPanel />}
     </>
   )
 }

@@ -395,7 +395,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
       {/* Input row — exactly one rounded box (the textarea itself carries
           the white fill + border now); the wrapper below is layout-only */}
       {user ? (
-        <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 96 }}>
           {replyingTo && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>
               Replying to @{replyingTo.username}

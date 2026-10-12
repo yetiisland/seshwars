@@ -12,6 +12,9 @@ import PrivacyPolicy from './pages/PrivacyPolicy.jsx'
 import SupportPage from './pages/SupportPage.jsx'
 import DeleteAccountPage from './pages/DeleteAccountPage.jsx'
 import DeepLinkHandler from './components/DeepLinkHandler.jsx'
+import { initPerfFromUrl } from './lib/perfReadout'
+
+initPerfFromUrl()
 
 // Upgrade previously-shared hash links (/#/spots/foo → /spots/foo) on web
 if (!Capacitor.isNativePlatform() && window.location.hash.startsWith('#/')) {

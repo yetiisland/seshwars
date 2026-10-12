@@ -9,6 +9,7 @@ import InitialsAvatar from '../components/InitialsAvatar'
 import { getProfiles } from '../utils/profileCache'
 import MapView from './MapView'
 import MembersSummary from '../components/MembersSummary'
+import { perfBeginNav, perfEndNav } from '../lib/perfReadout'
 
 // Inline suggestion dropdown — copied verbatim from the geocoder address
 // dropdown in AddSpot.jsx (same pattern CommentsSection.jsx's @mention
@@ -937,9 +938,11 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   }
 
   const handleBackFromCollection = () => {
+    const perfHandle = perfBeginNav('back')
     _savedOpenCollection = null
     _savedCollectionScrollTop = 0
     setOpenCollection(null)
+    perfEndNav(perfHandle)
   }
 
   // Stable across unrelated SavedView re-renders (lists/members refetch,
@@ -1048,7 +1051,11 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         <div style={{ padding: '8px 16px 0' }}>
         {/* Saved Spots (was Favorites) */}
         <div
-          onClick={() => setOpenCollection({ type: 'favorites', name: 'Saved Spots' })}
+          onClick={() => {
+            const perfHandle = perfBeginNav('open list')
+            setOpenCollection({ type: 'favorites', name: 'Saved Spots' })
+            perfEndNav(perfHandle)
+          }}
           style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
         >
           <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1073,9 +1080,13 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
           return (
             <div
               key={`${list._kind}-${list.id}`}
-              onClick={() => setOpenCollection(isShared
-                ? { type: 'shared', id: list.id, name: list.name, isOwner: false }
-                : { type: 'list', id: list.id, name: list.name, isOwner: true })}
+              onClick={() => {
+                const perfHandle = perfBeginNav('open list')
+                setOpenCollection(isShared
+                  ? { type: 'shared', id: list.id, name: list.name, isOwner: false }
+                  : { type: 'list', id: list.id, name: list.name, isOwner: true })
+                perfEndNav(perfHandle)
+              }}
               style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
             >
               <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

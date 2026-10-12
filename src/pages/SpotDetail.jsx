@@ -1084,7 +1084,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       )}
 
       {/* ── Maps modal ────────────────────────────────────── */}
-      {showMapsModal && (
+      {showMapsModal && createPortal(
         <div className="modal-overlay" onClick={() => setShowMapsModal(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
@@ -1112,11 +1112,12 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>Help us keep spots clean, don't intentionally damage property and respectfully leave if requested by owner, security, or officer. Sesh Wars is not responsible for any illegal activities.{' '}<span onClick={() => { setShowMapsModal(false); setShowTos(true) }} style={{ color: '#d4785a', cursor: 'pointer', textDecoration: 'underline' }}>Terms of Service</span></div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Edit password modal ───────────────────────────── */}
-      {showEditAuth && (
+      {showEditAuth && createPortal(
         <div className="modal-overlay" onClick={() => { setShowEditAuth(false); setEditPassword(''); setAuthError('') }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
@@ -1130,7 +1131,8 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             </div>
             <div className="modal-cancel" onClick={() => { setShowEditAuth(false); setEditPassword(''); setAuthError('') }}>Cancel</div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Edit form overlay ─────────────────────────────── */}
