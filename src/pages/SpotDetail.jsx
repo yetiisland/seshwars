@@ -437,7 +437,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     const errors = []
     for (const file of files) {
       if (file.size > MAX_PHOTO_BYTES) {
-        errors.push(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB) — max size is 25MB.`)
+        errors.push(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max size is 25MB.`)
         continue
       }
       let compressed
@@ -507,7 +507,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     setEditSaving(false)
     if (error) { setEditError(error.message); return }
     if (!data || data.length === 0) {
-      setEditError('Update failed — you may not have permission to edit this spot.')
+      setEditError('Update failed. You may not have permission to edit this spot.')
       return
     }
     if (photosChanged) setModStatus(newModerationStatus)
@@ -556,7 +556,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       .filter(r => r.error)
     if (failed.length > 0) {
       console.error('[SpotDetail] handleAdminReject: failed to clear related data:', failed)
-      setModActionError(`Could not reject this spot — failed to remove data from: ${failed.map(f => f.table).join(', ')}.`)
+      setModActionError(`Could not reject this spot. Failed to remove data from: ${failed.map(f => f.table).join(', ')}.`)
       return
     }
     const { data, error } = await supabase.from('spots').delete().eq('id', spot.id).select()
@@ -580,7 +580,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     setDeleting(false)
     if (error) { setDeleteError(error.message); return }
     if (!data || data.length === 0) {
-      setDeleteError("Couldn't delete this spot — you may not have permission.")
+      setDeleteError("Couldn't delete this spot. You may not have permission.")
       return
     }
     // Deleting always navigates away (onEditSuccess is called with no
@@ -818,32 +818,28 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         <div style={{ padding: '16px 14px 0', background: '#FDF8F0' }}>
 
           {/* Title row */}
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>{spot.title}</div>
-            {(avgRating != null && reviewCount > 0 || spot.distance != null) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                {avgRating != null && reviewCount > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#3D4454" />
-                    </svg>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#3D4454' }}>{avgRating.toFixed(1)}</span>
-                  </div>
-                )}
-                {avgRating != null && reviewCount > 0 && spot.distance != null && (
-                  <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
-                )}
-                {spot.distance != null && <span className="dist-text">{spot.distance} mi</span>}
-              </div>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', flex: 1, lineHeight: 1.3, paddingRight: 8 }}>{spot.title}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              {avgRating != null && reviewCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#3D4454" />
+                  </svg>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#3D4454' }}>{avgRating.toFixed(1)}</span>
+                </div>
+              )}
+              {avgRating != null && reviewCount > 0 && spot.distance != null && (
+                <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
+              )}
+              {spot.distance != null && <span className="dist-text">{spot.distance} mi</span>}
               <button
                 className="btn-salmon"
                 onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
-                style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}
+                style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 2 }}
               >
                 <TrickListIcon color="#fff" size={14} filled />
-                Trick List
+                Tricks
               </button>
               <div
                 onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
@@ -895,7 +891,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             <div style={{ background: '#fff3cd', border: '1px solid #c8a020', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                 <svg width="14" height="12" viewBox="0 0 18 16" fill="none"><path d="M9 1L17 15H1L9 1Z" stroke="#c8a020" strokeWidth="1.5" strokeLinejoin="round" fill="none" /><line x1="9" y1="5.5" x2="9" y2="10" stroke="#c8a020" strokeWidth="1.8" strokeLinecap="round" /><circle cx="9" cy="12.5" r="0.9" fill="#c8a020" /></svg>
-                <span style={{ fontSize: 11, fontWeight: 900, color: '#7a5c00', letterSpacing: 0.5, textTransform: 'uppercase' }}>Flagged — Pending Review</span>
+                <span style={{ fontSize: 11, fontWeight: 900, color: '#7a5c00', letterSpacing: 0.5, textTransform: 'uppercase' }}>Flagged: Pending Review</span>
               </div>
               <div style={{ fontSize: 11, color: '#7a5c00', marginBottom: 10, lineHeight: 1.5 }}>This spot was auto-flagged for possible nudity or gore and is hidden from the public feed.</div>
               {modActionError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 10, lineHeight: 1.5 }}>{modActionError}</div>}
@@ -907,13 +903,13 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           )}
           {modStatus === 'rejected' && isAdmin && (
             <div style={{ background: '#fdecea', border: '1px solid #c0453a', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#c0453a' }}>⊘ Rejected — not visible to public</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#c0453a' }}>⊘ Rejected: not visible to public</span>
             </div>
           )}
           {modStatus === 'pending' && !isAdmin && isOwner && (
             <div style={{ background: '#fff3cd', border: '1px solid #c8a020', borderRadius: 8, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
               <svg width="12" height="11" viewBox="0 0 18 16" fill="none"><path d="M9 1L17 15H1L9 1Z" stroke="#c8a020" strokeWidth="1.5" strokeLinejoin="round" fill="none" /><line x1="9" y1="5.5" x2="9" y2="10" stroke="#c8a020" strokeWidth="1.8" strokeLinecap="round" /><circle cx="9" cy="12.5" r="0.9" fill="#c8a020" /></svg>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#7a5c00' }}>Under Review — your spot is hidden until approved</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#7a5c00' }}>Under Review: your spot is hidden until approved</span>
             </div>
           )}
 
@@ -925,7 +921,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 <svg width="13" height="10" viewBox="0 0 18 12" fill="none"><path d="M9 1C5 1 1.73 3.89 1 6c.73 2.11 4 5 8 5s7.27-2.89 8-5c-.73-2.11-4-5-8-5z" stroke="#8a7848" strokeWidth="1.4" fill="none"/><circle cx="9" cy="6" r="2.5" stroke="#8a7848" strokeWidth="1.4"/></svg>
               )}
               <span style={{ fontSize: 11, fontWeight: 700, color: spot.visibility === 'private' ? '#7a4028' : '#6a5828' }}>
-                {spot.visibility === 'private' ? 'Private — only you can see this spot' : 'Unlisted — only visible via direct link'}
+                {spot.visibility === 'private' ? 'Private: only you can see this spot' : 'Unlisted: only visible via direct link'}
               </span>
             </div>
           )}

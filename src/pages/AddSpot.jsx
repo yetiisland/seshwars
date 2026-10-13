@@ -140,7 +140,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
       setPhotoUploadProgress({ current: i + 1, total: files.length })
       const file = files[i]
       if (file.size > MAX_PHOTO_BYTES) {
-        errors.push(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB) — max size is 25MB.`)
+        errors.push(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max size is 25MB.`)
         continue
       }
       let compressed

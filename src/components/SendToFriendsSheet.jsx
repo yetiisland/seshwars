@@ -99,7 +99,7 @@ export function SendToFriendsContent({ spot, onSent, onGoProfile, onBack, onClos
       return
     }
     if (count < selected.size) {
-      onSent(`Sent to ${count} of ${selected.size} friends — some couldn't be reached.`)
+      onSent(`Sent to ${count} of ${selected.size} friends. Some couldn't be reached.`)
       return
     }
     onSent('Spot sent!')

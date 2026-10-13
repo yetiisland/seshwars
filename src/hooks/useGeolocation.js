@@ -10,26 +10,30 @@ export function haversineDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.asin(Math.sqrt(a))
 }
 
-// permissionState: 'granted' | 'denied' | 'prompt' | 'unsupported'
+// permissionState: 'granted' | 'denied' | 'unsupported'
 // Location is requested unconditionally on mount (the OS/browser handles the
 // native permission prompt correctly on its own) — this hook does not defer
-// the request to an explicit user action. 'unsupported' covers both "no
-// navigator.geolocation at all" and "the Permissions API (or its
-// 'geolocation' name) isn't queryable here" — in the latter case this falls
-// back to the old unconditional watchPosition call so platforms without
-// Permissions API support (older browsers, and possibly the Capacitor
-// WebView — untested) keep working exactly as before.
+// the request to an explicit user action.
+//
+// permissionState is derived from the actual geolocation calls, never from
+// navigator.permissions.query('geolocation') — that API is unreliable on
+// Safari/iOS, which can report 'denied' (or 'prompt') even while
+// watchPosition is successfully delivering real fixes, which was causing
+// "Location is blocked" UI to show on devices where location was working
+// fine. The only two signals that change permissionState now:
+//   - any position arriving -> 'granted', regardless of what permissions.query said.
+//   - a PERMISSION_DENIED (code 1) error from watchPosition -> 'denied'.
+//     POSITION_UNAVAILABLE (2) and TIMEOUT (3) are transient and never
+//     change permissionState.
+// permissions.query is still consulted, but only as a hint to retry
+// watchPosition when it reports 'granted' (e.g. the user enabled location
+// in Settings while the app was open) — its 'denied'/'prompt' reports are
+// never used to drive UI.
 export function useGeolocation() {
   const [location, setLocation] = useState(null)
   const [error, setError] = useState(null)
   const [permissionState, setPermissionState] = useState('unsupported')
   const watchIdRef = useRef(null)
-  const permissionStateRef = useRef('unsupported')
-
-  const updatePermissionState = (state) => {
-    permissionStateRef.current = state
-    setPermissionState(state)
-  }
 
   const startWatching = useCallback(() => {
     if (!navigator.geolocation) return
@@ -37,6 +41,7 @@ export function useGeolocation() {
     watchIdRef.current = navigator.geolocation.watchPosition(
       pos => {
         setError(null)
+        setPermissionState('granted')
         setLocation({
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
@@ -46,6 +51,7 @@ export function useGeolocation() {
       err => {
         console.error('[useGeolocation] watchPosition error:', err.code, err.message)
         setError({ code: err.code, message: err.message })
+        if (err.code === err.PERMISSION_DENIED) setPermissionState('denied')
       },
       { enableHighAccuracy: true, maximumAge: 5000 }
     )
@@ -58,39 +64,36 @@ export function useGeolocation() {
     }
   }, [])
 
-  // Still exposed as a no-op-safe manual trigger for any other caller that
-  // wants to re-request after a denial is lifted elsewhere, but is no longer
-  // needed to kick off the initial request — that now happens on mount below.
+  // Manual re-trigger (map tab activation, Friends search focus, etc.) —
+  // always safe to call: startWatching no-ops if a watch is already active,
+  // and if permission was previously denied this simply retries, which is
+  // how a genuinely-fixed permission (changed in Settings) is ever
+  // discovered without a full reload.
   const requestLocation = useCallback(() => {
-    if (permissionStateRef.current === 'denied') return
     startWatching()
   }, [startWatching])
 
   useEffect(() => {
-    if (!navigator.geolocation) { updatePermissionState('unsupported'); return }
-    if (!navigator.permissions?.query) {
-      updatePermissionState('unsupported')
-      startWatching()
-      return
-    }
+    if (!navigator.geolocation) { setPermissionState('unsupported'); return }
+    startWatching()
+    if (!navigator.permissions?.query) return
     let permissionStatus = null
     let handleChange = null
     let cancelled = false
     navigator.permissions.query({ name: 'geolocation' }).then(status => {
       if (cancelled) return
       permissionStatus = status
-      updatePermissionState(status.state)
-      if (status.state !== 'denied') startWatching()
+      // Hint-only: a 'granted' report is a legitimate signal to retry a
+      // dropped/never-started watch. Anything else from this API is never
+      // acted on — see the module comment above.
       handleChange = () => {
-        updatePermissionState(status.state)
-        if (status.state === 'granted') startWatching()
-        else if (status.state === 'denied') stopWatching()
+        if (status.state === 'granted') {
+          stopWatching()
+          startWatching()
+        }
       }
       status.addEventListener('change', handleChange)
-    }).catch(() => {
-      updatePermissionState('unsupported')
-      startWatching()
-    })
+    }).catch(() => {})
     return () => {
       cancelled = true
       if (permissionStatus && handleChange) permissionStatus.removeEventListener('change', handleChange)

@@ -39,7 +39,7 @@ export default function SupportPage({ onClose }) {
             {
               n: '1',
               title: 'GENERAL HELP',
-              body: 'Questions about how the app works, account issues, or anything else — email us and we\'ll get back to you.',
+              body: 'Questions about how the app works, account issues, or anything else. Email us and we\'ll get back to you.',
             },
             {
               n: '2',

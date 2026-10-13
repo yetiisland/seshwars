@@ -115,7 +115,7 @@ function LocationPermissionPopup({ onTurnOn, onDismiss }) {
         <div style={{ padding: '0 20px 8px', textAlign: 'center' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Turn On Location</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            Location gives you the best experience — nearby spots, accurate distances, and skaters near you.
+            Location gives you the best experience: nearby spots, accurate distances, and skaters near you.
           </div>
         </div>
         <div style={{ padding: '8px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -499,7 +499,7 @@ export default function App() {
 
         if (isConfirmRedirect) {
           window.history.replaceState(null, '', window.location.pathname + '#/')
-          showToast('Email confirmed — welcome to Seshwars! 🤙')
+          showToast('Email confirmed. Welcome to Seshwars! 🤙')
           await ensureProfileFromSignupMeta(u)
         } else if (isNewSignup) {
           sessionStorage.removeItem('seshwars:newSignup')

@@ -21,8 +21,16 @@ export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, 
   const [loading, setLoading] = useState(!stateSpot)
   const spotDetailRef = useRef(null)
 
+  // Always fetches, even when stateSpot already gives us something to paint
+  // immediately. location.state.spot is a snapshot frozen at the moment the
+  // user navigated here (from whatever the list/card had cached at that
+  // click) — it's never updated by a later edit, and that stale snapshot is
+  // exactly what a hard reload hands back from the browser's preserved
+  // history state, re-showing pre-edit values (e.g. is_multi_spot) as if
+  // the edit had never happened. Fetching here in the background (without
+  // gating `loading` on it when stateSpot already exists) keeps the fast
+  // first paint while guaranteeing the real, current row always wins.
   useEffect(() => {
-    if (stateSpot) return
     let cancelled = false
     async function fetchSpot() {
       let { data } = await supabase.from('spots').select('*').eq('slug', slug).single()
@@ -30,11 +38,17 @@ export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, 
         const res = await supabase.from('spots').select('*').eq('id', slug).single()
         data = res.data
       }
-      if (!cancelled) { setSpot(data); setLoading(false) }
+      // A transient fetch failure shouldn't blank out a perfectly good
+      // stateSpot we already painted — only a genuine "not found" (no
+      // stateSpot to fall back on either) should ever set spot to null.
+      if (!cancelled) {
+        if (data || !stateSpot) setSpot(data)
+        setLoading(false)
+      }
     }
     fetchSpot()
     return () => { cancelled = true }
-  }, [slug, location.state?.spot])
+  }, [slug])
 
   useEffect(() => {
     if (!spot || Capacitor.isNativePlatform()) return

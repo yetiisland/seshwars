@@ -30,7 +30,7 @@ export default function DeleteAccountPage({ onClose, onDeleteClick }) {
         'Your saved lists and saved spots',
         'Spots you hid',
         'Friends and friend requests',
-        'Shared list memberships — lists you were added to, and other people’s membership in lists you created',
+        'Shared list memberships: lists you were added to, and other people’s membership in lists you created',
         'Your trick lists and tricks',
         'Comments you posted',
         'Clips you submitted',

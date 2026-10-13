@@ -47,7 +47,7 @@ export default function PrivacyPolicy({ onClose }) {
                 'Full name (first and last)',
                 'Email address',
                 'Username',
-                'Precise device location — only when you add a spot or use nearby features. We do not track your location in the background.',
+                'Precise device location: only when you add a spot or use nearby features. We do not track your location in the background.',
                 'User-uploaded content: photos, videos, and clip links you post to the app',
                 'A unique user ID to identify your account',
               ],
@@ -57,7 +57,7 @@ export default function PrivacyPolicy({ onClose }) {
               title: 'HOW WE USE YOUR DATA',
               body: null,
               bullets: [
-                'Solely to operate Sesh Wars — creating your account, displaying spots on the map, and showing your content.',
+                'Solely to operate Sesh Wars: creating your account, displaying spots on the map, and showing your content.',
                 'We do not use your data for advertising.',
                 'We do not use analytics platforms that track your behavior.',
                 'We do not sell, share, or trade your personal data.',
@@ -69,9 +69,9 @@ export default function PrivacyPolicy({ onClose }) {
               title: 'THIRD-PARTY SERVICES',
               body: 'The following services receive only the data necessary to perform their function:',
               bullets: [
-                'Supabase — database and user authentication (supabase.com)',
-                'Cloudinary — photo and media hosting (cloudinary.com)',
-                'Sightengine — automated content moderation for uploaded images (sightengine.com)',
+                'Supabase: database and user authentication (supabase.com)',
+                'Cloudinary: photo and media hosting (cloudinary.com)',
+                'Sightengine: automated content moderation for uploaded images (sightengine.com)',
               ],
             },
             {
