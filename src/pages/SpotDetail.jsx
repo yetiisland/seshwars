@@ -760,9 +760,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             </div>
           </div>
 
-          {/* Photo dots — bottom right */}
+          {/* Photo dots — bottom center */}
           {photos.length > 1 && (
-            <div style={{ position: 'absolute', bottom: 14, right: 14, zIndex: 10, display: 'flex', gap: 5 }}>
+            <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: 5 }}>
               {photos.map((_, i) => (
                 <div key={i} onClick={e => { e.stopPropagation(); setPhotoIndex(i) }}
                   style={{ width: i === photoIndex ? 7 : 5, height: i === photoIndex ? 7 : 5, borderRadius: '50%', background: i === photoIndex ? '#d4785a' : '#fff', opacity: i === photoIndex ? 1 : 0.5, cursor: 'pointer', transition: 'all 0.15s' }} />
