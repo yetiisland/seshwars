@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
-import { ShareIcon, BookmarkIcon, PencilIcon, FriendsIcon, TrickListIcon } from '../components/Icons'
+import { ShareIcon, BookmarkIcon, PencilIcon, FriendsIcon, TrickListIcon, MultiSpotIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import SpotFormFields from '../components/SpotFormFields'
 import ClipsSection from '../components/ClipsSection'
@@ -382,6 +382,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       features: [...(spot.features || [])],
       bust_rating: spot.bust_rating || '',
       lighting: spot.lighting || '',
+      is_multi_spot: spot.is_multi_spot ? 'Yes' : 'No',
       description: spot.description || '',
       visibility: spot.visibility || 'public',
     })
@@ -492,6 +493,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       longitude: editAddr.longitude,
       photos: editPhotos,
       visibility: editForm.visibility || 'public',
+      is_multi_spot: editForm.is_multi_spot === 'Yes',
     }
     SPOT_FIELDS.filter(f => f.showForTypes !== null).forEach(field => {
       if (field.showForTypes.includes(currentType)) {
@@ -804,6 +806,12 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </div>
             )
           })()}
+          {spot.is_multi_spot && (
+            <div style={{ position: 'absolute', bottom: 10, right: 12, zIndex: 10, display: 'flex', alignItems: 'center', gap: 5, background: '#DFEEDF', border: '1px solid #4E9A51', borderRadius: 6, padding: '3px 7px' }}>
+              <MultiSpotIcon color="#3d6830" holeColor="#DFEEDF" />
+              <span style={{ fontSize: 9, fontWeight: 700, color: '#3d6830', letterSpacing: 1, textTransform: 'uppercase' }}>Multi-Spot</span>
+            </div>
+          )}
         </div>
 
         {/* ── Content ───────────────────────────────────────── */}

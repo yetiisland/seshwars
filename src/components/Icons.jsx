@@ -374,3 +374,13 @@ export function SolidPin({ color = '#d4785a', size = 32 }) {
     </svg>
   )
 }
+
+export function MultiSpotIcon({ color = '#3d6830', holeColor = '#DFEEDF' }) {
+  return (
+    <svg width="15" height="13" viewBox="0 0 30 26">
+      <path d="M10 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z" fill={color} opacity="0.65" />
+      <path d="M19 4a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z" fill={color} />
+      <circle cx="19" cy="11" r="2.6" fill={holeColor} />
+    </svg>
+  )
+}

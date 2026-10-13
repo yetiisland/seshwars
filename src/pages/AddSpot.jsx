@@ -24,7 +24,7 @@ const VISIBILITY_OPTIONS = [
 
 export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [form, setForm] = useState({
-    title: '', type: '', features: [], bust_rating: '', lighting: '', description: '', visibility: 'public',
+    title: '', type: '', features: [], bust_rating: '', lighting: '', is_multi_spot: 'No', description: '', visibility: 'public',
   })
   const [photos, setPhotos] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -195,6 +195,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
       features: form.features,
       bust_rating: form.bust_rating || null,
       lighting: form.lighting || null,
+      is_multi_spot: form.is_multi_spot === 'Yes',
       description: form.description,
       address: addr.addressText,
       latitude: addr.latitude,

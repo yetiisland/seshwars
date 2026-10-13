@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { BookmarkIcon, ArrowIcon } from './Icons'
+import { BookmarkIcon, ArrowIcon, MultiSpotIcon } from './Icons'
 import TagsRow from './TagsRow'
 import { transformImageUrl } from '../utils/imageUrl'
 import { SHOP_STYLE } from '../lib/spotFields'
@@ -121,6 +121,12 @@ function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress,
             <BookmarkIcon color="#d4785a" size={18} filled={saved} />
           </div>
         </div>
+        {spot.is_multi_spot && (
+          <div style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 2, display: 'flex', alignItems: 'center', gap: 5, background: '#DFEEDF', border: '1px solid #4E9A51', borderRadius: 6, padding: '3px 7px' }}>
+            <MultiSpotIcon color="#3d6830" holeColor="#DFEEDF" />
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#3d6830', letterSpacing: 1, textTransform: 'uppercase' }}>Multi-Spot</span>
+          </div>
+        )}
       </div>
       <div className="spot-card-body">
         <div className="spot-title-row">

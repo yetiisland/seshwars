@@ -46,6 +46,15 @@ export const SPOT_FIELDS = [
     clearable: true,
   },
   {
+    key: 'is_multi_spot',
+    label: 'Are there multiple spots here?',
+    type: 'single',
+    options: ['Yes', 'No'],
+    showForTypes: null,
+    filterable: false,
+    clearable: false,
+  },
+  {
     key: 'description',
     label: 'Description',
     type: 'text',
