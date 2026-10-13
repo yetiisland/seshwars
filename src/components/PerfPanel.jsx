@@ -23,7 +23,7 @@ export default function PerfPanel() {
       {entries.length === 0 && <div style={{ opacity: 0.7 }}>No entries yet</div>}
       {entries.map((e, i) => (
         <div key={i}>
-          {e.actionName}: {e.totalMs}ms{e.netWaitMs != null ? ` (net ${e.netWaitMs}ms)` : ''}
+          {e.actionName}: {e.totalMs}ms{e.netWaitMs != null ? ` (net ${e.netWaitMs}ms)` : ''}{e.sizeKB != null ? ` (${e.sizeKB}kb)` : ''}
         </div>
       ))}
       <button

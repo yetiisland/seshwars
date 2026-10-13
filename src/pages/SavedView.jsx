@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
@@ -59,10 +60,16 @@ let _sharedListsUserId = null
 // Keyed by list id — members are per-list, not per-user.
 let _cachedMembersByListId = {}
 
+// Keyed by list id — same stale-then-refresh pattern, so reopening a shared
+// list already shows its spots immediately instead of an empty grid until
+// get_list_header/get_list_spot_ids resolve again.
+let _cachedSharedListDetailByListId = {}
+
 export function invalidateListsCache() {
   _listsUserId = null
   _sharedListsUserId = null
   _cachedMembersByListId = {}
+  _cachedSharedListDetailByListId = {}
 }
 
 // Canonical, comparable string for a listId -> Set<spotId> map — Sets
@@ -381,11 +388,18 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
 
   const memberResults = memberQuery.trim() ? memberSearchResults : memberSuggestions
 
+  const spotRowVirtualizer = useVirtualizer({
+    count: spots.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 320,
+    overscan: 4,
+  })
+
   // Restore scroll once spots content is actually rendered (listSpotIds loads async)
   useEffect(() => {
     if (scrollRestoredRef.current || !initialScrollTop || !scrollRef.current) return
     if (spots.length > 0) {
-      scrollRef.current.scrollTop = initialScrollTop
+      spotRowVirtualizer.scrollToOffset(initialScrollTop)
       scrollRestoredRef.current = true
     }
   }, [spots.length, initialScrollTop])
@@ -774,9 +788,21 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           {spots.length === 0 ? (
             <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No spots saved here yet</div>
           ) : (
-            spots.map((spot, i) => (
-              <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} priority={i < 3} />
-            ))
+            <div style={{ position: 'relative', height: spotRowVirtualizer.getTotalSize() }}>
+              {spotRowVirtualizer.getVirtualItems().map(virtualRow => {
+                const spot = spots[virtualRow.index]
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={spotRowVirtualizer.measureElement}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` }}
+                  >
+                    <SpotCard spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} priority={virtualRow.index < 3} />
+                  </div>
+                )
+              })}
+            </div>
           )}
           <div style={{ height: BOTTOM_PAD }} />
         </div>
@@ -834,17 +860,26 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   // returns rows with a single spot_id column.
   useEffect(() => {
     if (!openCollection || openCollection.type !== 'shared') { setSharedListDetail(null); return }
+    const listId = openCollection.id
+    // Show the last-known spots/header for this shared list immediately
+    // (if we've opened it before this session) while the fetch below
+    // refreshes it in the background — same cache-first pattern as
+    // _cachedMembersByListId above.
+    const cached = _cachedSharedListDetailByListId[listId]
+    setSharedListDetail(cached ? { listId, ...cached } : null)
     let cancelled = false
     ;(async () => {
       const [{ data: header, error: headerErr }, { data: idsData, error: idsErr }] = await Promise.all([
-        supabase.rpc('get_list_header', { p_list_id: openCollection.id }),
-        supabase.rpc('get_list_spot_ids', { p_list_id: openCollection.id }),
+        supabase.rpc('get_list_header', { p_list_id: listId }),
+        supabase.rpc('get_list_spot_ids', { p_list_id: listId }),
       ])
       if (cancelled) return
       if (headerErr) console.error('[SavedView] get_list_header failed:', headerErr)
       if (idsErr) console.error('[SavedView] get_list_spot_ids failed:', idsErr)
       const rawIds = (idsData || []).map(r => r.spot_id)
-      setSharedListDetail({ header: header || null, spotIds: new Set(rawIds) })
+      const next = { header: header || null, spotIds: new Set(rawIds) }
+      _cachedSharedListDetailByListId[listId] = next
+      setSharedListDetail({ listId, ...next })
     })()
     return () => { cancelled = true }
   }, [openCollection?.type, openCollection?.id])
@@ -987,14 +1022,22 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
     if (!openCollection) return null
     if (openCollection.type === 'favorites') return savedSpots
     if (openCollection.type === 'shared') {
-      const ids = sharedListDetail?.spotIds || new Set()
+      // Read straight from the module cache too (not just sharedListDetail
+      // state) so a previously-opened shared list's spots are available on
+      // this very first render — before the effect that refreshes
+      // sharedListDetail has even run — instead of rendering empty until
+      // get_list_header/get_list_spot_ids resolve again.
+      const detail = sharedListDetail?.listId === openCollection.id
+        ? sharedListDetail
+        : _cachedSharedListDetailByListId[openCollection.id]
+      const ids = detail?.spotIds || new Set()
       const result = spots.filter(s => ids.has(s.id))
       // Spot IDs the shared list contains that the useSpots cache has no row
       // for (typically a private/unlisted spot this member can't see via the
       // spots table's own RLS select) — silently excluded from the rendered
       // list, same as a regular owned-list spot id with no matching cache
       // entry already is via getListSpots() below.
-      if (sharedListDetail) {
+      if (detail) {
         const missing = [...ids].filter(id => !spots.some(s => s.id === id))
         if (missing.length > 0) console.warn('[SavedView] shared list spot ids not in useSpots cache (private/unlisted?):', missing)
       }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { createPortal } from 'react-dom'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
@@ -135,6 +136,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [showPwConfirm, setShowPwConfirm] = useState(false)
   const mySpotsScrollRef = useRef(null)
   const mySpotsScrollRestoredRef = useRef(false)
+  const hiddenSpotsScrollRef = useRef(null)
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
   const [showFeedbackSheet, setShowFeedbackSheet] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
@@ -276,6 +278,19 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const mySpots = spots.filter(s => s.added_by === user?.id)
   const hiddenSpots = spots.filter(s => hiddenIds.has(s.id))
 
+  const mySpotsVirtualizer = useVirtualizer({
+    count: mySpots.length,
+    getScrollElement: () => mySpotsScrollRef.current,
+    estimateSize: () => 320,
+    overscan: 4,
+  })
+  const hiddenSpotsVirtualizer = useVirtualizer({
+    count: hiddenSpots.length,
+    getScrollElement: () => hiddenSpotsScrollRef.current,
+    estimateSize: () => 320,
+    overscan: 4,
+  })
+
   const confirmUnhide = async () => {
     if (!unhideTarget) return
     const { error } = await onUnhideSpot(unhideTarget.id)
@@ -293,7 +308,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     if (mySpotsScrollRestoredRef.current) return
     if (!mySpotsScrollRef.current) return
     if (mySpots.length > 0) {
-      mySpotsScrollRef.current.scrollTop = _mySpotsScrollTop
+      mySpotsVirtualizer.scrollToOffset(_mySpotsScrollTop)
       mySpotsScrollRestoredRef.current = true
     }
   }, [showMySpots, mySpots.length])
@@ -1136,21 +1151,32 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: 1, textTransform: 'uppercase' }}>Hidden Spots</div>
             <div style={{ width: 32 }} />
           </div>
-          <div className="scroll-area">
+          <div className="scroll-area" ref={hiddenSpotsScrollRef}>
             {hiddenSpots.length === 0 ? (
               <div style={{ padding: '40px 24px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>No hidden spots.</div>
             ) : (
-              hiddenSpots.map((spot, i) => (
-                <SpotCard
-                  key={spot.id}
-                  spot={spot}
-                  saved={false}
-                  onSavePress={() => {}}
-                  onClick={onSpotClick}
-                  onUnhidePress={(s) => { setUnhideTarget(s); setShowUnhideConfirm(true) }}
-                  priority={i < 3}
-                />
-              ))
+              <div style={{ position: 'relative', height: hiddenSpotsVirtualizer.getTotalSize() }}>
+                {hiddenSpotsVirtualizer.getVirtualItems().map(virtualRow => {
+                  const spot = hiddenSpots[virtualRow.index]
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={hiddenSpotsVirtualizer.measureElement}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` }}
+                    >
+                      <SpotCard
+                        spot={spot}
+                        saved={false}
+                        onSavePress={() => {}}
+                        onClick={onSpotClick}
+                        onUnhidePress={(s) => { setUnhideTarget(s); setShowUnhideConfirm(true) }}
+                        priority={virtualRow.index < 3}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
             )}
             <div style={{ height: BOTTOM_PAD }} />
           </div>
@@ -1212,19 +1238,30 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                 No spots added yet
               </div>
             ) : (
-              mySpots.map((spot, i) => (
-                <SpotCard
-                  key={spot.id}
-                  spot={spot}
-                  saved={saved?.has(spot.id) ?? false}
-                  onSavePress={onSavePress}
-                  onClick={s => {
-                    _mySpotsScrollTop = mySpotsScrollRef.current?.scrollTop || 0
-                    onSpotClick?.(s)
-                  }}
-                  priority={i < 3}
-                />
-              ))
+              <div style={{ position: 'relative', height: mySpotsVirtualizer.getTotalSize() }}>
+                {mySpotsVirtualizer.getVirtualItems().map(virtualRow => {
+                  const spot = mySpots[virtualRow.index]
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={mySpotsVirtualizer.measureElement}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` }}
+                    >
+                      <SpotCard
+                        spot={spot}
+                        saved={saved?.has(spot.id) ?? false}
+                        onSavePress={onSavePress}
+                        onClick={s => {
+                          _mySpotsScrollTop = mySpotsScrollRef.current?.scrollTop || 0
+                          onSpotClick?.(s)
+                        }}
+                        priority={virtualRow.index < 3}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
             )}
             <div style={{ height: BOTTOM_PAD }} />
           </div>

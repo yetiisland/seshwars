@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import Navbar from '../components/Navbar'
 import FiltersModal from '../components/FiltersModal'
 import SpotCard from '../components/SpotCard'
+import { getLastSpotsPayloadSizeKB } from '../hooks/useSpots'
+import { isPerfActive, recordPageLoad } from '../lib/perfReadout'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -16,11 +19,14 @@ function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, 
   const handleFiltersChange = onFiltersChange ?? setLocalFilters
   const scrollRef = useRef(null)
 
-  // Restore scroll position on mount (e.g. returning from a spot page)
+  // Desktop shows a 3-column grid (.spots-list-grid's own media query),
+  // mobile stacks single-column — matches the exact breakpoint already used
+  // by App.jsx/MapView.jsx for the same isDesktop split.
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 769)
   useEffect(() => {
-    if (scrollRef.current && _savedScrollTop > 0) {
-      scrollRef.current.scrollTop = _savedScrollTop
-    }
+    const handler = () => setIsDesktop(window.innerWidth >= 769)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
   }, [])
 
   // ListView now stays mounted across the map<->list toggle (App.jsx just
@@ -28,12 +34,9 @@ function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, 
   // no restore logic needed there. But a filter/sort/search change is a new
   // result set, and should land the user at the top of it rather than
   // wherever they happened to be scrolled to in the old one. Skip the very
-  // first run so this doesn't fight the mount-restore effect above.
+  // first run so this doesn't fight the virtualizer's own initialOffset
+  // restore (below) on mount.
   const isFirstFilterRun = useRef(true)
-  useEffect(() => {
-    if (isFirstFilterRun.current) { isFirstFilterRun.current = false; return }
-    if (scrollRef.current) scrollRef.current.scrollTop = 0
-  }, [filters, sortMode, searchLocation])
 
   // Desktop: on wide viewports the list column is centered with empty margin
   // on either side, and that margin isn't itself scrollable — the wheel does
@@ -99,6 +102,47 @@ function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, 
     return filtered
   }, [filtered, sortMode])
 
+  const columns = isDesktop ? 3 : 1
+  const rows = useMemo(() => {
+    const out = []
+    for (let i = 0; i < sorted.length; i += columns) out.push(sorted.slice(i, i + columns))
+    return out
+  }, [sorted, columns])
+
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 320,
+    overscan: 4,
+    gap: isDesktop ? 16 : 0,
+    paddingStart: isDesktop ? 16 : 0,
+    paddingEnd: isDesktop ? 16 : 0,
+    initialOffset: () => _savedScrollTop,
+  })
+
+  // A filter/sort/search change is a new result set, and should land the
+  // user at the top of it rather than wherever they happened to be scrolled
+  // to in the old one. Skip the very first run so this doesn't fight the
+  // virtualizer's own initialOffset restore on mount.
+  useEffect(() => {
+    if (isFirstFilterRun.current) { isFirstFilterRun.current = false; return }
+    rowVirtualizer.scrollToOffset(0)
+  }, [filters, sortMode, searchLocation])
+
+  // ?perf=1 page-load entry: time from page start to the spots list's first
+  // paint with content, plus the initial spots payload size — fires once,
+  // the first time real (non-loading, non-empty) content shows up. No-op
+  // (no rAF scheduling at all) when perf mode is inactive.
+  const pageLoadRecordedRef = useRef(false)
+  useEffect(() => {
+    if (!isPerfActive() || pageLoadRecordedRef.current) return
+    if (loading || sorted.length === 0) return
+    pageLoadRecordedRef.current = true
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      recordPageLoad(performance.now(), getLastSpotsPayloadSizeKB())
+    }))
+  }, [loading, sorted.length])
+
   return (
     <>
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
@@ -119,10 +163,23 @@ function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, 
             ) : sorted.length === 0 ? (
               <div className="loading">No spots found</div>
             ) : (
-              <div className="spots-list-grid">
-                {sorted.map((spot, i) => (
-                  <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} onHidePress={onHidePress} priority={i < 3} />
-                ))}
+              <div className="spots-list-grid" style={{ position: 'relative', height: rowVirtualizer.getTotalSize() }}>
+                {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                  const row = rows[virtualRow.index]
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
+                      className={isDesktop ? 'spots-list-row' : undefined}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` }}
+                    >
+                      {row.map((spot, j) => (
+                        <SpotCard key={spot.id} spot={spot} saved={saved.has(spot.id)} onSavePress={onSavePress} onClick={handleSpotClick} onHidePress={onHidePress} priority={virtualRow.index * columns + j < 3} />
+                      ))}
+                    </div>
+                  )
+                })}
               </div>
             )}
             <div style={{ height: BOTTOM_PAD }} />

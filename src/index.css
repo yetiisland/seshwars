@@ -568,21 +568,6 @@ textarea.form-input {
   overflow: hidden;
   cursor: pointer;
   transition: border-color 0.15s;
-  /* Skips layout/paint for cards scrolled out of view (ListView/SavedView
-     both render every matching spot with no virtualization) so a large
-     list stays cheap to lay out. contain-intrinsic-height only — width is
-     already extrinsic (block-level, sized by the containing block, not by
-     content), so constraining it too would risk a wrong fixed width on
-     other viewport sizes. 320px ≈ a typical card's own rendered height
-     with a photo: ~206px 16:9 image (~366px typical mobile card width,
-     i.e. ~390px viewport minus this rule's 24px side margins) + 22px body
-     padding (10 top + 12 bottom) + ~21px title row (13px bold line +3px
-     margin) + ~41px description (2 lines at 11px/1.5 line-height +8px
-     margin) + 26px footer row (.arrow-btn's own height) ≈ 316px, rounded.
-     An estimate only — content-visibility corrects the real height once
-     a card actually enters the viewport. */
-  content-visibility: auto;
-  contain-intrinsic-height: 320px;
 }
 
 .spot-card:hover { border-color: #C8CAD4; }
@@ -671,23 +656,31 @@ textarea.form-input {
   margin-bottom: 0;
 }
 
-/* Desktop list view 3-column grid */
+/* Desktop list view 3-column grid. ListView.jsx virtualizes this by row
+   (one row = up to 3 cards), so the vertical gap/padding that used to live
+   here as a single CSS grid's own row-gap/padding is now reproduced via the
+   virtualizer's own `gap`/`paddingStart`/`paddingEnd` options instead —
+   .spots-list-grid keeps only the horizontal inset/centering, and each
+   virtualized row gets .spots-list-row for its own 3-column layout. */
 @media (min-width: 769px) {
   .spots-list-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    padding: 16px;
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
+    padding: 0 16px;
   }
 
-  .spots-list-grid .spot-card {
+  .spots-list-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .spots-list-row .spot-card {
     margin: 0;
   }
 
-  .spots-list-grid .spot-card:hover {
+  .spots-list-row .spot-card:hover {
     border-color: #d4785a;
   }
 

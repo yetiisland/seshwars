@@ -13,6 +13,18 @@ let _spotsReady = false
 let _lastFetched = 0
 let _lastFingerprint = ''
 
+// Size (in KB) of the raw spots-table response from the most recent
+// fetchSpots() — read by the ?perf=1 page-load readout (App.jsx/ListView.jsx)
+// to track the initial spots payload as it grows toward "Phase 2" territory.
+// Measured on spotsRes.data specifically (the wire download), not the
+// merged/computed object below (avg_rating/report_count are computed
+// client-side from separate review/report queries, not part of this
+// download).
+let _lastSpotsSizeKB = 0
+export function getLastSpotsPayloadSizeKB() {
+  return _lastSpotsSizeKB
+}
+
 function spotsFingerprint(arr) {
   return arr.map(s => `${s.id}:${s.updated_at}:${s.report_count}`).join('|')
 }
@@ -53,6 +65,7 @@ export function useSpots() {
       supabase.from('spot_reports').select('spot_id, report_type, custom_text').order('created_at', { ascending: false }),
     ])
     if (!spotsRes.error && spotsRes.data) {
+      _lastSpotsSizeKB = Math.round(JSON.stringify(spotsRes.data).length / 1024 * 10) / 10
       const rMap = {}
       for (const r of (reviewsRes.data || [])) {
         if (!rMap[r.spot_id]) rMap[r.spot_id] = { sum: 0, count: 0 }

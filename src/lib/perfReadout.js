@@ -98,6 +98,16 @@ function finish(handle, endTime) {
   notify()
 }
 
+// One-shot page-load entry: time from page start (performance.now()'s own
+// origin) to the spots list's first paint with content, plus the initial
+// spots payload size — tracks when the list is getting big enough that
+// Phase 2 (server-side paging/etc.) is due. Call once per app load.
+export function recordPageLoad(totalMs, sizeKB) {
+  if (!isPerfActive()) return
+  entries = [{ actionName: 'page load', totalMs: Math.round(totalMs), netWaitMs: null, sizeKB }, ...entries].slice(0, 10)
+  notify()
+}
+
 // Call synchronously inside a navigation tap handler, before triggering the
 // navigation. Returns a handle to pass to perfEndNav, or null when inactive.
 export function perfBeginNav(actionName) {

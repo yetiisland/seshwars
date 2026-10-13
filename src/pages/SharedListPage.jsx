@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { supabase } from '../lib/supabase'
 import { createPortal } from 'react-dom'
 import SpotCard from '../components/SpotCard'
@@ -142,6 +143,14 @@ export default function SharedListPage() {
     }
   }
 
+  const scrollRef = useRef(null)
+  const spotRowVirtualizer = useVirtualizer({
+    count: spots.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 320,
+    overscan: 4,
+  })
+
   const handleSpotClick = (spot) => navigate(`/spots/${spot.slug || spot.id}`)
 
   const handleTabChange = (tabId) => {
@@ -209,15 +218,27 @@ export default function SharedListPage() {
           )}
         </div>
       ) : (
-        <div className="scroll-area" style={{ paddingTop: 8 }}>
+        <div className="scroll-area" ref={scrollRef} style={{ paddingTop: 8 }}>
           {spots.length === 0 ? (
             <div style={{ padding: '60px 32px', textAlign: 'center', fontSize: 12, color: '#9a8878', fontWeight: 700, fontFamily: 'Barlow, sans-serif' }}>
               No spots in this list yet.
             </div>
           ) : (
-            spots.map((spot, i) => (
-              <SpotCard key={spot.id} spot={spot} saved={false} onSavePress={() => {}} onClick={handleSpotClick} priority={i < 3} />
-            ))
+            <div style={{ position: 'relative', height: spotRowVirtualizer.getTotalSize() }}>
+              {spotRowVirtualizer.getVirtualItems().map(virtualRow => {
+                const spot = spots[virtualRow.index]
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={spotRowVirtualizer.measureElement}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` }}
+                  >
+                    <SpotCard spot={spot} saved={false} onSavePress={() => {}} onClick={handleSpotClick} priority={virtualRow.index < 3} />
+                  </div>
+                )
+              })}
+            </div>
           )}
           <div style={{ height: BOTTOM_PAD }} />
         </div>
