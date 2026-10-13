@@ -4,7 +4,6 @@ import Navbar from '../components/Navbar'
 import FiltersModal from '../components/FiltersModal'
 import SpotCard from '../components/SpotCard'
 import { getLastSpotsPayloadSizeKB } from '../hooks/useSpots'
-import { isPerfActive, recordPageLoad } from '../lib/perfReadout'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -13,7 +12,7 @@ let _savedScrollTop = 0
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
-function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress, sortMode, onSortModeChange, locationPermission }) {
+function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, searchLocation, onClearSearch, showNav = true, filters: propFilters, onFiltersChange, distance, onDistanceChange, onHidePress, sortMode, onSortModeChange, locationPermission, isActive = true }) {
   const [localFilters, setLocalFilters] = useState(['All'])
   const filters = propFilters ?? localFilters
   const handleFiltersChange = onFiltersChange ?? setLocalFilters
@@ -118,6 +117,16 @@ function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, 
     paddingStart: isDesktop ? 16 : 0,
     paddingEnd: isDesktop ? 16 : 0,
     initialOffset: () => _savedScrollTop,
+    // ListView stays mounted behind display:none when another tab is active
+    // (never unmounted — see the architecture note on the wrapping div in
+    // App.jsx). While hidden, this container's rows collapse to 0×0, and
+    // the virtualizer's own ResizeObserver-driven remeasurement treats that
+    // as real item shrinkage/regrowth, nudging scrollTop to compensate each
+    // time — a few rows' worth each way, net non-zero, so it compounds on
+    // every return to this tab. `enabled: false` disconnects that observer
+    // entirely while hidden, so the display:none collapse is never observed
+    // as a size change in the first place.
+    enabled: isActive,
   })
 
   // A filter/sort/search change is a new result set, and should land the
@@ -129,17 +138,16 @@ function ListView({ spots, loading, saved, onSavePress, onSpotClick, onAddSpot, 
     rowVirtualizer.scrollToOffset(0)
   }, [filters, sortMode, searchLocation])
 
-  // ?perf=1 page-load entry: time from page start to the spots list's first
+  // One-time console log: time from page start to the spots list's first
   // paint with content, plus the initial spots payload size — fires once,
-  // the first time real (non-loading, non-empty) content shows up. No-op
-  // (no rAF scheduling at all) when perf mode is inactive.
-  const pageLoadRecordedRef = useRef(false)
+  // the first time real (non-loading, non-empty) content shows up.
+  const pageLoadLoggedRef = useRef(false)
   useEffect(() => {
-    if (!isPerfActive() || pageLoadRecordedRef.current) return
+    if (pageLoadLoggedRef.current) return
     if (loading || sorted.length === 0) return
-    pageLoadRecordedRef.current = true
+    pageLoadLoggedRef.current = true
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      recordPageLoad(performance.now(), getLastSpotsPayloadSizeKB())
+      console.log(`[perf] spots list first paint: ${Math.round(performance.now())}ms, initial payload: ${getLastSpotsPayloadSizeKB()}kb`)
     }))
   }, [loading, sorted.length])
 

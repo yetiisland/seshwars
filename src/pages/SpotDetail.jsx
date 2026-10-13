@@ -810,25 +810,29 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         <div style={{ padding: '16px 14px 0', background: '#FDF8F0' }}>
 
           {/* Title row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', flex: 1, lineHeight: 1.3, paddingRight: 8 }}>{spot.title}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-              {avgRating != null && reviewCount > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#3D4454" />
-                  </svg>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#3D4454' }}>{avgRating.toFixed(1)}</span>
-                </div>
-              )}
-              {avgRating != null && reviewCount > 0 && spot.distance != null && (
-                <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
-              )}
-              {spot.distance != null && <span className="dist-text">{spot.distance} mi</span>}
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>{spot.title}</div>
+            {(avgRating != null && reviewCount > 0 || spot.distance != null) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                {avgRating != null && reviewCount > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#3D4454" />
+                    </svg>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#3D4454' }}>{avgRating.toFixed(1)}</span>
+                  </div>
+                )}
+                {avgRating != null && reviewCount > 0 && spot.distance != null && (
+                  <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
+                )}
+                {spot.distance != null && <span className="dist-text">{spot.distance} mi</span>}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
               <button
                 className="btn-salmon"
                 onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
-                style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 2 }}
+                style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}
               >
                 <TrickListIcon color="#fff" size={14} filled />
                 Trick List

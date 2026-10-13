@@ -375,7 +375,12 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
     for (const id of Object.keys(pinVariants)) {
       if (!map.hasImage(id)) {
         const { fill, stroke } = pinVariants[id]
-        map.addImage(id, makePinIconData(fill, stroke))
+        // makePinIconData rasterizes at PIN_SHARPNESS× for a retina-sharp
+        // image, but without a matching pixelRatio here Mapbox treats the
+        // raw canvas pixel dimensions as the icon's logical display size —
+        // rendering it PIN_SHARPNESS× (3×) too large instead of scaling it
+        // back down to the intended display size.
+        map.addImage(id, makePinIconData(fill, stroke), { pixelRatio: PIN_SHARPNESS })
       }
     }
   }, [pinVariants])

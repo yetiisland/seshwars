@@ -10,7 +10,6 @@ import InitialsAvatar from '../components/InitialsAvatar'
 import { getProfiles } from '../utils/profileCache'
 import MapView from './MapView'
 import MembersSummary from '../components/MembersSummary'
-import { perfBeginNav, perfEndNav } from '../lib/perfReadout'
 
 // Inline suggestion dropdown — copied verbatim from the geocoder address
 // dropdown in AddSpot.jsx (same pattern CommentsSection.jsx's @mention
@@ -231,7 +230,7 @@ function ShareSavedListFriends({ listId, userId, onBack, onShared }) {
   )
 }
 
-function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, onFavoritesListCreated, onLeft, spots, saved, onSavePress, onSpotClick, onBack, onListDeleted, initialScrollTop, onSaveScrollTop }) {
+function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, onFavoritesListCreated, onLeft, spots, saved, onSavePress, onSpotClick, onBack, onListDeleted, initialScrollTop, onSaveScrollTop, isActive = true }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteClosing, setDeleteClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -393,6 +392,15 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 320,
     overscan: 4,
+    // SavedView (this component's parent) stays mounted behind display:none
+    // when another tab is active, so if a list is left open while switching
+    // away and back, this container's rows collapse to 0×0 while hidden —
+    // the virtualizer's own ResizeObserver-driven remeasurement treats that
+    // as real item shrinkage/regrowth and nudges scrollTop to compensate
+    // each time, compounding on every return. `enabled: false` disconnects
+    // that observer entirely while hidden, so the collapse is never
+    // observed as a size change in the first place.
+    enabled: isActive,
   })
 
   // Restore scroll once spots content is actually rendered (listSpotIds loads async)
@@ -973,11 +981,9 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
   }
 
   const handleBackFromCollection = () => {
-    const perfHandle = perfBeginNav('back')
     _savedOpenCollection = null
     _savedCollectionScrollTop = 0
     setOpenCollection(null)
-    perfEndNav(perfHandle)
   }
 
   // Stable across unrelated SavedView re-renders (lists/members refetch,
@@ -1055,6 +1061,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <CollectionView
           key={openCollection.type === 'favorites' ? 'favorites' : openCollection.id}
+          isActive={isActive}
           title={title}
           isList={openCollection.type === 'list' || openCollection.type === 'shared'}
           isFavorites={openCollection.type === 'favorites'}
@@ -1094,11 +1101,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
         <div style={{ padding: '8px 16px 0' }}>
         {/* Saved Spots (was Favorites) */}
         <div
-          onClick={() => {
-            const perfHandle = perfBeginNav('open list')
-            setOpenCollection({ type: 'favorites', name: 'Saved Spots' })
-            perfEndNav(perfHandle)
-          }}
+          onClick={() => setOpenCollection({ type: 'favorites', name: 'Saved Spots' })}
           style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
         >
           <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1123,13 +1126,9 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
           return (
             <div
               key={`${list._kind}-${list.id}`}
-              onClick={() => {
-                const perfHandle = perfBeginNav('open list')
-                setOpenCollection(isShared
-                  ? { type: 'shared', id: list.id, name: list.name, isOwner: false }
-                  : { type: 'list', id: list.id, name: list.name, isOwner: true })
-                perfEndNav(perfHandle)
-              }}
+              onClick={() => setOpenCollection(isShared
+                ? { type: 'shared', id: list.id, name: list.name, isOwner: false }
+                : { type: 'list', id: list.id, name: list.name, isOwner: true })}
               style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 8, padding: 14, cursor: 'pointer', marginBottom: 8 }}
             >
               <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
