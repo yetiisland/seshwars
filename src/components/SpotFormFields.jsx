@@ -1,4 +1,4 @@
-import { SPOT_FIELDS, bustChipActiveStyle } from '../lib/spotFields'
+import { SPOT_FIELDS, bustChipActiveStyle, multiSpotChipActiveStyle } from '../lib/spotFields'
 
 export default function SpotFormFields({ form, setForm }) {
   const currentType = form.type
@@ -54,7 +54,9 @@ export default function SpotFormFields({ form, setForm }) {
                   : form[field.key] === opt
                 const activeStyle = field.key === 'bust_rating' && isActive
                   ? bustChipActiveStyle(opt)
-                  : undefined
+                  : field.key === 'is_multi_spot' && isActive
+                    ? multiSpotChipActiveStyle(opt)
+                    : undefined
                 return (
                   <div
                     key={opt}

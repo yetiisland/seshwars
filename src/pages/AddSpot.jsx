@@ -11,6 +11,7 @@ import { compressImage } from '../utils/compressImage'
 import { checkPhotosSafe } from '../utils/moderation'
 import TermsOfService from './TermsOfService'
 import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
+import { mergeSpotIntoCache } from '../hooks/useSpots'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const DRAFT_KEY = 'seshwars_spot_draft'
@@ -212,6 +213,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
       return
     }
     sessionStorage.removeItem(DRAFT_KEY)
+    mergeSpotIntoCache(data)
     if (moderation_status === 'pending') {
       setSpotPending(true)
     } else {

@@ -14,7 +14,7 @@ import OpenInAppSheet from '../components/OpenInAppSheet'
 // the save/sign-in modals are App's own already-loaded state, passed down
 // as props — this component only owns the spot fetch itself and the
 // header chrome SpotPage.jsx used to render standalone.
-export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, onBack, onGoProfile, onGoAuth, onSavePress, sheetPad, onSheetPad }) {
+export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, onBack, onGoProfile, onGoAuth, onSavePress, sheetPad, onSheetPad, userLocation }) {
   const location = useLocation()
   const stateSpot = location.state?.spot?.title ? location.state.spot : null
   const [spot, setSpot] = useState(stateSpot)
@@ -147,6 +147,7 @@ export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, 
           saved={saved.has(spot.id)}
           onSavePress={onSavePress}
           onBack={onBack}
+          userLocation={userLocation}
           onEditSuccess={(updatedSpot) => {
             // Edit success passes the saved row — merge it and stay on this page.
             // Reject/delete call with no argument — the spot is gone, navigate away.

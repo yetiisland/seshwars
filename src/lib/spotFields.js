@@ -77,3 +77,11 @@ export function bustChipActiveStyle(rating) {
     return { background: '#c8a020', borderColor: '#b08818', color: '#ffffff' }
   return {}
 }
+
+// Same trick-checkmark tokens as the MULTI-SPOT chip (SpotCard/SpotDetail).
+// "No" keeps the default selected chip style — not a fresh exception, just
+// no override here, same as bustChipActiveStyle's unmatched ratings.
+export function multiSpotChipActiveStyle(opt) {
+  if (opt === 'Yes') return { background: '#DFEEDF', borderColor: '#4E9A51', color: '#3d6830' }
+  return {}
+}

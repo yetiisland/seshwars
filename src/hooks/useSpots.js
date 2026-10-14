@@ -29,30 +29,64 @@ function spotsFingerprint(arr) {
   return arr.map(s => `${s.id}:${s.updated_at}:${s.report_count}`).join('|')
 }
 
-// Patches a single spot into the module-level cache so the next mount of
-// App.jsx (e.g. after navigating back from an edit) reads fresh data
-// immediately, without waiting on the 30s staleness gate in fetchSpots().
-// Preserves computed fields (avg_rating, report_count, ...) that aren't
-// part of the raw `spots` row returned by an update.
+// useSpots() is called exactly once (App.jsx), but mergeSpotIntoCache/
+// removeSpotFromCache are called from wherever a write happens (AddSpot,
+// SpotDetail's edit/reject/delete) — plain module-variable reassignment
+// there previously updated _cachedSpots but never told React about it, so
+// every SpotCard kept rendering from the stale array it already had until
+// something ELSE (a fresh fetchSpots() call) happened to run. This is the
+// notify side of that: useSpots() subscribes its setSpots once, and every
+// cache mutation below pushes the new array straight into it.
+const listeners = new Set()
+function notifyListeners() {
+  listeners.forEach(fn => fn(_cachedSpots))
+}
+
+// Patches a single spot into the module-level cache so every mounted
+// SpotCard (list, map, saved lists, profile) reflects a verified add/edit
+// immediately, no reload needed. Preserves computed fields (avg_rating,
+// report_count, ...) that aren't part of the raw `spots` row returned by
+// an insert/update, by merging onto the existing entry rather than
+// replacing it outright. A spot not yet in the cache (a brand new one,
+// just inserted) is prepended instead, with those computed fields
+// defaulted the same way fetchSpots() itself would for a spot with no
+// reviews/reports yet.
+// Other, unchanged rows keep their exact same object reference (the map
+// callback's else-branch returns `s` itself), so SpotCard's React.memo
+// only re-renders the one card whose props actually changed.
 export function mergeSpotIntoCache(updatedSpot) {
   if (!updatedSpot?.id) return
-  _cachedSpots = _cachedSpots.map(s => (s.id === updatedSpot.id ? { ...s, ...updatedSpot } : s))
+  const idx = _cachedSpots.findIndex(s => s.id === updatedSpot.id)
+  if (idx === -1) {
+    _cachedSpots = [
+      { avg_rating: null, rating_count: 0, report_count: 0, most_recent_report: null, most_recent_report_custom: null, ...updatedSpot },
+      ..._cachedSpots,
+    ]
+  } else {
+    _cachedSpots = _cachedSpots.map(s => (s.id === updatedSpot.id ? { ...s, ...updatedSpot } : s))
+  }
   _lastFingerprint = spotsFingerprint(_cachedSpots)
+  notifyListeners()
 }
 
 // Same idea as mergeSpotIntoCache, for a confirmed-successful delete: removes
-// the spot from the module-level cache so the next mount of App.jsx (e.g.
-// navigating back after deleting) reads its absence immediately, without
-// waiting on the 30s staleness gate in fetchSpots().
+// the spot from the module-level cache so every mounted SpotCard reflects
+// its absence immediately, no reload needed.
 export function removeSpotFromCache(spotId) {
   if (!spotId) return
   _cachedSpots = _cachedSpots.filter(s => s.id !== spotId)
   _lastFingerprint = spotsFingerprint(_cachedSpots)
+  notifyListeners()
 }
 
 export function useSpots() {
   const [spots, setSpots] = useState(_cachedSpots)
   const [loading, setLoading] = useState(!_spotsReady)
+
+  useEffect(() => {
+    listeners.add(setSpots)
+    return () => listeners.delete(setSpots)
+  }, [])
 
   const fetchSpots = useCallback(async ({ force = false } = {}) => {
     // Skip if cache is fresh and not forced (prevents re-render on back navigation)

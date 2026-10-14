@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
+import { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
@@ -18,6 +18,7 @@ import { checkImageModeration } from '../utils/moderation'
 import { transformImageUrl } from '../utils/imageUrl'
 import TermsOfService from './TermsOfService'
 import { isAdminUser } from '../lib/admin'
+import { haversineDistance } from '../hooks/useGeolocation'
 import AddFriendButton from '../components/AddFriendButton'
 import { SPOT_FIELDS } from '../lib/spotFields'
 import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
@@ -40,7 +41,7 @@ function bustBadgeStyle(rating) {
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
 }
 
-const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, isHidden, onUnhidePress, onHidePress, sheetPad = 0, scrollToCommentId }, ref) {
+const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, isHidden, onUnhidePress, onHidePress, sheetPad = 0, scrollToCommentId, userLocation }, ref) {
   // ── Photo / hero state ────────────────────────────────────────
   const [photoIndex, setPhotoIndex] = useState(0)
   const [dragX, setDragX] = useState(0)
@@ -124,6 +125,16 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const handleStatsChange = (avg, count) => { setAvgRating(avg); setReviewCount(count) }
   const [modStatus, setModStatus] = useState(spot.moderation_status || 'approved')
   const scrollAreaRef = useRef()
+
+  // Computed here (not read off spot.distance) so it never depends on
+  // which source the spot object came from — router-state (has it,
+  // computed client-side) or a fresh Supabase row (never has it, since
+  // distance isn't a stored column) — same helper/formatting as every
+  // SpotCard's own distance.
+  const distance = useMemo(() => {
+    if (!userLocation || spot.latitude == null || spot.longitude == null) return null
+    return parseFloat(haversineDistance(userLocation.latitude, userLocation.longitude, spot.latitude, spot.longitude).toFixed(1))
+  }, [userLocation, spot.latitude, spot.longitude])
 
   const photos = spot.photos || []
 
@@ -760,9 +771,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             </div>
           </div>
 
-          {/* Photo dots — bottom center */}
+          {/* Photo dots — bottom right */}
           {photos.length > 1 && (
-            <div style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: 5 }}>
+            <div style={{ position: 'absolute', bottom: 14, right: 14, zIndex: 10, display: 'flex', gap: 5 }}>
               {photos.map((_, i) => (
                 <div key={i} onClick={e => { e.stopPropagation(); setPhotoIndex(i) }}
                   style={{ width: i === photoIndex ? 7 : 5, height: i === photoIndex ? 7 : 5, borderRadius: '50%', background: i === photoIndex ? '#d4785a' : '#fff', opacity: i === photoIndex ? 1 : 0.5, cursor: 'pointer', transition: 'all 0.15s' }} />
@@ -807,7 +818,12 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             )
           })()}
           {spot.is_multi_spot && (
-            <div style={{ position: 'absolute', bottom: 10, right: 12, zIndex: 10, display: 'flex', alignItems: 'center', gap: 5, background: '#DFEEDF', border: '1px solid #4E9A51', borderRadius: 6, padding: '3px 7px' }}>
+            <div style={{
+              position: 'absolute',
+              bottom: photos.length > 1 ? 27 : 10,
+              right: photos.length > 1 ? 14 : 12,
+              zIndex: 10, display: 'flex', alignItems: 'center', gap: 5, background: '#DFEEDF', border: '1px solid #4E9A51', borderRadius: 6, padding: '3px 7px',
+            }}>
               <MultiSpotIcon color="#3d6830" holeColor="#DFEEDF" />
               <span style={{ fontSize: 9, fontWeight: 700, color: '#3d6830', letterSpacing: 1, textTransform: 'uppercase' }}>Multi-Spot</span>
             </div>
@@ -818,34 +834,40 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         <div style={{ padding: '16px 14px 0', background: '#FDF8F0' }}>
 
           {/* Title row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', flex: 1, lineHeight: 1.3, paddingRight: 8 }}>{spot.title}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-              {avgRating != null && reviewCount > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#3D4454" />
-                  </svg>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#3D4454' }}>{avgRating.toFixed(1)}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
+              {(avgRating != null && reviewCount > 0 || distance != null) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {avgRating != null && reviewCount > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#3D4454" />
+                      </svg>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#3D4454' }}>{avgRating.toFixed(1)}</span>
+                    </div>
+                  )}
+                  {avgRating != null && reviewCount > 0 && distance != null && (
+                    <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
+                  )}
+                  {distance != null && <span className="dist-text">{distance} mi</span>}
                 </div>
               )}
-              {avgRating != null && reviewCount > 0 && spot.distance != null && (
-                <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
-              )}
-              {spot.distance != null && <span className="dist-text">{spot.distance} mi</span>}
-              <button
-                className="btn-salmon"
-                onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
-                style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 2 }}
-              >
-                <TrickListIcon color="#fff" size={14} filled />
-                Tricks
-              </button>
-              <div
-                onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
-                style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-              >
-                <ShareIcon color="#d4785a" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button
+                  className="btn-salmon"
+                  onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
+                  style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}
+                >
+                  <TrickListIcon color="#fff" size={14} filled />
+                  Tricks
+                </button>
+                <div
+                  onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
+                  style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <ShareIcon color="#d4785a" />
+                </div>
               </div>
             </div>
           </div>

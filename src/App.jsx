@@ -1028,6 +1028,7 @@ export default function App() {
             onSavePress={handleSavePress}
             sheetPad={spotSheetPad}
             onSheetPad={setSpotSheetPad}
+            userLocation={userLocation}
           />
         </div>
       )}
