@@ -192,7 +192,7 @@ export default function DraggablePhotos({ photos, setPhotos, onAdd, uploading, u
                 userSelect: 'none', WebkitUserSelect: 'none',
               }}
             >
-              <img src={url} alt="spot" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
+              <img src={url} alt="spot" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} onContextMenu={e => e.preventDefault()} />
               <DragHandle />
               {i === 0 && (
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.55)', fontSize: 7, color: '#fff', textAlign: 'center', padding: '2px 0', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', pointerEvents: 'none' }}>

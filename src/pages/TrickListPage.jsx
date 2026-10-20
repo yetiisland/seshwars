@@ -508,7 +508,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
                     <div onClick={() => handleCardClick(group.spotId)} style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}>
                       <div style={{ width: 44, height: 44, borderRadius: 6, background: '#F0E8DE', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {detail?.photos?.[0] && (
-                          <img src={transformImageUrl(detail.photos[0], 88)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={transformImageUrl(detail.photos[0], 88)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', WebkitTouchCallout: 'none' }} draggable={false} onContextMenu={e => e.preventDefault()} />
                         )}
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

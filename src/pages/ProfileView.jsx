@@ -80,7 +80,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled, isActive = true }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled, openFriends, onOpenFriendsHandled, isActive = true }) {
   // Read via a ref inside event listeners below (not as a dep — these
   // listeners stay registered for the component's whole lifetime now that
   // it's kept mounted) so a friends/tricks-changed event or the app
@@ -107,6 +107,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   useEffect(() => {
     if (openTrickListId) setShowTrickList(true)
   }, [openTrickListId])
+
+  // ADD FRIENDS from the saved-list share sheet — same deep-link shape as
+  // openTrickListId above.
+  useEffect(() => {
+    if (openFriends) { setShowFriendsScreen(true); onOpenFriendsHandled?.() }
+  }, [openFriends])
   const [trickCounts, setTrickCounts] = useState(() => _trickCountsUserId === user?.id ? _cachedTrickCounts : { landed: 0, total: 0 })
   const [friendCount, setFriendCount] = useState(() => _friendCountUserId === user?.id ? _cachedFriendCount : 0)
   const [friendReqState, setFriendReqState] = useState({})
@@ -1535,7 +1541,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                       {n.type === 'spot_share' ? (
                         <div style={{ flexShrink: 0, width: 38, height: 38, borderRadius: 6, background: '#F0E8DE', border: '1px solid #C8CAD4', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {n.spotPhoto && (
-                            <img src={transformImageUrl(n.spotPhoto, 80)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={transformImageUrl(n.spotPhoto, 80)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', WebkitTouchCallout: 'none' }} draggable={false} onContextMenu={e => e.preventDefault()} />
                           )}
                         </div>
                       ) : (

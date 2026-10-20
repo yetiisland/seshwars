@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { SPOT_FIELDS, bustChipActiveStyle } from '../lib/spotFields'
+import { SPOT_FIELDS, bustChipActiveStyle, featureOptionsForTypes } from '../lib/spotFields'
 
 function LocationChip({ location, onClear }) {
   return (
@@ -188,11 +188,12 @@ export default function FiltersModal({ active, onChange, compact = false, distan
 
               {filterableFields.map(field => {
                 if (!isFieldVisible(field)) return null
+                const options = field.key === 'features' ? featureOptionsForTypes(selectedTypes) : field.options
                 return (
                   <div key={field.key}>
                     <div className="section-label" style={{ marginBottom: 8 }}>{field.label}</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {field.options.map(f => {
+                      {options.map(f => {
                         const active = isActive(f)
                         return (
                           <div

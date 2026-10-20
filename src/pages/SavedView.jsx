@@ -119,7 +119,7 @@ function SquareToggle({ selected }) {
 // the Share Link choice, same shape as TrickListPage.jsx's own
 // ShareTrickListFriends. Inserts into list_members directly, skipping
 // friends who are already members. Owner only (caller gates the choice row).
-function ShareSavedListFriends({ listId, userId, onBack, onShared }) {
+function ShareSavedListFriends({ listId, userId, onBack, onShared, onGoToFriends }) {
   const [friends, setFriends] = useState([])
   const [currentMemberIds, setCurrentMemberIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
@@ -190,8 +190,11 @@ function ShareSavedListFriends({ listId, userId, onBack, onShared }) {
       {loading ? (
         <div style={{ padding: '0 20px 20px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>Loading...</div>
       ) : friends.length === 0 ? (
-        <div style={{ padding: '0 20px 20px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          You don't have any friends yet. Add some from the Friends page first.
+        <div style={{ padding: '0 20px 20px' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 14 }}>
+            Click to add friends below in order to share.
+          </div>
+          <button className="btn-salmon" onClick={onGoToFriends}>Add Friends</button>
         </div>
       ) : (
         <>
@@ -223,6 +226,12 @@ function ShareSavedListFriends({ listId, userId, onBack, onShared }) {
             <button className="btn-salmon" onClick={handleSend} disabled={selected.size === 0 || sending} style={{ opacity: selected.size === 0 || sending ? 0.5 : 1 }}>
               {sending ? 'Sharing...' : 'Share'}
             </button>
+            <button
+              onClick={onGoToFriends}
+              style={{ width: '100%', marginTop: 8, padding: 13, borderRadius: 6, background: 'transparent', border: '1.5px solid #d4785a', color: '#d4785a', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}
+            >
+              Add Friends
+            </button>
           </div>
         </>
       )}
@@ -230,7 +239,7 @@ function ShareSavedListFriends({ listId, userId, onBack, onShared }) {
   )
 }
 
-function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, onFavoritesListCreated, onLeft, spots, saved, onSavePress, onSpotClick, onBack, onListDeleted, initialScrollTop, onSaveScrollTop, isActive = true }) {
+function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, onFavoritesListCreated, onLeft, spots, saved, onSavePress, onSpotClick, onBack, onGoToFriends, onListDeleted, initialScrollTop, onSaveScrollTop, isActive = true }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteClosing, setDeleteClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -706,6 +715,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                 userId={userId}
                 onBack={() => setShareSheetMode('choice')}
                 onShared={(msg) => { closeShareSheet(); showShareToast(msg) }}
+                onGoToFriends={() => { closeShareSheet(); onGoToFriends?.() }}
               />
             )}
           </div>
@@ -720,8 +730,12 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
       )}
 
 
-      {/* Fixed bottom toggle */}
-      {createPortal(
+      {/* Fixed bottom toggle — portaled to document.body, so unlike the rest
+          of this view it isn't hidden by the Saved tab's own display:none
+          when another tab is active. Gate it on isActive explicitly so it
+          doesn't float on top of (and intercept taps meant for) whatever
+          other tab's own LIST/MAP toggle occupies this same screen position. */}
+      {isActive && createPortal(
         <div ref={viewToggleTrackRef} style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
           <div ref={viewToggleThumbRef} style={{ position: 'absolute', top: 3, bottom: 3, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
           <div ref={el => { viewToggleSegmentRefs.current.list = el }} onClick={() => setViewMode('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
@@ -819,7 +833,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   )
 }
 
-export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user, openListId, onOpenListIdHandled, isActive = true }) {
+export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user, openListId, onOpenListIdHandled, onGoToFriends, isActive = true }) {
   const [lists, setLists] = useState(() => _listsUserId === user?.id ? _cachedLists : [])
   const [listSpotIds, setListSpotIds] = useState(() => _listsUserId === user?.id ? _cachedListSpotIds : {})
   const [openCollection, setOpenCollection] = useState(_savedOpenCollection)
@@ -1074,6 +1088,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
           onSavePress={onSavePress}
           onSpotClick={handleSpotClickInCollection}
           onBack={handleBackFromCollection}
+          onGoToFriends={onGoToFriends}
           initialScrollTop={_savedCollectionScrollTop}
           onSaveScrollTop={handleSaveScrollTop}
           onListDeleted={() => {

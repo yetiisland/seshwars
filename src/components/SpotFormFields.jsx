@@ -1,4 +1,4 @@
-import { SPOT_FIELDS, bustChipActiveStyle, multiSpotChipActiveStyle } from '../lib/spotFields'
+import { SPOT_FIELDS, bustChipActiveStyle, multiSpotChipActiveStyle, lightsChipActiveStyle, featureOptionsForTypes } from '../lib/spotFields'
 
 export default function SpotFormFields({ form, setForm }) {
   const currentType = form.type
@@ -44,11 +44,13 @@ export default function SpotFormFields({ form, setForm }) {
           )
         }
 
+        const options = field.key === 'features' ? featureOptionsForTypes([currentType]) : field.options
+
         return (
           <div key={field.key} style={{ marginBottom: 14 }}>
             <div className="section-label">{field.label}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {field.options.map(opt => {
+              {options.map(opt => {
                 const isActive = field.type === 'multi'
                   ? (form[field.key] || []).includes(opt)
                   : form[field.key] === opt
@@ -56,7 +58,9 @@ export default function SpotFormFields({ form, setForm }) {
                   ? bustChipActiveStyle(opt)
                   : field.key === 'is_multi_spot' && isActive
                     ? multiSpotChipActiveStyle(opt)
-                    : undefined
+                    : field.key === 'lighting' && isActive
+                      ? lightsChipActiveStyle(opt)
+                      : undefined
                 return (
                   <div
                     key={opt}

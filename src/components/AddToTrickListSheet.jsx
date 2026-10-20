@@ -386,13 +386,11 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                 breaks its own absolutely/fixed-positioned content and the
                 keyboard-open resize. */}
             <div style={{ width: '50%', flexShrink: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <div className="modal-title" style={{ padding: '0 20px' }}>Trick List</div>
+              <div className="modal-title" style={{ padding: '0 20px', marginBottom: 16 }}>Your Trick List</div>
 
               <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px' }}>
                 <div className="section-label">Tricks at this spot</div>
-                {noTricksYet ? (
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>No tricks at this spot yet.</div>
-                ) : (
+                {!noTricksYet && (
                   <div style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6 }}>
                     {orderedTricks.map((trick, i) => (
                       <div key={trick.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderTop: i > 0 ? '1px solid #EAD8C8' : 'none' }}>
@@ -415,7 +413,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
               </div>
 
               <div style={{ padding: '0 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'stretch', border: '1.5px solid var(--salmon)', borderRadius: 6, overflow: 'hidden', background: '#FFFFFF' }}>
+                <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
                   <input
                     ref={addInputRef}
                     value={nameInput}
@@ -423,13 +421,13 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDraftTrick() } }}
                     placeholder="Add a trick"
                     maxLength={NAME_MAX}
-                    style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', padding: '10px 12px', fontSize: 16, fontFamily: 'Barlow, sans-serif', color: 'var(--text-primary)', background: 'transparent' }}
+                    style={{ flex: 1, minWidth: 0, border: '1.5px solid var(--salmon)', borderRadius: 6, outline: 'none', padding: '10px 12px', fontSize: 16, fontFamily: 'Barlow, sans-serif', color: 'var(--text-primary)', background: '#FFFFFF' }}
                   />
                   <button
                     onMouseDown={e => e.preventDefault()}
                     onClick={addDraftTrick}
                     disabled={addDisabled}
-                    style={{ width: 44, flexShrink: 0, border: 'none', background: 'var(--salmon)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: addDisabled ? 0.5 : 1 }}
+                    style={{ width: 44, flexShrink: 0, border: 'none', borderRadius: 6, background: 'var(--salmon)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: addDisabled ? 0.5 : 1 }}
                   >
                     <PlusIcon color="#fff" />
                   </button>

@@ -154,7 +154,11 @@ export function BookmarkIcon({ color = '#6a6c7a', size = 22, filled = false }) {
               <path d={path} />
             </clipPath>
           </defs>
-          <path d={path} stroke={color} strokeWidth="7" strokeLinejoin="round" fill="none" clipPath={`url(#${clipId})`} />
+          {/* 5.33 = MapPinIcon's main-stroke width (3) scaled by this icon's
+              48-unit viewBox against MapPinIcon's 27-unit one (both render
+              at height=size), so the two nav icons read as the same stroke
+              weight despite their very different viewBox scales. */}
+          <path d={path} stroke={color} strokeWidth="5.33" strokeLinejoin="round" fill="none" clipPath={`url(#${clipId})`} />
         </>
       )}
     </svg>

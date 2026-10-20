@@ -135,7 +135,7 @@ export default function AddFriendButton({ targetUserId, friendshipStatus, isRequ
           : outlineBtnStyle}
       >
         <span style={filled ? primaryBtnTextStyle : outlineBtnTextStyle}>
-          {loading ? '...' : label}
+          {label}
         </span>
       </div>
       {error && <div style={errorTextStyle}>{error}</div>}

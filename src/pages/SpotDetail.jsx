@@ -37,7 +37,10 @@ const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 function bustBadgeStyle(rating) {
   if (rating === 'No Bust') return { background: '#4a7a3a', color: '#ffffff', border: '1px solid #3d6830' }
   if (rating === 'Bust') return { background: '#c0453a', color: '#ffffff', border: '1px solid #a83830' }
-  if (rating === 'Medium Bust' || rating === 'Weekends Only' || rating === 'Weekdays Only') return { background: '#c8a020', color: '#ffffff', border: '1px solid #b08818' }
+  // Same style as the MULTI-SPOT chip: lighter fill, border/text in the
+  // same gold instead of white-on-gold.
+  if (rating === 'Medium Bust') return { background: '#fff3cd', color: '#b08818', border: '1px solid #b08818' }
+  if (rating === 'Weekends Only' || rating === 'Weekdays Only') return { background: '#c8a020', color: '#ffffff', border: '1px solid #b08818' }
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
 }
 
@@ -506,7 +509,10 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       visibility: editForm.visibility || 'public',
       is_multi_spot: editForm.is_multi_spot === 'Yes',
     }
-    SPOT_FIELDS.filter(f => f.showForTypes !== null).forEach(field => {
+    // is_multi_spot is excluded here — it needs the Yes/No -> boolean
+    // conversion already handled above, not the generic string/array
+    // assignment this loop does for every other type-scoped field.
+    SPOT_FIELDS.filter(f => f.showForTypes !== null && f.key !== 'is_multi_spot').forEach(field => {
       if (field.showForTypes.includes(currentType)) {
         payload[field.key] = field.type === 'multi'
           ? (editForm[field.key] || [])
@@ -617,12 +623,11 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
   const handleShare = async () => {
     const shareUrl = `${siteOrigin()}/api/spot/${spot.slug || spot.id}`
-    const text = `Check out this spot: ${spot.title}`
 
     let shared = false
     if (navigator.share) {
       try {
-        await navigator.share({ title: spot.title, text, url: shareUrl })
+        await navigator.share({ url: shareUrl })
         shared = true
       } catch (err) {
         // Cancelling the share sheet is normal — don't fall through to a toast.
@@ -706,7 +711,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 transition: transitioning ? 'transform 0.28s cubic-bezier(0.25,0.1,0.25,1)' : 'none',
                 willChange: 'transform',
               }}>
-                <img src={transformImageUrl(photo, 1000)} alt={spot.title} width="800" height="600" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} />
+                <img src={transformImageUrl(photo, 1000)} alt={spot.title} width="800" height="600" loading="eager" fetchPriority="high" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none', display: 'block' }} draggable={false} onContextMenu={e => e.preventDefault()} />
               </div>
             ))
           ) : (
@@ -732,6 +737,16 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             {spot.bust_rating && (
               <div style={{ ...bustBadgeStyle(spot.bust_rating), fontSize: 9, padding: '3px 7px', borderRadius: 6, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
                 {spot.bust_rating}
+              </div>
+            )}
+            {spot.lighting === 'Lights' && (
+              <div style={{ background: '#f5c518', borderRadius: 6, padding: '3px 7px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
+                  <path d="M4 0.5C2 0.5 0.75 2 0.75 3.75C0.75 5 1.4 5.8 2 6.3C2.3 6.55 2.5 6.9 2.5 7.2V7.5H5.5V7.2C5.5 6.9 5.7 6.55 6 6.3C6.6 5.8 7.25 5 7.25 3.75C7.25 2 6 0.5 4 0.5Z" stroke="#000" strokeWidth="0.9" fill="none" />
+                  <line x1="2.7" y1="8.3" x2="5.3" y2="8.3" stroke="#000" strokeWidth="0.9" strokeLinecap="round" />
+                  <line x1="3" y1="9.3" x2="5" y2="9.3" stroke="#000" strokeWidth="0.9" strokeLinecap="round" />
+                </svg>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#000', letterSpacing: 1, textTransform: 'uppercase' }}>Lights</span>
               </div>
             )}
           </div>
@@ -817,7 +832,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </div>
             )
           })()}
-          {spot.is_multi_spot && (
+          {spot.is_multi_spot && (spot.type === 'Street' || spot.type === 'DIY') && (
             <div style={{
               position: 'absolute',
               bottom: photos.length > 1 ? 27 : 10,
@@ -836,74 +851,89 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           {/* Title row */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', flex: 1, lineHeight: 1.3, paddingRight: 8 }}>{spot.title}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
-              {(avgRating != null && reviewCount > 0 || distance != null) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {avgRating != null && reviewCount > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#3D4454" />
-                      </svg>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#3D4454' }}>{avgRating.toFixed(1)}</span>
-                    </div>
-                  )}
-                  {avgRating != null && reviewCount > 0 && distance != null && (
-                    <span style={{ color: '#b0a090', fontSize: 10 }}>·</span>
-                  )}
-                  {distance != null && <span className="dist-text">{distance} mi</span>}
-                </div>
-              )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <button
-                  className="btn-salmon"
-                  onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
-                  style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}
-                >
-                  <TrickListIcon color="#fff" size={14} filled />
-                  Tricks
-                </button>
-                <div
-                  onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
-                  style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                >
-                  <ShareIcon color="#d4785a" />
-                </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              {distance != null && <span className="dist-text">{distance} mi</span>}
+              <button
+                className="btn-salmon"
+                onClick={() => { if (!user) { onGoProfile?.(); return } setShowTrickSheet(true) }}
+                style={{ width: 'auto', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}
+              >
+                <TrickListIcon color="#fff" size={14} filled />
+                Tricks
+              </button>
+              <div
+                onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
+                style={{ width: 34, height: 34, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <ShareIcon color="#d4785a" />
               </div>
             </div>
           </div>
 
-          {/* Feature chips — above publisher */}
-          {((spot.features || []).length > 0 || spot.lighting) && (
+          {/* Feature chips — above publisher. Lights is excluded here once
+              it has its own chip in the hero's image row above; No Lights
+              stays here unchanged. */}
+          {((spot.features || []).length > 0 || (spot.lighting && spot.lighting !== 'Lights')) && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', marginBottom: 8 }}>
-              {[...(spot.features || []), ...(spot.lighting ? [spot.lighting] : [])].map(f => <span key={f} className="tag">{f}</span>)}
+              {[...(spot.features || []), ...(spot.lighting && spot.lighting !== 'Lights' ? [spot.lighting] : [])].map(f => <span key={f} className="tag">{f}</span>)}
             </div>
           )}
 
-          {/* Publisher row — white card, hugs its contents (inline-flex)
-              rather than spanning the full page width */}
-          {(publisherAvatar || publisherUsername || spot.added_by === null) && (
-            <div style={{ display: 'inline-flex', maxWidth: '100%', alignItems: 'center', gap: 10, marginBottom: 12, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '10px 12px' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
-                {publisherAvatar ? (
-                  <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: 12, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial || '?'}</span>
-                )}
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3 }}>Added by</div>
-                <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
-                  {spot.added_by === null ? 'Anonymous' : publisherUsername ? `@${publisherUsername}` : ''}
+          {/* Publisher + rating row — each a white card hugging its own
+              contents (inline-flex/flexShrink:0), not spanning the full
+              page width. The rating card uses marginLeft:auto so it sits
+              at the right edge regardless of whether the publisher card
+              is present. */}
+          {((publisherAvatar || publisherUsername || spot.added_by === null) || (avgRating != null && reviewCount > 0)) && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+              {(publisherAvatar || publisherUsername || spot.added_by === null) && (
+                <div style={{ display: 'inline-flex', maxWidth: '100%', alignItems: 'center', gap: 10, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '10px 12px' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
+                    {publisherAvatar ? (
+                      <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: 12, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial || '?'}</span>
+                    )}
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3 }}>Added by</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+                      {spot.added_by === null ? 'Anonymous' : publisherUsername ? `@${publisherUsername}` : ''}
+                    </div>
+                  </div>
+                  {publisherFriendship && publisherFriendship.status !== 'accepted' && (
+                    <AddFriendButton
+                      targetUserId={spot.added_by}
+                      friendshipStatus={publisherFriendship.status}
+                      isRequester={publisherFriendship.isRequester}
+                      friendshipId={publisherFriendship.friendshipId}
+                      onChange={(status, row) => setPublisherFriendship(prev => ({
+                        ...prev,
+                        status,
+                        friendshipId: row?.id ?? prev.friendshipId,
+                        // A fresh request's returned row is the only place that
+                        // tells us who the requester actually is — without this,
+                        // isRequester stayed stuck at its initial "no friendship
+                        // yet" default of false, so the sender's own button
+                        // would flip to ACCEPT right after they sent a request.
+                        isRequester: row ? row.requester_id === user.id : prev.isRequester,
+                      }))}
+                    />
+                  )}
                 </div>
-              </div>
-              {publisherFriendship && publisherFriendship.status !== 'accepted' && (
-                <AddFriendButton
-                  targetUserId={spot.added_by}
-                  friendshipStatus={publisherFriendship.status}
-                  isRequester={publisherFriendship.isRequester}
-                  friendshipId={publisherFriendship.friendshipId}
-                  onChange={(status, row) => setPublisherFriendship(prev => ({ ...prev, status, friendshipId: row?.id ?? prev.friendshipId }))}
-                />
+              )}
+              {avgRating != null && reviewCount > 0 && (
+                <div style={{ marginLeft: 'auto', flexShrink: 0, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2L14.5 9.5H22.5L16.1 13.9L18.5 21.5L12 17.2L5.5 21.5L7.9 13.9L1.5 9.5H9.5Z" fill="#d4785a" />
+                    </svg>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {Number.isInteger(avgRating) ? avgRating : avgRating.toFixed(1)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3, marginTop: 4 }}>Rating</div>
+                </div>
               )}
             </div>
           )}
@@ -1398,7 +1428,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   decoding="async"
                   style={{
                     maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
-                    userSelect: 'none', pointerEvents: 'none', display: 'block',
+                    userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none', display: 'block',
                     transform: i === lightboxIndex
                       ? `scale(${lbScale}) translate(${lbPanX / lbScale}px, ${lbPanY / lbScale}px)`
                       : undefined,
@@ -1406,6 +1436,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                     willChange: 'transform',
                   }}
                   draggable={false}
+                  onContextMenu={e => e.preventDefault()}
                 />
               </div>
             ))}

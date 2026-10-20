@@ -321,6 +321,9 @@ export default function App() {
   const [openListId, setOpenListId] = useState(null)
   // trick_list_invite notification tap — see handleTrickListClick below.
   const [openTrickListId, setOpenTrickListId] = useState(null)
+  // "Add Friends" from the saved-list share sheet (no friends to share
+  // with yet, or wants to add more) — see handleGoToFriends below.
+  const [openFriends, setOpenFriends] = useState(false)
   // Shared by both the desktop and mobile spots-view toggle pills below —
   // only one of the two is ever mounted at a time (isDesktop branch).
   const spotsToggleTrackRef = useRef(null)
@@ -632,6 +635,14 @@ export default function App() {
     setOpenTrickListId(trickListId)
   }
 
+  // "Add Friends" from the saved-list share sheet — same in-app
+  // destination the Friends stat card on Profile would reach.
+  const handleGoToFriends = () => {
+    setTab('profile')
+    sessionStorage.setItem('activeTab', 'profile')
+    setOpenFriends(true)
+  }
+
   const handleTabChange = (t) => {
     const normalized = normalizeTab(t)
     if (!user && (normalized === 'saved' || normalized === 'profile')) {
@@ -781,6 +792,7 @@ export default function App() {
                 user={user}
                 openListId={openListId}
                 onOpenListIdHandled={() => setOpenListId(null)}
+                onGoToFriends={handleGoToFriends}
               />
             </div>
             {/* Kept mounted (hidden) like ListView/MapView/SavedView above —
@@ -813,6 +825,8 @@ export default function App() {
                 openTrickListId={openTrickListId}
                 onOpenTrickListIdHandled={() => setOpenTrickListId(null)}
                 onTrickListClick={handleTrickListClick}
+                openFriends={openFriends}
+                onOpenFriendsHandled={() => setOpenFriends(false)}
               />
             </div>
           </div>
@@ -903,6 +917,7 @@ export default function App() {
                   user={user}
                   openListId={openListId}
                   onOpenListIdHandled={() => setOpenListId(null)}
+                  onGoToFriends={handleGoToFriends}
                 />
               </div>
               {/* Kept mounted (hidden) like ListView/MapView/SavedView
@@ -939,6 +954,8 @@ export default function App() {
                   openTrickListId={openTrickListId}
                   onOpenTrickListIdHandled={() => setOpenTrickListId(null)}
                   onTrickListClick={handleTrickListClick}
+                  openFriends={openFriends}
+                  onOpenFriendsHandled={() => setOpenFriends(false)}
                 />
               </div>
             </>

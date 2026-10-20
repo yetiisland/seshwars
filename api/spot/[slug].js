@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { transformImageUrl } from '../../src/utils/imageUrl.js'
 
 export default async function handler(req, res) {
   const { slug } = req.query
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
   const canonicalSlug = spot?.slug || slug
   const title = spot ? `${spot.title} — Seshwars` : 'Seshwars'
   const description = spot?.description || 'Discover and share skate spots near you.'
-  const image = spot?.photos?.[0] || `${origin}/sw-webclip.png`
+  const image = spot?.photos?.[0] ? transformImageUrl(spot.photos[0], 1200) : `${origin}/sw-webclip.png`
   const canonicalUrl = `https://seshwars.com/spot/${canonicalSlug}`
   const appUrl = `/spots/${canonicalSlug}`
 

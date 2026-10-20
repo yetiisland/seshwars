@@ -40,18 +40,32 @@ const PIN_VIEWBOX_H = 24
 const PIN_DISPLAY_H = 28 // matches SpotPin's unselected `size`
 const PIN_SHARPNESS = 3 // retina-sharp raster at normal map zoom
 const PIN_PATH = 'M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z'
+// Padding (viewBox units, same scale as PIN_VIEWBOX_W/H) around the pin's
+// own path so its 1.5px stroke and drop shadow (blur 6, offset-y 2) never
+// get cut off at the canvas edge — the path itself already runs edge to
+// edge of the old, unpadded canvas. Bottom gets extra since the shadow is
+// offset downward; the layer's icon-offset below shifts the anchor back
+// up by exactly this much so the pin still points at its true coordinate.
+const PIN_PAD_X = 8
+const PIN_PAD_TOP = 8
+const PIN_PAD_BOTTOM = 10
+// "Icon pixels" (Mapbox's logical, post-pixelRatio unit) per viewBox unit —
+// PIN_SHARPNESS cancels out against the matching pixelRatio passed to
+// map.addImage, leaving just the display-to-viewBox scale.
+const PIN_LOGICAL_SCALE = PIN_DISPLAY_H / PIN_VIEWBOX_H
 
 function pinVariantId(fill, stroke) {
   return `pin_${fill.replace('#', '')}_${stroke.replace('#', '')}`
 }
 
 function makePinIconData(fill, stroke) {
-  const scale = (PIN_DISPLAY_H / PIN_VIEWBOX_H) * PIN_SHARPNESS
+  const scale = PIN_LOGICAL_SCALE * PIN_SHARPNESS
   const canvas = document.createElement('canvas')
-  canvas.width = Math.round(PIN_VIEWBOX_W * scale)
-  canvas.height = Math.round(PIN_VIEWBOX_H * scale)
+  canvas.width = Math.round((PIN_VIEWBOX_W + PIN_PAD_X * 2) * scale)
+  canvas.height = Math.round((PIN_VIEWBOX_H + PIN_PAD_TOP + PIN_PAD_BOTTOM) * scale)
   const ctx = canvas.getContext('2d')
   ctx.scale(scale, scale)
+  ctx.translate(PIN_PAD_X, PIN_PAD_TOP)
   const body = new Path2D(PIN_PATH)
   ctx.shadowColor = 'rgba(0,0,0,0.45)'
   ctx.shadowBlur = 6
@@ -120,6 +134,12 @@ const clusterCountLayer = {
     'text-field': '{point_count_abbreviated}',
     'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
     'text-size': 13,
+    // The bubble itself (clusterCircleLayer, a circle layer) can never be
+    // collision-hidden — only this text label can, since it's a symbol
+    // layer. Force it to always render so a cluster never shows an empty
+    // bubble with no count.
+    'text-allow-overlap': true,
+    'text-ignore-placement': true,
   },
   paint: { 'text-color': '#ffffff' },
 }
@@ -139,6 +159,11 @@ function spotPinsLayer(excludedIds) {
       'icon-image': ['get', 'pinVariant'],
       'icon-size': 1,
       'icon-anchor': 'bottom',
+      // Compensates for the bottom padding added in makePinIconData — the
+      // icon's padded bounding box now extends PIN_PAD_BOTTOM past the
+      // pin's true tip, so shift it back up by that same amount (in icon
+      // pixels) to keep it anchored at the real coordinate.
+      'icon-offset': [0, -(PIN_PAD_BOTTOM * PIN_LOGICAL_SCALE)],
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
     },
