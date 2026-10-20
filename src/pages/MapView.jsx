@@ -18,7 +18,7 @@ const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
 const CLOSED_REPORTS = new Set(['No Longer Skateable', 'Spot Destroyed', "Spot Doesn't Exist", 'No Longer Exists', 'Skate Stopped'])
 
-function getSpotPinColors(spot) {
+export function getSpotPinColors(spot) {
   const report = spot.most_recent_report
   const active = report && report !== 'Skateable Again' ? report : null
   if (CLOSED_REPORTS.has(active)) return { fill: '#C8CAD4', stroke: '#6a6c7a' }
@@ -83,7 +83,7 @@ function makePinIconData(fill, stroke) {
   return ctx.getImageData(0, 0, canvas.width, canvas.height)
 }
 
-function SpotPin({ fill, stroke, selected = false }) {
+export function SpotPin({ fill, stroke, selected = false }) {
   const size = selected ? 36 : 28
   const strokeW = selected ? 2.5 : 1.5
   const shadow = selected

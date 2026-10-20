@@ -24,9 +24,14 @@ import InitialsAvatar from '../components/InitialsAvatar'
 import { SPOT_FIELDS } from '../lib/spotFields'
 import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
 import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
+import { SpotPin, getSpotPinColors } from './MapView'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024
+// The old interactive Location map opened at zoom 15 — the static preview
+// image below renders one zoom level in so the (now non-interactive) image
+// shows a bit more detail, capped at the Static Images API's own max of 19.
+const LOCATION_MAP_ZOOM = Math.min(15 + 1, 19)
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
@@ -156,6 +161,37 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const isAdmin = isAdminUser(user)
   const isOwner = !!user && user.id === spot.added_by
   const hasCoords = spot.latitude && spot.longitude
+
+  // ── Location static image ─────────────────────────────────────
+  // Measures the Location container's own rendered size (so the Static
+  // Images API request — and its URL, and the browser cache entry for it —
+  // exactly matches what's on screen) instead of hardcoding a width.
+  const locationMapRef = useRef(null)
+  const [locationImgSize, setLocationImgSize] = useState(null) // { width, height } | null
+  const [locationImgLoaded, setLocationImgLoaded] = useState(false)
+  const [locationImgError, setLocationImgError] = useState(false)
+
+  useEffect(() => {
+    if (!hasCoords) return
+    const el = locationMapRef.current
+    if (!el) return
+    const measure = () => {
+      const rect = el.getBoundingClientRect()
+      const width = Math.min(1280, Math.round(rect.width))
+      const height = Math.min(1280, Math.round(rect.height))
+      if (width <= 0 || height <= 0) return
+      setLocationImgSize(prev => (prev && prev.width === width && prev.height === height) ? prev : { width, height })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [hasCoords])
+
+  const locationStaticImgUrl = useMemo(() => {
+    if (!hasCoords || !locationImgSize) return null
+    return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${spot.longitude},${spot.latitude},${LOCATION_MAP_ZOOM},0/${locationImgSize.width}x${locationImgSize.height}@2x?access_token=${MAPBOX_TOKEN}`
+  }, [hasCoords, spot.longitude, spot.latitude, locationImgSize])
 
   // ── Data fetching ─────────────────────────────────────────────
   useEffect(() => {
@@ -985,42 +1021,35 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
           {/* Location */}
           <div className="section-label">Location</div>
-          <div style={{ width: '100%', height: 180, borderRadius: 6, overflow: 'hidden', marginBottom: 6, background: '#ECEDF2', position: 'relative' }}>
+          <div ref={locationMapRef} style={{ width: '100%', height: 180, borderRadius: 6, overflow: 'hidden', marginBottom: 6, background: '#ECEDF2', position: 'relative' }}>
             {hasCoords ? (
-              <>
-                <Map
-                  initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: 15 }}
-                  onLoad={e => {
-                    // Mapbox GL JS v3+ defaults to 'globe' and auto-switches
-                    // by zoom level — force mercator permanently, and
-                    // re-apply on any future style reload.
-                    e.target.setProjection('mercator')
-                    e.target.on('style.load', () => e.target.setProjection('mercator'))
-                  }}
-                  projection="mercator"
-                  mapStyle="mapbox://styles/mapbox/streets-v12"
-                  mapboxAccessToken={MAPBOX_TOKEN}
-                  style={{ width: '100%', height: '100%' }}
-                  attributionControl={false}
-                  scrollZoom={true}
-                  touchZoomRotate={true}
-                >
-                  <Marker longitude={spot.longitude} latitude={spot.latitude} anchor="bottom">
-                    <svg width="20" height="24" viewBox="0 0 20 24" fill="none" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.35))' }}>
-                      <path d="M10 0C4.5 0 0 4.5 0 10C0 13.5 2 16.5 10 24C18 16.5 20 13.5 20 10C20 4.5 15.5 0 10 0Z" fill="#d4785a" />
-                      <circle cx="10" cy="10" r="4" fill="#fff" />
-                    </svg>
-                  </Marker>
-                </Map>
+              <div onClick={() => setShowMapFullscreen(true)} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}>
+                {locationStaticImgUrl && !locationImgError && (
+                  <img
+                    src={locationStaticImgUrl}
+                    alt=""
+                    draggable={false}
+                    onContextMenu={e => e.preventDefault()}
+                    onLoad={() => setLocationImgLoaded(true)}
+                    onError={() => setLocationImgError(true)}
+                    style={{
+                      position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block',
+                      objectFit: 'cover', opacity: locationImgLoaded ? 1 : 0, transition: 'opacity 0.15s',
+                      userSelect: 'none', WebkitTouchCallout: 'none', pointerEvents: 'none',
+                    }}
+                  />
+                )}
+                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -100%)', pointerEvents: 'none' }}>
+                  <SpotPin {...getSpotPinColors(spot)} selected />
+                </div>
                 <div
-                  onClick={() => setShowMapFullscreen(true)}
-                  style={{ position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 6, background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}
+                  style={{ position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 6, background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M1 5V1H5M9 1H13V5M13 9V13H9M5 13H1V9" stroke="#2a1e14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-              </>
+              </div>
             ) : (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>No coordinates</span>
@@ -1087,7 +1116,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       {showMapFullscreen && hasCoords && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 2000050, background: '#000' }}>
           <Map
-            initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: 15 }}
+            initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: LOCATION_MAP_ZOOM }}
             onLoad={e => {
               // Mapbox GL JS v3+ defaults to 'globe' and auto-switches by
               // zoom level — force mercator permanently, and re-apply on
