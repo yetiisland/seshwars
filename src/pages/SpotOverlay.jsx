@@ -42,7 +42,21 @@ export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, 
       // stateSpot we already painted — only a genuine "not found" (no
       // stateSpot to fall back on either) should ever set spot to null.
       if (!cancelled) {
-        if (data || !stateSpot) setSpot(data)
+        if (data) {
+          // This raw `spots` row has no avg_rating/rating_count/report_count/
+          // most_recent_report/most_recent_report_custom — those are computed
+          // client-side (useSpots.js) by joining spot_reviews/spot_reports,
+          // not stored columns. Merge onto whatever spot we already had so
+          // this background refresh (which only needs to catch title/feature
+          // edits) can't make those fields disappear mid-view.
+          setSpot(prev => ({
+            avg_rating: null, rating_count: 0, report_count: 0, most_recent_report: null, most_recent_report_custom: null,
+            ...prev,
+            ...data,
+          }))
+        } else if (!stateSpot) {
+          setSpot(data)
+        }
         setLoading(false)
       }
     }

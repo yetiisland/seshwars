@@ -3,12 +3,11 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import AddFriendButton from './AddFriendButton'
 import { CloseIcon, IconBox } from './Icons'
+import InitialsAvatar from './InitialsAvatar'
 
-// Row container + avatar — copied verbatim from the notification card
-// markup in ProfileView.jsx (~line 1009-1035).
+// Row container — copied verbatim from the notification card markup in
+// ProfileView.jsx (~line 1009-1035).
 const rowStyle = { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 8, borderRadius: 10, background: '#FFFFFF', border: '1px solid #EAD8C8' }
-const avatarWrapStyle = { flexShrink: 0, width: 38, height: 38, borderRadius: '50%', background: '#ECEDF2', border: '1px solid #C8CAD4', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-const avatarInitialStyle = { fontSize: 15, fontWeight: 900, color: '#6a6c7a' }
 const usernameStyle = { fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 const errorTextStyle = { fontSize: 11, color: '#e07070', fontWeight: 700 }
 
@@ -30,13 +29,14 @@ const denyBtnTextStyle = { fontSize: 10, fontWeight: 700, color: 'var(--salmon)'
 
 function Avatar({ avatarUrl, username }) {
   return (
-    <div style={avatarWrapStyle}>
-      {avatarUrl ? (
-        <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        <span style={avatarInitialStyle}>{username ? username[0].toUpperCase() : '?'}</span>
-      )}
-    </div>
+    <InitialsAvatar
+      avatarUrl={avatarUrl}
+      initials={username ? username[0].toUpperCase() : '?'}
+      size={38}
+      bg="#ECEDF2"
+      textColor="#6a6c7a"
+      ring="0 0 0 1px #C8CAD4"
+    />
   )
 }
 

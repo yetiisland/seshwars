@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { NAV_TABS } from '../lib/navTabs'
+import InitialsAvatar from './InitialsAvatar'
 
 function formatCount(n) {
   if (n > 99) return '99+'
@@ -7,8 +7,6 @@ function formatCount(n) {
 }
 
 export default function TabBar({ active, onChange, user, profileAvatar, profileInitials, notificationCount = 0, zIndex }) {
-  const [avatarError, setAvatarError] = useState(false)
-
   return (
     <div className="tab-bar" style={zIndex != null ? { zIndex } : undefined}>
       {NAV_TABS.map(({ id, label, Icon }) => (
@@ -21,20 +19,13 @@ export default function TabBar({ active, onChange, user, profileAvatar, profileI
           {id === 'profile' ? (
             <div style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <div style={{ position: 'relative' }}>
-                <div style={{
-                  width: 33, height: 33, borderRadius: '50%',
-                  background: (profileAvatar && !avatarError) ? 'transparent' : '#d4785a',
-                  border: active === 'profile' ? '2.5px solid #fff' : '2.5px solid rgba(255,255,255,0.3)',
-                  overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {profileAvatar && !avatarError ? (
-                    <img src={profileAvatar} alt="Profile" onError={() => setAvatarError(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>
-                      {profileInitials || 'U'}
-                    </span>
-                  )}
-                </div>
+                <InitialsAvatar
+                  avatarUrl={profileAvatar}
+                  initials={profileInitials || 'U'}
+                  size={33}
+                  bg="#d4785a"
+                  ring={active === 'profile' ? '0 0 0 2.5px #fff' : '0 0 0 2.5px rgba(255,255,255,0.3)'}
+                />
                 {notificationCount > 0 && (
                   <div style={{
                     position: 'absolute', top: -4, right: -4,

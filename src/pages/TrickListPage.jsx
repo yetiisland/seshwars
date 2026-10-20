@@ -16,14 +16,6 @@ import { ArrowIcon, TrickListIcon, SettingsIcon, ShareIcon, LeaveIcon, FriendsIc
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
-// Same avatar-with-initials-fallback pattern as SendToFriendsSheet.jsx's
-// own FriendAvatar / FriendsView.jsx's Avatar.
-function FriendAvatar({ profile, size = 38 }) {
-  if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt="" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #EAD8C8' }} />
-  }
-  return <InitialsAvatar profile={profile} size={size} />
-}
 
 // Copied verbatim from SaveToListModal.jsx / SendToFriendsSheet.jsx's own SquareToggle.
 function SquareToggle({ selected }) {
@@ -134,7 +126,7 @@ function ShareTrickListFriends({ listId, onBack, onShared }) {
               const already = currentMemberIds.has(f.id)
               return (
                 <div key={f.id} className="modal-row" onClick={() => !already && toggleFriend(f.id)} style={already ? { opacity: 0.5, cursor: 'default' } : undefined}>
-                  <FriendAvatar profile={f} />
+                  <InitialsAvatar profile={f} size={38} ring="0 0 0 1px #EAD8C8" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {f.first_name || f.username}

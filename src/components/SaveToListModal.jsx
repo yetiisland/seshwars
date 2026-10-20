@@ -42,7 +42,7 @@ function SquareToggle({ selected }) {
   )
 }
 
-export default function SaveToListModal({ spot, user, onClose }) {
+export default function SaveToListModal({ spot, user, onClose, zIndex }) {
   const [lists, setLists] = useState([])
   const [listItems, setListItems] = useState(new Set()) // set of list_ids this spot is in
   const [isFav, setIsFav] = useState(false)
@@ -164,7 +164,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
 
   if (!user) {
     return (
-      <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-overlay" onClick={onClose} style={zIndex != null ? { zIndex } : undefined}>
         <div className="modal-sheet" onClick={e => e.stopPropagation()}>
           <div className="modal-handle" />
           <div className="modal-title" style={{ padding: '0 16px' }}>Save to List</div>
@@ -182,7 +182,7 @@ export default function SaveToListModal({ spot, user, onClose }) {
   const anySelected = isFav || listItems.size > 0
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={zIndex != null ? { zIndex } : undefined}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()}>
         <div className="modal-handle" />
         <div className="modal-title" style={{ padding: '0 16px' }}>Save to</div>

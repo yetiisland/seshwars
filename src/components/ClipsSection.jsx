@@ -62,14 +62,6 @@ function getThumbnail(clip) {
   return null
 }
 
-function SmallAvatar({ profile }) {
-  const [imgError, setImgError] = useState(false)
-  if (profile?.avatar_url && !imgError) {
-    return <img src={profile.avatar_url} alt="" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #EAD8C8' }} onError={() => setImgError(true)} />
-  }
-  return <InitialsAvatar profile={profile} size={20} />
-}
-
 export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = false }) {
   const [clips, setClips] = useState([])
   const [showModal, setShowModal] = useState(false)
@@ -320,7 +312,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 2px 2px' }}>
-                    <SmallAvatar profile={clip.profile} />
+                    <InitialsAvatar profile={clip.profile} size={20} ring="0 0 0 1px #EAD8C8" />
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#2a1e14', fontFamily: 'Barlow, sans-serif', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{uname}</span>
                     <span style={{ fontSize: 9, color: '#b0a090', fontWeight: 600, fontFamily: 'Barlow, sans-serif', flexShrink: 0 }}>{relativeTime(clip.created_at)}</span>
                   </div>

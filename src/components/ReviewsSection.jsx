@@ -20,14 +20,6 @@ async function fetchProfiles(userIds) {
   return Object.fromEntries((data || []).map(p => [p.id, p]))
 }
 
-function Avatar({ profile, size = 32 }) {
-  const [imgError, setImgError] = useState(false)
-  if (profile?.avatar_url && !imgError) {
-    return <img src={profile.avatar_url} alt="" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #EAD8C8' }} onError={() => setImgError(true)} />
-  }
-  return <InitialsAvatar profile={profile} size={size} />
-}
-
 function StarRow({ value, onChange, size = 28 }) {
   return (
     <div style={{ display: 'flex', gap: 8 }}>
@@ -204,7 +196,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
             const isOwn = user?.id === review.user_id
             return (
               <div key={review.id} style={{ flexShrink: 0, background: '#fff', border: '1px solid #EAD8C8', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 160, maxWidth: 220 }}>
-                <Avatar profile={review.profile} size={36} />
+                <InitialsAvatar profile={review.profile} size={36} ring="0 0 0 1px #EAD8C8" />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <StarMini rating={review.rating} />
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#2a1e14', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'Barlow, sans-serif' }}>@{name}</div>

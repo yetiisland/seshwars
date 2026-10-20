@@ -16,18 +16,6 @@ import MembersSummary from '../components/MembersSummary'
 // dropdown already reuses).
 const memberDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden', maxHeight: 240, overflowY: 'auto' }
 
-function MemberAvatar({ profile, size = 32, border }) {
-  const style = { width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, ...(border ? { border } : {}) }
-  if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt="" style={{ ...style, objectFit: 'cover' }} />
-  }
-  return (
-    <div style={style}>
-      <InitialsAvatar profile={profile} size={size} />
-    </div>
-  )
-}
-
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
 // Module-level state: survives App remount so back-nav restores the open collection
@@ -203,7 +191,7 @@ function ShareSavedListFriends({ listId, userId, onBack, onShared, onGoToFriends
               const already = currentMemberIds.has(f.id)
               return (
                 <div key={f.id} className="modal-row" onClick={() => !already && toggleFriend(f.id)} style={already ? { opacity: 0.5, cursor: 'default' } : undefined}>
-                  <MemberAvatar profile={f} />
+                  <InitialsAvatar profile={f} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {f.first_name || f.username}
@@ -780,7 +768,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                           const already = members.some(m => m.id === p.id)
                           return (
                             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid #ECEDF2' }}>
-                              <MemberAvatar profile={p} size={28} />
+                              <InitialsAvatar profile={p} size={28} />
                               <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.username}</span>
                               {!already && p.id !== userId && (
                                 <IconBox size={28} onMouseDown={() => handleAddMember(p)}>

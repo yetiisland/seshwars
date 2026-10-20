@@ -20,6 +20,7 @@ import TermsOfService from './TermsOfService'
 import { isAdminUser } from '../lib/admin'
 import { haversineDistance } from '../hooks/useGeolocation'
 import AddFriendButton from '../components/AddFriendButton'
+import InitialsAvatar from '../components/InitialsAvatar'
 import { SPOT_FIELDS } from '../lib/spotFields'
 import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
 import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
@@ -881,13 +882,14 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
               {(publisherAvatar || publisherUsername || spot.added_by === null) && (
                 <div style={{ display: 'inline-flex', maxWidth: '100%', alignItems: 'center', gap: 10, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '10px 12px' }}>
-                  <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #EAD8C8', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEDF2', flexShrink: 0 }}>
-                    {publisherAvatar ? (
-                      <img src={publisherAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: 12, fontWeight: 900, color: '#6a6c7a' }}>{publisherInitial || '?'}</span>
-                    )}
-                  </div>
+                  <InitialsAvatar
+                    avatarUrl={publisherAvatar}
+                    initials={publisherInitial || '?'}
+                    size={32}
+                    bg="#ECEDF2"
+                    textColor="#6a6c7a"
+                    ring="0 0 0 1px #EAD8C8"
+                  />
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3 }}>Added by</div>
                     <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
@@ -1083,7 +1085,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
       {/* ── Fullscreen map ───────────────────────────────── */}
       {showMapFullscreen && hasCoords && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: '#000' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000050, background: '#000' }}>
           <Map
             initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: 15 }}
             onLoad={e => {
@@ -1138,7 +1140,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
       {/* ── Maps modal ────────────────────────────────────── */}
       {showMapsModal && createPortal(
-        <div className="modal-overlay" onClick={() => setShowMapsModal(false)}>
+        <div className="modal-overlay" onClick={() => setShowMapsModal(false)} style={{ zIndex: 2000050 }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-title" style={{ padding: '0 16px' }}>Open with</div>
@@ -1171,7 +1173,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
       {/* ── Edit password modal ───────────────────────────── */}
       {showEditAuth && createPortal(
-        <div className="modal-overlay" onClick={() => { setShowEditAuth(false); setEditPassword(''); setAuthError('') }}>
+        <div className="modal-overlay" onClick={() => { setShowEditAuth(false); setEditPassword(''); setAuthError('') }} style={{ zIndex: 2000050 }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-title" style={{ padding: '0 16px' }}>Edit Spot</div>
@@ -1190,7 +1192,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
       {/* ── Edit form overlay ─────────────────────────────── */}
       {showEditForm && editForm && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 2000050, display: 'flex', flexDirection: 'column' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
             <div style={{ width: 28 }} />
@@ -1387,7 +1389,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       {/* ── Lightbox with pinch zoom ──────────────────────── */}
       {lightboxOpen && photos.length > 0 && createPortal(
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.96)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none' }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.96)', zIndex: 2000050, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none' }}
           onTouchStart={onLbTouchStart}
           onTouchMove={onLbTouchMove}
           onTouchEnd={onLbTouchEnd}
@@ -1452,7 +1454,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       )}
       {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
       {showUnhideModal && createPortal(
-        <div className="modal-overlay" onClick={() => setShowUnhideModal(false)}>
+        <div className="modal-overlay" onClick={() => setShowUnhideModal(false)} style={{ zIndex: 2000050 }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -1483,7 +1485,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         document.body
       )}
       {(showHideModal || hideModalClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeHideModal}>
+        <div className="modal-overlay" onClick={closeHideModal} style={{ zIndex: 2000050 }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -1506,7 +1508,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         document.body
       )}
       {shareCopied && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000050, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           Link Copied!
         </div>,
         document.body
@@ -1515,7 +1517,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           swapped in place for the friend-picker content — never a second
           sheet animated on top of this one. */}
       {showShareSheet && createPortal(
-        <div className="modal-overlay" onClick={closeShareSheet}>
+        <div className="modal-overlay" onClick={closeShareSheet} style={{ zIndex: 2000050 }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div className="modal-handle" />
             {shareSheetMode === 'choice' ? (
@@ -1550,7 +1552,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         document.body
       )}
       {sendToast && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, maxWidth: 'calc(100vw - 48px)', textAlign: 'center', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000050, maxWidth: 'calc(100vw - 48px)', textAlign: 'center', pointerEvents: 'none' }}>
           {sendToast}
         </div>,
         document.body

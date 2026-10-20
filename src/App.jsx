@@ -22,6 +22,7 @@ import ProfileView from './pages/ProfileView'
 import AddSpot from './pages/AddSpot'
 import SearchPage from './pages/SearchPage'
 import SpotOverlay from './pages/SpotOverlay'
+import InitialsAvatar from './components/InitialsAvatar'
 
 // Module-level auth cache — survives App unmount/remount so there's no loading flash
 // when navigating back from a spot page.
@@ -683,7 +684,10 @@ export default function App() {
   const searchOverlay = showSearch ? <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} /> : null
 
   const hideConfirmModal = (showHideConfirm || hideConfirmClosing) ? createPortal(
-    <div className="modal-overlay" onClick={closeHideConfirm}>
+    // Reachable from an open spot's own hide button — same reasoning as
+    // SaveToListModal's zIndex prop below, just inline here since this
+    // modal isn't its own component.
+    <div className="modal-overlay" onClick={closeHideConfirm} style={spotMatch ? { zIndex: 2000100 } : undefined}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideConfirmClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
         <div className="modal-handle" />
         <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -853,9 +857,13 @@ export default function App() {
               >
                 {id === 'profile' ? (
                   <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <div style={{ width: 33, height: 33, borderRadius: '50%', background: profileAvatar ? 'transparent' : '#d4785a', border: tab === 'profile' ? '2.5px solid #fff' : '2.5px solid rgba(255,255,255,0.3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {profileAvatar ? <img src={profileAvatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{profileInitials}</span>}
-                    </div>
+                    <InitialsAvatar
+                      avatarUrl={profileAvatar}
+                      initials={profileInitials}
+                      size={33}
+                      bg="#d4785a"
+                      ring={tab === 'profile' ? '0 0 0 2.5px #fff' : '0 0 0 2.5px rgba(255,255,255,0.3)'}
+                    />
                     {unreadCount > 0 && (
                       <div style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: '#d4785a', border: '2px solid #FDF8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
                         <span style={{ fontSize: 8, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{unreadCount > 99 ? '99+' : String(unreadCount)}</span>
@@ -1004,10 +1012,10 @@ export default function App() {
             </div>
           )}
 
-          {/* Above the spot overlay (zIndex 2000) while a spot is open, so
+          {/* Above the spot overlay (zIndex 2000000) while a spot is open, so
               the nav stays visible/tappable on top of it — same as the old
               standalone SpotPage.jsx, which rendered its own TabBar. */}
-          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} zIndex={spotMatch ? 2100 : undefined} />}
+          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} zIndex={spotMatch ? 2000100 : undefined} />}
 
           {toast && (
             <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, right: 16, zIndex: 2001, background: '#2a1e14', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, textAlign: 'center', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', letterSpacing: 0.3 }}>
@@ -1030,9 +1038,18 @@ export default function App() {
           both fall through to this same route, so App, its kept-alive
           ListView/MapView, and all already-loaded data stay mounted the
           entire time). A full-screen takeover, same as the old standalone
-          SpotPage route looked, just layered instead of swapped. */}
+          SpotPage route looked, just layered instead of swapped.
+          zIndex 2000000 — must render above every other full-screen page
+          in the app (Spots Added/Hidden Spots/Trick List/Friends/Settings
+          and its sub-pages/Notifications all top out at 999999, the
+          highest being Settings > Delete Account's own confirm modal at
+          1000000), so opening a spot from any of them covers it instead
+          of opening invisibly underneath. TabBar's own raised zIndex
+          below, and SaveToListModal/hideConfirmModal/AuthScreen (reachable
+          from within an open spot and meant to interrupt it) are kept
+          above this same value — see each site's own comment. */}
       {spotMatch && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#FDF8F0' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000000, background: '#FDF8F0' }}>
           <SpotOverlay
             slug={spotSlug}
             user={user}
@@ -1073,16 +1090,24 @@ export default function App() {
         document.body
       )}
 
+      {/* SaveToListModal/hideConfirmModal are reachable from an open spot
+          (its own save/hide buttons) as well as from list cards elsewhere,
+          so their zIndex only needs raising above the spot overlay
+          (2000000) while one is actually open — everywhere else the
+          existing .modal-overlay 99999 is unaffected. */}
       {saveModalSpot && (
         <SaveToListModal
           spot={saveModalSpot}
           user={user}
           onClose={() => setSaveModalSpot(null)}
+          zIndex={spotMatch ? 2000100 : undefined}
         />
       )}
 
       {hideConfirmModal}
 
+      {/* Always above everything — the sign-in takeover should never be
+          reachable-but-hidden behind any other page or the spot overlay. */}
       {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
     </>
   )

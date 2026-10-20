@@ -28,15 +28,6 @@ function SquareToggle({ selected }) {
   )
 }
 
-// Same avatar-with-initials-fallback pattern already used by FriendsView.jsx
-// and CommentsSection.jsx's own local Avatar wrappers.
-function FriendAvatar({ profile, size = 38 }) {
-  if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt="" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #EAD8C8' }} />
-  }
-  return <InitialsAvatar profile={profile} size={size} />
-}
-
 // Content-only (no portal/overlay/handle of its own) so the spot-page share
 // sheet can swap this in as a second "screen" inside the SAME modal-sheet
 // element it already opened for the Share/Share Link choice, instead of
@@ -139,7 +130,7 @@ export function SendToFriendsContent({ spot, onSent, onGoProfile, onBack, onClos
                 const isSelected = selected.has(f.id)
                 return (
                   <div key={f.id} className="modal-row" onClick={() => toggleFriend(f.id)}>
-                    <FriendAvatar profile={f} />
+                    <InitialsAvatar profile={f} size={38} ring="0 0 0 1px #EAD8C8" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {f.first_name || f.username}

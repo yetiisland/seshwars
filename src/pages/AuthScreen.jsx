@@ -165,7 +165,10 @@ export default function AuthScreen({ onClose }) {
 
   return (
     <div className="desktop-page-root" style={{
-      position: 'fixed', inset: 0, zIndex: 100000,
+      // Above every other full-screen page/overlay in the app, including
+      // the spot overlay (zIndex 2000000, App.jsx) — sign-in is reachable
+      // from within an open spot and must always take over the screen.
+      position: 'fixed', inset: 0, zIndex: 2000200,
       background: '#FDF8F0',
       overflowY: 'auto',
       display: 'flex',

@@ -30,21 +30,6 @@ function relativeTime(ts) {
   return new Date(ts).toLocaleDateString()
 }
 
-function Avatar({ profile, size = 32 }) {
-  const [imgError, setImgError] = useState(false)
-  if (profile?.avatar_url && !imgError) {
-    return (
-      <img
-        src={profile.avatar_url}
-        alt=""
-        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #EAD8C8' }}
-        onError={() => setImgError(true)}
-      />
-    )
-  }
-  return <InitialsAvatar profile={profile} size={size} />
-}
-
 // Small salmon text-link — copied verbatim from the "Sign in to leave a
 // comment" link style further down this same file.
 const inlineLinkStyle = { fontSize: 11, color: '#d4785a', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }
@@ -433,7 +418,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                     onMouseDown={() => handleSelectMention(p)}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #ECEDF2' }}
                   >
-                    <Avatar profile={p} size={22} />
+                    <InitialsAvatar profile={p} size={22} ring="0 0 0 1px #EAD8C8" />
                     <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>@{p.username}</span>
                   </div>
                 ))}
@@ -483,7 +468,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                 style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: 10 }}
               >
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <Avatar profile={profile} size={28} />
+                  <InitialsAvatar profile={profile} size={28} ring="0 0 0 1px #EAD8C8" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -530,7 +515,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                             ref={el => { commentRefs.current[reply.id] = el }}
                             style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}
                           >
-                            <Avatar profile={replyProfile} size={24} />
+                            <InitialsAvatar profile={replyProfile} size={24} ring="0 0 0 1px #EAD8C8" />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -581,7 +566,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
       )}
 
       {(showDeleteModal || deleteModalClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeDeleteModal}>
+        <div className="modal-overlay" onClick={closeDeleteModal} style={{ zIndex: 2000050 }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Comment</div>
@@ -601,11 +586,11 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
           pieces FriendsView's search results already use, in a bottom
           sheet, rather than inventing a new full profile page. */}
       {viewingProfile && createPortal(
-        <div className="modal-overlay" onClick={() => setViewingProfile(null)}>
+        <div className="modal-overlay" onClick={() => setViewingProfile(null)} style={{ zIndex: 2000050 }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 20px 24px' }}>
-              <Avatar profile={viewingProfile} size={48} />
+              <InitialsAvatar profile={viewingProfile} size={48} ring="0 0 0 1px #EAD8C8" />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   @{viewingProfile.username}

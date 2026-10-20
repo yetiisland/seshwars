@@ -17,6 +17,7 @@ import ImageCropModal from '../components/ImageCropModal'
 import FriendsView from '../components/FriendsView'
 import TrickListPage from './TrickListPage'
 import AddFriendButton from '../components/AddFriendButton'
+import InitialsAvatar from '../components/InitialsAvatar'
 import { TrickListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
 import { transformImageUrl } from '../utils/imageUrl'
 import { openLocationSettings } from '../lib/locationSettings'
@@ -759,17 +760,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               which tab is active. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <div
-                onClick={() => avatarRef.current?.click()}
-                style={{ width: 56, height: 56, borderRadius: '50%', background: '#ECEDF2', border: '2px solid #C8CAD4', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer' }}
-              >
-                {storeProfile.avatar_url ? (
-                  <img src={storeProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: 22, fontWeight: 900, color: '#6a6c7a' }}>
-                    {storeProfile.initials}
-                  </span>
-                )}
+              <div onClick={() => avatarRef.current?.click()} style={{ cursor: 'pointer' }}>
+                <InitialsAvatar
+                  avatarUrl={storeProfile.avatar_url}
+                  initials={storeProfile.initials}
+                  size={56}
+                  bg="#ECEDF2"
+                  textColor="#6a6c7a"
+                  ring="0 0 0 2px #C8CAD4"
+                />
               </div>
               {editDraft && (
                 <div
@@ -1355,15 +1354,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               {/* Avatar */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
                 <div style={{ position: 'relative', width: 72, height: 72 }}>
-                  <div
-                    onClick={() => avatarRef.current?.click()}
-                    style={{ width: 72, height: 72, borderRadius: '50%', background: '#ECEDF2', border: '2px solid #C8CAD4', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer' }}
-                  >
-                    {storeProfile.avatar_url ? (
-                      <img src={storeProfile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: 28, fontWeight: 900, color: '#6a6c7a' }}>{storeProfile.initials}</span>
-                    )}
+                  <div onClick={() => avatarRef.current?.click()} style={{ cursor: 'pointer' }}>
+                    <InitialsAvatar
+                      avatarUrl={storeProfile.avatar_url}
+                      initials={storeProfile.initials}
+                      size={72}
+                      bg="#ECEDF2"
+                      textColor="#6a6c7a"
+                      ring="0 0 0 2px #C8CAD4"
+                    />
                   </div>
                   <div
                     onClick={() => avatarRef.current?.click()}
@@ -1549,22 +1548,23 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
                             <img src={transformImageUrl(n.spotPhoto, 80)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', WebkitTouchCallout: 'none' }} draggable={false} onContextMenu={e => e.preventDefault()} />
                           )}
                         </div>
-                      ) : (
+                      ) : n.type === 'admin_update' ? (
                         <div style={{ flexShrink: 0, width: 38, height: 38, borderRadius: '50%', background: '#ECEDF2', border: '1px solid #C8CAD4', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {n.type === 'admin_update' ? (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                              <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
-                              <path d="M2 17l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
-                              <path d="M2 12l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
-                            </svg>
-                          ) : n.actorAvatar ? (
-                            <img src={n.actorAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <span style={{ fontSize: 15, fontWeight: 900, color: '#6a6c7a' }}>
-                              {n.actorUsername ? n.actorUsername[0].toUpperCase() : '?'}
-                            </span>
-                          )}
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
+                            <path d="M2 17l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
+                            <path d="M2 12l10 5 10-5" stroke="#d4785a" strokeWidth="1.6" strokeLinejoin="round" />
+                          </svg>
                         </div>
+                      ) : (
+                        <InitialsAvatar
+                          avatarUrl={n.actorAvatar}
+                          initials={n.actorUsername ? n.actorUsername[0].toUpperCase() : '?'}
+                          size={38}
+                          bg="#ECEDF2"
+                          textColor="#6a6c7a"
+                          ring="0 0 0 1px #C8CAD4"
+                        />
                       )}
 
                       {/* Text column */}
@@ -1650,13 +1650,14 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 20px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#ECEDF2', border: '2px solid #C8CAD4', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                {viewProfileFor.avatar_url ? (
-                  <img src={viewProfileFor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: 22, fontWeight: 900, color: '#6a6c7a' }}>{viewProfileFor.username ? viewProfileFor.username[0].toUpperCase() : '?'}</span>
-                )}
-              </div>
+              <InitialsAvatar
+                avatarUrl={viewProfileFor.avatar_url}
+                initials={viewProfileFor.username ? viewProfileFor.username[0].toUpperCase() : '?'}
+                size={56}
+                bg="#ECEDF2"
+                textColor="#6a6c7a"
+                ring="0 0 0 2px #C8CAD4"
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{viewProfileFor.username || 'skater'}</div>
                 <div style={{ marginTop: 8 }}>

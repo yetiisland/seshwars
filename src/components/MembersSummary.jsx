@@ -3,21 +3,6 @@ import { createPortal } from 'react-dom'
 import InitialsAvatar from './InitialsAvatar'
 import { CloseIcon, IconBox } from './Icons'
 
-// Matches SavedView.jsx's own MemberAvatar exactly — duplicated locally,
-// same pattern already repeated across this codebase's shared sub-pieces
-// (SquareToggle, HeaderBackButton, etc.).
-function MemberAvatar({ profile, size = 32, border }) {
-  const style = { width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, ...(border ? { border } : {}) }
-  if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt="" style={{ ...style, objectFit: 'cover' }} />
-  }
-  return (
-    <div style={style}>
-      <InitialsAvatar profile={profile} size={size} />
-    </div>
-  )
-}
-
 // "Added:" row (overlapping member avatars) + the members bottom sheet it
 // opens — shared by saved list pages (SavedView.jsx) and individual trick
 // list pages (TrickListPage.jsx). Renders nothing when there are no
@@ -60,7 +45,7 @@ export default function MembersSummary({ members, isOwner, onRemove }) {
         <div style={{ display: 'flex' }}>
           {members.map((m, i) => (
             <div key={m.id} style={{ marginLeft: i === 0 ? 0 : -12, zIndex: members.length - i }}>
-              <MemberAvatar profile={m} size={32} border="2px solid #FDF8F0" />
+              <InitialsAvatar profile={m} size={32} ring="0 0 0 2px #FDF8F0" />
             </div>
           ))}
         </div>
@@ -74,7 +59,7 @@ export default function MembersSummary({ members, isOwner, onRemove }) {
             {removeError && <div style={{ padding: '0 20px 12px', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{removeError}</div>}
             {members.map(m => (
               <div key={m.id} className="modal-row">
-                <MemberAvatar profile={m} size={38} />
+                <InitialsAvatar profile={m} size={38} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {[m.first_name, m.last_name].filter(Boolean).join(' ') || m.username}
