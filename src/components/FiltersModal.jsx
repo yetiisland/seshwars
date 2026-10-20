@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { SPOT_FIELDS, bustChipActiveStyle, featureOptionsForTypes } from '../lib/spotFields'
+import { SPOT_FIELDS, bustChipActiveStyle, lightsChipActiveStyle, featureOptionsForTypes } from '../lib/spotFields'
 
 function LocationChip({ location, onClear }) {
   return (
@@ -199,7 +199,11 @@ export default function FiltersModal({ active, onChange, compact = false, distan
                           <div
                             key={f}
                             className={`chip ${active ? 'active' : ''}`}
-                            style={field.key === 'bust_rating' && active ? bustChipActiveStyle(f) : undefined}
+                            style={field.key === 'bust_rating' && active
+                              ? bustChipActiveStyle(f)
+                              : field.key === 'lighting' && active
+                                ? lightsChipActiveStyle(f)
+                                : undefined}
                             onClick={() => toggle(f)}
                           >{f}</div>
                         )

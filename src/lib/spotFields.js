@@ -90,10 +90,7 @@ export function featureOptionsForTypes(types) {
 export function bustChipActiveStyle(rating) {
   if (rating === 'No Bust') return { background: '#4a7a3a', borderColor: '#3d6830', color: '#ffffff' }
   if (rating === 'Bust') return { background: '#c0453a', borderColor: '#a83830', color: '#ffffff' }
-  // Same style as the MULTI-SPOT chip: lighter fill, border/text in the
-  // same gold instead of white-on-gold.
-  if (rating === 'Medium Bust') return { background: '#fff3cd', borderColor: '#b08818', color: '#b08818' }
-  if (rating === 'Weekends Only' || rating === 'Weekdays Only')
+  if (rating === 'Medium Bust' || rating === 'Weekends Only' || rating === 'Weekdays Only')
     return { background: '#c8a020', borderColor: '#b08818', color: '#ffffff' }
   return {}
 }
@@ -106,9 +103,10 @@ export function multiSpotChipActiveStyle(opt) {
   return {}
 }
 
-// Same yellow as the LIGHTS image chip (SpotCard/SpotDetail) and the
-// report-a-spot button. "No Lights" keeps the default selected chip style.
+// Same style as the LIGHTS image chip (SpotCard/SpotDetail) — shared by
+// Drop a Spot, Edit Spot, and the Filters popup so all three stay
+// identical. "No Lights" keeps the default selected chip style.
 export function lightsChipActiveStyle(opt) {
-  if (opt === 'Lights') return { background: '#f5c518', borderColor: '#f5c518', color: '#000000' }
+  if (opt === 'Lights') return { background: '#fff3cd', borderColor: '#d4aa00', color: '#c8a020' }
   return {}
 }

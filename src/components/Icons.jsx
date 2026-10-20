@@ -388,3 +388,12 @@ export function MultiSpotIcon({ color = '#3d6830', holeColor = '#DFEEDF' }) {
     </svg>
   )
 }
+
+export function SunIcon({ color = '#c8a020' }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 26 26">
+      <circle cx="13" cy="13" r="5" fill={color} />
+      <path d="M13 1.5v3M13 21.5v3M1.5 13h3M21.5 13h3M4.9 4.9l2.1 2.1M19 19l2.1 2.1M4.9 21.1L7 19M19 7l2.1-2.1" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  )
+}

@@ -366,7 +366,6 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
   }
 
   const noTricksYet = orderedTricks.length === 0
-  const addDisabled = !nameInput.trim()
 
   return createPortal(
     <div className="modal-overlay" onClick={requestClose}>
@@ -388,9 +387,9 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
             <div style={{ width: '50%', flexShrink: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div className="modal-title" style={{ padding: '0 20px', marginBottom: 16 }}>Your Trick List</div>
 
-              <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px' }}>
-                <div className="section-label">Tricks at this spot</div>
-                {!noTricksYet && (
+              {!noTricksYet && (
+                <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px' }}>
+                  <div className="section-label">Tricks at this spot</div>
                   <div style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6 }}>
                     {orderedTricks.map((trick, i) => (
                       <div key={trick.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderTop: i > 0 ? '1px solid #EAD8C8' : 'none' }}>
@@ -409,8 +408,8 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               <div style={{ padding: '0 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
@@ -426,8 +425,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                   <button
                     onMouseDown={e => e.preventDefault()}
                     onClick={addDraftTrick}
-                    disabled={addDisabled}
-                    style={{ width: 44, flexShrink: 0, border: 'none', borderRadius: 6, background: 'var(--salmon)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: addDisabled ? 0.5 : 1 }}
+                    style={{ width: 44, flexShrink: 0, border: 'none', borderRadius: 6, background: 'var(--salmon)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                   >
                     <PlusIcon color="#fff" />
                   </button>

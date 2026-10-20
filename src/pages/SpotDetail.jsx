@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
-import { ShareIcon, BookmarkIcon, PencilIcon, FriendsIcon, TrickListIcon, MultiSpotIcon } from '../components/Icons'
+import { ShareIcon, BookmarkIcon, PencilIcon, FriendsIcon, TrickListIcon, MultiSpotIcon, SunIcon } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import SpotFormFields from '../components/SpotFormFields'
 import ClipsSection from '../components/ClipsSection'
@@ -37,10 +37,7 @@ const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 function bustBadgeStyle(rating) {
   if (rating === 'No Bust') return { background: '#4a7a3a', color: '#ffffff', border: '1px solid #3d6830' }
   if (rating === 'Bust') return { background: '#c0453a', color: '#ffffff', border: '1px solid #a83830' }
-  // Same style as the MULTI-SPOT chip: lighter fill, border/text in the
-  // same gold instead of white-on-gold.
-  if (rating === 'Medium Bust') return { background: '#fff3cd', color: '#b08818', border: '1px solid #b08818' }
-  if (rating === 'Weekends Only' || rating === 'Weekdays Only') return { background: '#c8a020', color: '#ffffff', border: '1px solid #b08818' }
+  if (rating === 'Medium Bust' || rating === 'Weekends Only' || rating === 'Weekdays Only') return { background: '#c8a020', color: '#ffffff', border: '1px solid #b08818' }
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
 }
 
@@ -740,13 +737,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </div>
             )}
             {spot.lighting === 'Lights' && (
-              <div style={{ background: '#f5c518', borderRadius: 6, padding: '3px 7px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
-                  <path d="M4 0.5C2 0.5 0.75 2 0.75 3.75C0.75 5 1.4 5.8 2 6.3C2.3 6.55 2.5 6.9 2.5 7.2V7.5H5.5V7.2C5.5 6.9 5.7 6.55 6 6.3C6.6 5.8 7.25 5 7.25 3.75C7.25 2 6 0.5 4 0.5Z" stroke="#000" strokeWidth="0.9" fill="none" />
-                  <line x1="2.7" y1="8.3" x2="5.3" y2="8.3" stroke="#000" strokeWidth="0.9" strokeLinecap="round" />
-                  <line x1="3" y1="9.3" x2="5" y2="9.3" stroke="#000" strokeWidth="0.9" strokeLinecap="round" />
-                </svg>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#000', letterSpacing: 1, textTransform: 'uppercase' }}>Lights</span>
+              <div style={{ background: '#fff3cd', border: '1px solid #d4aa00', borderRadius: 6, padding: '3px 7px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <SunIcon color="#c8a020" />
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#c8a020', letterSpacing: 1, textTransform: 'uppercase' }}>Lights</span>
               </div>
             )}
           </div>
@@ -1035,7 +1028,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           {spot.address && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>{spot.address}</div>}
 
           {hasCoords && (
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 8 }}>
               <div
                 onClick={() => setShowMapsModal(true)}
                 style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}

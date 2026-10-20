@@ -511,6 +511,11 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   }
 
   const handleNotifTap = async (notif) => {
+    // The notifications screen is a full-screen portal (zIndex 999999) —
+    // every destination below (the spot overlay at 2000, the saved/trick
+    // list tabs, the profile-preview modal at 99999) renders underneath it
+    // and was invisible/untappable until this closed first.
+    setShowNotifications(false)
     if (notif.type === 'friend_request' || notif.type === 'friend_accepted') {
       await onMarkNotificationRead?.(notif.id)
       openUserProfile(notif)
