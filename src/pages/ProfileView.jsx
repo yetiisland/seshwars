@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabase'
 import { compressImage } from '../utils/compressImage'
 import { useProfileStore, setProfileDirect, reloadProfile } from '../lib/profileStore'
 import Navbar from '../components/Navbar'
-import TabBar from '../components/TabBar'
 import SpotCard from '../components/SpotCard'
 import TermsOfService from './TermsOfService'
 import PrivacyPolicy from './PrivacyPolicy'
@@ -82,7 +81,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled, openFriends, onOpenFriendsHandled, isActive = true, closeSubpagesSignal }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled, openFriends, onOpenFriendsHandled, isActive = true, closeSubpagesSignal }) {
   // Read via a ref inside event listeners below (not as a dep — these
   // listeners stay registered for the component's whole lifetime now that
   // it's kept mounted) so a friends/tricks-changed event or the app
@@ -1214,7 +1213,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             )}
             <div style={{ height: BOTTOM_PAD }} />
           </div>
-          {onTabChange && <TabBar active="profile" onChange={t => { setShowHiddenSpots(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
         </div>,
         document.body
       )}
@@ -1299,7 +1297,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             )}
             <div style={{ height: BOTTOM_PAD }} />
           </div>
-          {onTabChange && <TabBar active="profile" onChange={t => { sessionStorage.removeItem('mySpots:open'); setShowMySpots(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
         </div>,
         document.body
       )}
@@ -1329,7 +1326,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
             <div style={{ height: BOTTOM_PAD }} />
           </div>
-          {onTabChange && <TabBar active="profile" onChange={t => { setShowFriendsScreen(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
         </div>,
         document.body
       )}
@@ -1346,10 +1342,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           onClose={() => setShowTrickList(false)}
           openListId={openTrickListId}
           onOpenListIdHandled={onOpenTrickListIdHandled}
-          onTabChange={onTabChange ? (t => { setShowTrickList(false); onTabChange(t) }) : undefined}
-          profileAvatar={storeProfile?.avatar_url}
-          profileInitials={storeProfile?.initials}
-          unreadCount={unreadCount}
         />,
         document.body
       )}
@@ -1660,7 +1652,6 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             )}
             <div style={{ height: BOTTOM_PAD }} />
           </div>
-          {onTabChange && <TabBar active="profile" onChange={t => { setShowNotifications(false); onTabChange(t) }} user={user} profileAvatar={storeProfile?.avatar_url} profileInitials={storeProfile?.initials} notificationCount={unreadCount} />}
         </div>,
         document.body
       )}

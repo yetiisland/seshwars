@@ -323,12 +323,11 @@ export default function App() {
   // already active) — ProfileView watches this to close every full-screen
   // page opened from it (Spots Added, Hidden Spots, Trick List, Friends,
   // Settings and its sub-pages, Notifications, Edit Profile), the same
-  // root-level close the spot overlay already gets below. Needed because
-  // TabBar's own CSS class (.tab-bar, LAYERS.BOTTOM_NAV) is now shared by
-  // this persistent nav AND by the duplicate <TabBar> each of those
-  // full-screen pages renders internally — same z-index, so this one
-  // (rendered later in the tree) always wins the tap, making each
-  // subpage's own "close myself first" onChange wrapper unreachable.
+  // root-level close the spot overlay already gets below. This TabBar
+  // (rendered once here) is the app's only bottom nav — those full-screen
+  // pages used to render their own duplicate TabBar to close themselves
+  // on a tap, back when each one needed its own; now that this signal
+  // closes them at the root, those duplicates were removed.
   const [profileSubpagesCloseSignal, setProfileSubpagesCloseSignal] = useState(0)
   const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')
   const [openListId, setOpenListId] = useState(null)
@@ -838,7 +837,6 @@ export default function App() {
                 onFetchNotifications={fetchNotifications}
                 onMarkNotificationRead={markRead}
                 onMarkAllNotificationsRead={markAllRead}
-                onTabChange={handleTabChange}
                 closeSubpagesSignal={profileSubpagesCloseSignal}
                 hiddenIds={hiddenIds}
                 onUnhideSpot={unhideSpot}
@@ -972,7 +970,6 @@ export default function App() {
                   onFetchNotifications={fetchNotifications}
                   onMarkNotificationRead={markRead}
                   onMarkAllNotificationsRead={markAllRead}
-                  onTabChange={handleTabChange}
                   closeSubpagesSignal={profileSubpagesCloseSignal}
                   hiddenIds={hiddenIds}
                   onUnhideSpot={unhideSpot}

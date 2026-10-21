@@ -10,7 +10,6 @@ import { formatTrickDates } from '../lib/trickDates'
 import TrickCheckmark from '../components/TrickCheckmark'
 import TrickEditPanel from '../components/TrickEditPanel'
 import MembersSummary from '../components/MembersSummary'
-import TabBar from '../components/TabBar'
 import InitialsAvatar from '../components/InitialsAvatar'
 import { ArrowIcon, TrickListIcon, SettingsIcon, ShareIcon, LeaveIcon, FriendsIcon, PencilIcon, IconBox } from '../components/Icons'
 import { LAYERS } from '../lib/layers'
@@ -162,7 +161,7 @@ function ShareTrickListFriends({ listId, onBack, onShared }) {
 // (back returns to the list-of-lists, not out of the whole Trick List
 // screen) — same split SavedView.jsx uses between its own default view
 // and CollectionView.
-function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, profileAvatar, profileInitials, unreadCount, onListRenamed, onListDeleted, onLeft, onGoProfile }) {
+function TrickListDetail({ list, user, spots, onSpotClick, onBack, onListRenamed, onListDeleted, onLeft, onGoProfile }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [listName, setListName] = useState(list.name)
@@ -539,7 +538,6 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
           <div style={{ height: BOTTOM_PAD }} />
         </div>
       </div>
-      {onTabChange && <TabBar active="profile" onChange={onTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} />}
 
       {/* Settings sheet — rename + delete */}
       {showSettings && createPortal(
@@ -679,7 +677,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
   )
 }
 
-export default function TrickListPage({ user, spots, onSpotClick, onClose, openListId, onOpenListIdHandled, onTabChange, profileAvatar, profileInitials, unreadCount, onGoProfile }) {
+export default function TrickListPage({ user, spots, onSpotClick, onClose, openListId, onOpenListIdHandled, onGoProfile }) {
   const [trickLists, setTrickLists] = useState([]) // owned, with computed landed/total
   const [sharedTrickLists, setSharedTrickLists] = useState([]) // from get_trick_lists_shared_with_me()
   const [loading, setLoading] = useState(true)
@@ -790,10 +788,6 @@ export default function TrickListPage({ user, spots, onSpotClick, onClose, openL
           spots={spots}
           onSpotClick={onSpotClick}
           onBack={() => setOpenList(null)}
-          onTabChange={onTabChange}
-          profileAvatar={profileAvatar}
-          profileInitials={profileInitials}
-          unreadCount={unreadCount}
           onGoProfile={onGoProfile}
           onListRenamed={(name) => setTrickLists(prev => prev.map(l => (l.id === openList.id ? { ...l, name } : l)))}
           onListDeleted={() => { setTrickLists(prev => prev.filter(l => l.id !== openList.id)); setOpenList(null) }}
@@ -895,7 +889,6 @@ export default function TrickListPage({ user, spots, onSpotClick, onClose, openL
           <div style={{ height: BOTTOM_PAD }} />
         </div>
       </div>
-      {onTabChange && <TabBar active="profile" onChange={onTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} />}
     </div>
   )
 }

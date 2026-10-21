@@ -678,6 +678,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
             {clipDeleteError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 5 }}>{clipDeleteError}</div>}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <AddedByCard
+                label="Posted by"
                 avatarUrl={activeClip.profile?.avatar_url}
                 initials={(activeClip.profile?.first_name || activeClip.profile?.username || '?')[0].toUpperCase()}
                 username={activeClip.profile?.username || activeClip.profile?.first_name}
