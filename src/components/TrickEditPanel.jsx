@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { LAYERS } from '../lib/layers'
 
 const NAME_MAX = 60
 
@@ -87,7 +88,7 @@ export default function TrickEditPanel({ trick, onRename, onDelete, onClose }) {
       </div>
 
       {(pendingDelete || deleteClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeDeleteConfirm}>
+        <div className="modal-overlay" onClick={closeDeleteConfirm} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Trick</div>

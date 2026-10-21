@@ -23,6 +23,7 @@ import AddSpot from './pages/AddSpot'
 import SearchPage from './pages/SearchPage'
 import SpotOverlay from './pages/SpotOverlay'
 import InitialsAvatar from './components/InitialsAvatar'
+import { LAYERS } from './lib/layers'
 
 // Module-level auth cache — survives App unmount/remount so there's no loading flash
 // when navigating back from a spot page.
@@ -78,7 +79,7 @@ function SafeAreaTop() {
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         height: 'env(safe-area-inset-top)',
-        background: '#FDF8F0', zIndex: 300, pointerEvents: 'none', flexShrink: 0,
+        background: '#FDF8F0', zIndex: LAYERS.PAGE_CONTENT, pointerEvents: 'none', flexShrink: 0,
       }} />
     )
   }
@@ -229,7 +230,7 @@ function DesktopSearchBar({ spots, searchLocation, onSelect, onClear }) {
         <div style={{
           position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
           background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 8,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 2000, overflow: 'hidden',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: LAYERS.PAGE_CONTENT, overflow: 'hidden',
         }}>
           {loading && (
             <div style={{ padding: '10px 14px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>Searching…</div>
@@ -684,10 +685,9 @@ export default function App() {
   const searchOverlay = showSearch ? <SearchPage spots={spots} onSelect={handleSelectLocation} onClose={closeSearch} /> : null
 
   const hideConfirmModal = (showHideConfirm || hideConfirmClosing) ? createPortal(
-    // Reachable from an open spot's own hide button — same reasoning as
-    // SaveToListModal's zIndex prop below, just inline here since this
-    // modal isn't its own component.
-    <div className="modal-overlay" onClick={closeHideConfirm} style={spotMatch ? { zIndex: 2000100 } : undefined}>
+    // Confirmation dialog — same tier regardless of where it was opened
+    // from (a list card or an open spot's own hide button).
+    <div className="modal-overlay" onClick={closeHideConfirm} style={{ zIndex: LAYERS.CONFIRM }}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideConfirmClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
         <div className="modal-handle" />
         <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -837,11 +837,11 @@ export default function App() {
 
           {/* Spots view toggle pill for desktop */}
           {effectiveTab === 'spots' && (
-            <div style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}>
+            <div style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', zIndex: LAYERS.PAGE_CONTENT }}>
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
-                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
-                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: LAYERS.PAGE_CONTENT }} />
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
               </div>
             </div>
           )}
@@ -976,7 +976,7 @@ export default function App() {
               inset: 0,
               display: isMapActive && !showAdd ? 'flex' : 'none',
               flexDirection: 'column',
-              zIndex: 2,
+              zIndex: LAYERS.PAGE_CONTENT + 2,
             }}>
               <MapView
                 isActive={isMapActive && !showAdd}
@@ -1003,32 +1003,34 @@ export default function App() {
 
           {/* Spots view toggle pill — above tab bar, only when on spots tab */}
           {effectiveTab === 'spots' && !showAdd && (
-            <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 1001, pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: LAYERS.PAGE_CONTENT, pointerEvents: 'none' }}>
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
-                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
-                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: LAYERS.PAGE_CONTENT }} />
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
               </div>
             </div>
           )}
 
-          {/* Above the spot overlay (zIndex 2000000) while a spot is open, so
-              the nav stays visible/tappable on top of it — same as the old
-              standalone SpotPage.jsx, which rendered its own TabBar. */}
-          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} zIndex={spotMatch ? 2000100 : undefined} />}
+          {/* .tab-bar's own CSS class is already LAYERS.BOTTOM_NAV, above the
+              spot overlay unconditionally — same as the old standalone
+              SpotPage.jsx, which rendered its own TabBar. */}
+          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} />}
 
-          {toast && (
-            <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, right: 16, zIndex: 2001, background: '#2a1e14', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, textAlign: 'center', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', letterSpacing: 0.3 }}>
+          {toast && createPortal(
+            <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, right: 16, zIndex: LAYERS.TOAST, background: '#2a1e14', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, textAlign: 'center', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', letterSpacing: 0.3 }}>
               {toast}
-            </div>
+            </div>,
+            document.body
           )}
 
-          {showAuthPrompt && <AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />}
-          {showLocationPopup && (
+          {showAuthPrompt && createPortal(<AuthPromptModal onClose={() => setShowAuthPrompt(false)} onGoProfile={goToProfile} />, document.body)}
+          {showLocationPopup && createPortal(
             <LocationPermissionPopup
               onTurnOn={() => { dismissLocationPopup(); handleTurnOnLocation() }}
               onDismiss={dismissLocationPopup}
-            />
+            />,
+            document.body
           )}
         </>
       )}
@@ -1039,17 +1041,15 @@ export default function App() {
           ListView/MapView, and all already-loaded data stay mounted the
           entire time). A full-screen takeover, same as the old standalone
           SpotPage route looked, just layered instead of swapped.
-          zIndex 2000000 — must render above every other full-screen page
-          in the app (Spots Added/Hidden Spots/Trick List/Friends/Settings
-          and its sub-pages/Notifications all top out at 999999, the
-          highest being Settings > Delete Account's own confirm modal at
-          1000000), so opening a spot from any of them covers it instead
-          of opening invisibly underneath. TabBar's own raised zIndex
-          below, and SaveToListModal/hideConfirmModal/AuthScreen (reachable
-          from within an open spot and meant to interrupt it) are kept
-          above this same value — see each site's own comment. */}
+          LAYERS.SPOT_OVERLAY sits above every full-screen page (Spots
+          Added/Hidden Spots/Trick List/Friends/Settings and its sub-pages/
+          Notifications, all LAYERS.FULL_SCREEN_PAGE) so opening a spot
+          from any of them covers it instead of opening invisibly
+          underneath. The bottom nav, every sheet/popup, and every
+          confirmation dialog sit above this same tier unconditionally —
+          see src/lib/layers.js. */}
       {spotMatch && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000000, background: '#FDF8F0' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: LAYERS.SPOT_OVERLAY, background: '#FDF8F0' }}>
           <SpotOverlay
             slug={spotSlug}
             user={user}
@@ -1072,8 +1072,8 @@ export default function App() {
       {showAdd && createPortal(
         <div
           style={isDesktop
-            ? { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }
-            : { position: 'fixed', inset: 0, zIndex: 2000 }
+            ? { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }
+            : { position: 'fixed', inset: 0, zIndex: LAYERS.FULL_SCREEN_PAGE }
           }
           onClick={isDesktop ? () => setShowAdd(false) : undefined}
         >
@@ -1091,16 +1091,15 @@ export default function App() {
       )}
 
       {/* SaveToListModal/hideConfirmModal are reachable from an open spot
-          (its own save/hide buttons) as well as from list cards elsewhere,
-          so their zIndex only needs raising above the spot overlay
-          (2000000) while one is actually open — everywhere else the
-          existing .modal-overlay 99999 is unaffected. */}
+          (its own save/hide buttons) as well as from list cards elsewhere —
+          the shared LAYERS.SHEET/LAYERS.CONFIRM tiers already sit above the
+          spot overlay unconditionally, so no per-instance override is
+          needed either way. */}
       {saveModalSpot && (
         <SaveToListModal
           spot={saveModalSpot}
           user={user}
           onClose={() => setSaveModalSpot(null)}
-          zIndex={spotMatch ? 2000100 : undefined}
         />
       )}
 

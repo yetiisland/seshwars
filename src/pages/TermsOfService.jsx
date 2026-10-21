@@ -1,6 +1,9 @@
+import { createPortal } from 'react-dom'
+import { LAYERS } from '../lib/layers'
+
 export default function TermsOfService({ onClose }) {
-  return (
-    <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 2000300, display: 'flex', flexDirection: 'column' }}>
+  return createPortal(
+    <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.CONFIRM, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -97,6 +100,7 @@ export default function TermsOfService({ onClose }) {
 
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

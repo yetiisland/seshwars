@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar'
 import FiltersModal from '../components/FiltersModal'
 import SpotCard from '../components/SpotCard'
 import { SHOP_STYLE } from '../lib/spotFields'
+import { LAYERS } from '../lib/layers'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const FALLBACK = { longitude: -104.9903, latitude: 39.7392, zoom: 13 }
@@ -107,7 +108,7 @@ function UserLocationDot({ heading }) {
           <path d="M24 24 L19 4 L24 9 L29 4 Z" fill="rgba(61,186,110,0.55)" />
         </svg>
       )}
-      <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#3dba6e', border: '2.5px solid #fff', boxShadow: '0 1px 6px rgba(0,0,0,0.35)', position: 'relative', zIndex: 2, flexShrink: 0 }} />
+      <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#3dba6e', border: '2.5px solid #fff', boxShadow: '0 1px 6px rgba(0,0,0,0.35)', position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 2, flexShrink: 0 }} />
     </div>
   )
 }
@@ -593,14 +594,14 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
 
         {/* Filters row — top */}
         {showFilterChips && (
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT + 10 }}>
             <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} searchLocation={searchLocation} onClearSearch={onClearSearch} />
           </div>
         )}
 
         {/* Eye/satellite toggle — bottom-right (within container on desktop) */}
         {showSatelliteToggle && (
-          <div style={{ position: 'fixed', bottom: isDesktop ? 'var(--desktop-nav-clearance)' : 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, zIndex: 10, pointerEvents: 'none' }}>
+          <div style={{ position: 'fixed', bottom: isDesktop ? 'var(--desktop-nav-clearance)' : 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT + 10, pointerEvents: 'none' }}>
             <div style={{ maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto', display: 'flex', justifyContent: 'flex-end', paddingRight: 10, pointerEvents: 'auto' }}>
               <div
                 onClick={() => setSatellite(s => !s)}
@@ -631,7 +632,7 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
         {/* Peek card — desktop: compact floating, mobile: full-width */}
         {showPeekCard && selected && (
           isDesktop ? (
-            <div className="desktop-peek-card" style={{ position: 'fixed', bottom: 'var(--desktop-peek-card-bottom)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 12px', zIndex: 100 }}>
+            <div className="desktop-peek-card" style={{ position: 'fixed', bottom: 'var(--desktop-peek-card-bottom)', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '0 12px', zIndex: LAYERS.PAGE_CONTENT + 100 }}>
               <SpotCard
                 spot={selected}
                 saved={saved.has(selected.id)}
@@ -642,7 +643,7 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
               />
             </div>
           ) : (
-            <div className="mobile-peek-card" style={{ position: 'absolute', bottom: 60, left: 0, right: 0, padding: '0 12px 8px', zIndex: 10 }}>
+            <div className="mobile-peek-card" style={{ position: 'absolute', bottom: 60, left: 0, right: 0, padding: '0 12px 8px', zIndex: LAYERS.PAGE_CONTENT + 10 }}>
               <div style={{ width: 32, height: 3, background: '#C8CAD4', borderRadius: 2, margin: '8px auto 10px' }} />
               <SpotCard
                 spot={selected}

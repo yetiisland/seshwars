@@ -13,6 +13,7 @@ import MembersSummary from '../components/MembersSummary'
 import TabBar from '../components/TabBar'
 import InitialsAvatar from '../components/InitialsAvatar'
 import { ArrowIcon, TrickListIcon, SettingsIcon, ShareIcon, LeaveIcon, FriendsIcon, PencilIcon, IconBox } from '../components/Icons'
+import { LAYERS } from '../lib/layers'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -577,7 +578,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
       {/* Delete list confirmation — existing confirm-dialog pattern, closes
           via closeDeleteConfirm in both outcomes. */}
       {(pendingDeleteList || deleteClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeDeleteConfirm}>
+        <div className="modal-overlay" onClick={closeDeleteConfirm} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete List</div>
@@ -610,7 +611,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
         document.body
       )}
       {deleteError && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {deleteError}
         </div>,
         document.body
@@ -645,7 +646,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
         document.body
       )}
       {shareToast && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {shareToast}
         </div>,
         document.body
@@ -653,7 +654,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
 
       {/* Leave confirmation (members) — same pattern */}
       {(pendingLeave || leaveClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeLeaveConfirm}>
+        <div className="modal-overlay" onClick={closeLeaveConfirm} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={leaveClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Leave List</div>
@@ -669,7 +670,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onTabChange, 
         document.body
       )}
       {leaveError && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {leaveError}
         </div>,
         document.body
@@ -781,7 +782,7 @@ export default function TrickListPage({ user, spots, onSpotClick, onClose, openL
 
   if (openList) {
     return (
-      <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
         <TrickListDetail
           key={openList.id}
           list={openList}
@@ -803,7 +804,7 @@ export default function TrickListPage({ user, spots, onSpotClick, onClose, openL
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
       <div style={{
         display: 'flex', alignItems: 'center',
         padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',

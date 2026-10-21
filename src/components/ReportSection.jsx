@@ -96,7 +96,7 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
 
       {/* Bottom sheet modal */}
       {(open || closing) && createPortal(
-        <div className="modal-overlay" onClick={closeModal} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', overflowY: 'auto', ...(closing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : {}) }}>
             <div className="modal-handle" />
 

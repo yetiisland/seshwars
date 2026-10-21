@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import InitialsAvatar from './InitialsAvatar'
+import { LAYERS } from '../lib/layers'
 
 function relativeTime(ts) {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
@@ -217,7 +218,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
       )}
 
       {(showDeleteModal || deleteModalClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeDeleteModal}>
+        <div className="modal-overlay" onClick={closeDeleteModal} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Rating</div>

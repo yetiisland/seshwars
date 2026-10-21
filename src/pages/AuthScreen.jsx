@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
 import TermsOfService from './TermsOfService'
 import PrivacyPolicy from './PrivacyPolicy'
 import { setProfileDirect } from '../lib/profileStore'
+import { LAYERS } from '../lib/layers'
 
 export default function AuthScreen({ onClose }) {
   const [mode, setMode] = useState('login')
@@ -163,12 +165,12 @@ export default function AuthScreen({ onClose }) {
     </div>
   )
 
-  return (
+  return createPortal(
     <div className="desktop-page-root" style={{
-      // Above every other full-screen page/overlay in the app, including
-      // the spot overlay (zIndex 2000000, App.jsx) — sign-in is reachable
-      // from within an open spot and must always take over the screen.
-      position: 'fixed', inset: 0, zIndex: 2000200,
+      // LAYERS.CONFIRM — above every full-screen page and the spot
+      // overlay; sign-in is reachable from within an open spot and must
+      // always take over the screen.
+      position: 'fixed', inset: 0, zIndex: LAYERS.CONFIRM,
       background: '#FDF8F0',
       overflowY: 'auto',
       display: 'flex',
@@ -181,7 +183,7 @@ export default function AuthScreen({ onClose }) {
       {onClose && (
         <div
           onClick={onClose}
-          style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 16, width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 1 }}
+          style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 16, width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT }}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
@@ -380,6 +382,7 @@ export default function AuthScreen({ onClose }) {
       </p>
       {showTos && <TermsOfService onClose={() => setShowTos(false)} />}
       {showPrivacy && <PrivacyPolicy onClose={() => setShowPrivacy(false)} />}
-    </div>
+    </div>,
+    document.body
   )
 }

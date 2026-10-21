@@ -205,3 +205,32 @@ Safe-area-aware paddings also appear (not plain numbers): `calc(env(safe-area-in
 | `0 8px 32px rgba(0,0,0,0.18)` | Desktop floating bottom nav shadow | `index.css` (`.desktop-float-nav`) |
 
 `filter: drop-shadow(...)` (SVG pin icons, not `box-shadow`): `0 2px 4px rgba(0,0,0,0.35)`, `0 2px 5px rgba(0,0,0,0.4)`, `0 2px 5px rgba(0,0,0,0.5)` — all in map-pin SVGs across `components/SpotCard.jsx`, `pages/MapView.jsx`, `pages/AddSpot.jsx`, `pages/SpotDetail.jsx`.
+
+---
+
+## Layers (z-index)
+
+One scale for the whole app, exported as named constants from
+`src/lib/layers.js` (`LAYERS.<TIER>`), lowest to highest:
+
+| Tier | Constant | Covers |
+|---|---|---|
+| 1 | `PAGE_CONTENT` | In-page stacking only — card badges, floating toggle pills, anchored suggestion dropdowns, status-bar cover. Never competes with anything outside its own page. |
+| 2 | `FULL_SCREEN_PAGE` | Settings, Friends, Trick List, Spots Added, Hidden Spots, Notifications, Edit Profile, Feedback, Support, Delete Account, Add Spot — pages reached from the main tabs, never opened on top of an open spot. |
+| 3 | `SPOT_OVERLAY` | The open-spot takeover (`App.jsx`) — renders above every full-screen page so opening a spot from one of them covers it instead of opening underneath. |
+| 4 | `BOTTOM_NAV` | The tab bar (mobile `.tab-bar`, desktop `.desktop-float-nav`) — always above the spot overlay, unconditionally. |
+| 5 | `SHEET` | Every bottom sheet/popup (`.modal-overlay`'s own default) — save-to-list, share, report, options, filters, and the rest. Always above the bottom nav. |
+| 6 | `CONFIRM` | Confirmation dialogs (delete/hide/leave/remove, unsaved-changes) and full-screen interrupts reachable from anywhere (sign-in, Terms, Privacy) — above sheets. |
+| 7 | `TOAST` | Transient toast/snackbar messages — always on top. |
+
+Tiers are spaced 10,000 apart so a component needing fine-grained order
+against its own siblings (two badges on one card, a toggle pill's own
+thumb) can do `LAYERS.<TIER> + 1`, `+ 2`, ... without ever reaching the
+next tier.
+
+**Rule:** every bottom sheet, popup, modal, and confirmation dialog in the
+app renders through `createPortal(..., document.body)` at `SHEET` or
+`CONFIRM`. Nothing that is a popup may ever render below the bottom nav,
+on any screen. `.modal-overlay`'s shared CSS class (`src/index.css`) is
+`LAYERS.SHEET` by default; call sites that are confirmation dialogs
+override it inline to `LAYERS.CONFIRM`.

@@ -18,6 +18,7 @@ import FriendsView from '../components/FriendsView'
 import TrickListPage from './TrickListPage'
 import AddFriendButton from '../components/AddFriendButton'
 import InitialsAvatar from '../components/InitialsAvatar'
+import { LAYERS } from '../lib/layers'
 import { TrickListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
 import { transformImageUrl } from '../utils/imageUrl'
 import { openLocationSettings } from '../lib/locationSettings'
@@ -512,10 +513,9 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   }
 
   const handleNotifTap = async (notif) => {
-    // The notifications screen is a full-screen portal (zIndex 999999) —
-    // every destination below (the spot overlay at 2000, the saved/trick
-    // list tabs, the profile-preview modal at 99999) renders underneath it
-    // and was invisible/untappable until this closed first.
+    // The notifications screen is a full-screen page (LAYERS.FULL_SCREEN_PAGE) —
+    // every destination below (the spot overlay, the saved/trick list tabs)
+    // renders underneath it and was invisible/untappable until this closed first.
     setShowNotifications(false)
     if (notif.type === 'friend_request' || notif.type === 'friend_accepted') {
       await onMarkNotificationRead?.(notif.id)
@@ -927,7 +927,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               regardless of which tab is active, since the header that
               triggers them is now rendered for all 3 tabs. */}
           {showFeedbackSheet && createPortal(
-            <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+            <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
               <div style={{
                 display: 'flex', alignItems: 'center',
                 padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
@@ -979,7 +979,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               Rows below navigate to their own pages without closing this
               one, so the back arrow on each destination returns here. */}
           {showSettingsSheet && createPortal(
-            <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+            <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
               <div style={{
                 display: 'flex', alignItems: 'center',
                 padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
@@ -1088,15 +1088,15 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>,
             document.body
           )}
-          {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
-          {showPrivacy && createPortal(<PrivacyPolicy onClose={() => setShowPrivacy(false)} />, document.body)}
+          {showTos && <TermsOfService onClose={() => setShowTos(false)} />}
+          {showPrivacy && <PrivacyPolicy onClose={() => setShowPrivacy(false)} />}
           {showSupport && createPortal(<SupportPage onClose={() => setShowSupport(false)} />, document.body)}
           {showDeleteAccountPage && createPortal(<DeleteAccountPage onClose={() => setShowDeleteAccountPage(false)} onDeleteClick={() => setShowDeleteConfirm(true)} />, document.body)}
           {showDeleteConfirm && createPortal(
             <div
               className="modal-overlay"
               onClick={() => !deleteLoading && setShowDeleteConfirm(false)}
-              style={{ position: 'fixed', zIndex: 1000000 }}
+              style={{ position: 'fixed', zIndex: LAYERS.CONFIRM }}
             >
               <div
                 className="modal-sheet"
@@ -1149,7 +1149,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           reachable tier (Edit Profile / Feedback / ToS / Privacy) since this
           is also opened from a Settings row now, not just the stat card. */}
       {showHiddenSpots && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '14px 14px 10px', paddingTop: 'calc(env(safe-area-inset-top) + 14px)',
@@ -1196,7 +1196,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       )}
 
       {showUnhideConfirm && createPortal(
-        <div className="modal-overlay" onClick={() => { setShowUnhideConfirm(false); setUnhideTarget(null) }}>
+        <div className="modal-overlay" onClick={() => { setShowUnhideConfirm(false); setUnhideTarget(null) }} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -1226,7 +1226,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
       {/* My Spots overlay — full screen, covers top nav */}
       {showMySpots && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center',
             padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
@@ -1283,7 +1283,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       {/* Friends screen — full page (Section A), reached from the Friends
           stat card. Same shell as My Spots; FriendsView supplies the body. */}
       {showFriendsScreen && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center',
             padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
@@ -1335,7 +1335,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
 
       {/* Edit Profile — full page (Section E), reached from Settings */}
       {showEditSheet && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center',
             padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
@@ -1485,7 +1485,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           other settings-reachable pages (also opened from the bell icon
           directly, which works fine at this tier too). */}
       {showNotifications && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex', alignItems: 'center',
             padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
@@ -1681,7 +1681,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       )}
 
       {locationToast && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, maxWidth: 'calc(100vw - 48px)', textAlign: 'center', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: LAYERS.TOAST, maxWidth: 'calc(100vw - 48px)', textAlign: 'center', pointerEvents: 'none' }}>
           {locationToast}
         </div>,
         document.body

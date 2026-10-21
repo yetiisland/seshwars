@@ -1,3 +1,5 @@
+import { LAYERS } from '../lib/layers'
+
 export default function DeleteAccountPage({ onClose, onDeleteClick }) {
   // Every claim below is confirmed against two sources: the live
   // database's ON DELETE CASCADE foreign keys (hidden_spots, friendships,
@@ -46,7 +48,7 @@ export default function DeleteAccountPage({ onClose, onDeleteClick }) {
   ]
 
   return (
-    <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+    <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

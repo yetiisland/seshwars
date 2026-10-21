@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Capacitor } from '@capacitor/core'
+import { LAYERS } from '../lib/layers'
 
 const APP_STORE_URL = 'https://apps.apple.com/app/id6779744364'
 const GOOGLE_PLAY_URL = 'https://play.google.com/store/apps/details?id=com.seshwars.app'
@@ -81,7 +82,7 @@ export default function OpenInAppSheet({ spot, onHeight }) {
 
   return createPortal(
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end' }}
+      style={{ position: 'fixed', inset: 0, zIndex: LAYERS.SHEET, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end' }}
       onClick={dismiss}
     >
       <div

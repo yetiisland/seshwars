@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import InitialsAvatar from './InitialsAvatar'
 import { CloseIcon, IconBox } from './Icons'
+import { LAYERS } from '../lib/layers'
 
 // "Added:" row (overlapping member avatars) + the members bottom sheet it
 // opens — shared by saved list pages (SavedView.jsx) and individual trick
@@ -44,7 +45,7 @@ export default function MembersSummary({ members, isOwner, onRemove }) {
         </span>
         <div style={{ display: 'flex' }}>
           {members.map((m, i) => (
-            <div key={m.id} style={{ marginLeft: i === 0 ? 0 : -12, zIndex: members.length - i }}>
+            <div key={m.id} style={{ marginLeft: i === 0 ? 0 : -12, zIndex: LAYERS.PAGE_CONTENT + (members.length - i) }}>
               <InitialsAvatar profile={m} size={32} ring="0 0 0 2px #FDF8F0" />
             </div>
           ))}
@@ -81,7 +82,7 @@ export default function MembersSummary({ members, isOwner, onRemove }) {
       {/* Remove-member confirmation — existing confirm-dialog pattern,
           closes in both outcomes. */}
       {pendingRemove && createPortal(
-        <div className="modal-overlay" onClick={() => setPendingRemove(null)}>
+        <div className="modal-overlay" onClick={() => setPendingRemove(null)} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Member</div>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { sortTricks } from '../lib/trickSort'
 import { notifyTricksChanged, cascadeDeleteOrphanedSpot } from '../lib/trickWrites'
+import { LAYERS } from '../lib/layers'
 import { formatTrickDates } from '../lib/trickDates'
 import TrickCheckmark from './TrickCheckmark'
 import TrickEditPanel from './TrickEditPanel'
@@ -349,7 +350,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
 
   if (!user) {
     return createPortal(
-      <div className="modal-overlay" onClick={onClose} style={{ zIndex: 2000050 }}>
+      <div className="modal-overlay" onClick={onClose}>
         <div className="modal-sheet" onClick={e => e.stopPropagation()}>
           <div className="modal-handle" />
           <div className="modal-title" style={{ padding: '0 16px' }}>Trick List</div>
@@ -368,7 +369,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
   const noTricksYet = orderedTricks.length === 0
 
   return createPortal(
-    <div className="modal-overlay" onClick={requestClose} style={{ zIndex: 2000050 }}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-handle" />
 
@@ -543,7 +544,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
           shared TrickEditPanel, same stacked-sheet structure, trick list
           pages use for theirs. */}
       {optionsTrick && createPortal(
-        <div className="modal-overlay" onClick={closeOptions} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={closeOptions}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-title" style={{ padding: '0 20px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{optionsTrick.name}</div>
@@ -556,7 +557,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
       )}
 
       {landedError && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000050, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {landedError}
         </div>,
         document.body
@@ -565,7 +566,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
       {/* Unsaved-changes exit confirmation — existing confirm-dialog
           pattern, stacked on top of the sheet, closes in both outcomes. */}
       {(pendingExit || exitClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeExitConfirm} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={closeExitConfirm} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={exitClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Unsaved Changes</div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { LAYERS } from '../lib/layers'
 
 const CROP_PX = 280
 
@@ -151,7 +152,7 @@ export default function ImageCropModal({ imageFile, onConfirm, onCancel }) {
   const { scale, x, y } = txRef.current
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: LAYERS.SHEET, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ fontSize: 13, fontWeight: 900, color: '#fff', marginBottom: 20, textTransform: 'uppercase', letterSpacing: 1.5 }}>
         Crop Photo
       </div>

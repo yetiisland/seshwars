@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { getProfiles } from '../utils/profileCache'
 import InitialsAvatar from './InitialsAvatar'
 import AddFriendButton from './AddFriendButton'
+import { LAYERS } from '../lib/layers'
 
 // Same ~80px fixed-bottom-nav height used as BOTTOM_PAD elsewhere
 // (SpotDetail.jsx, SavedView.jsx, ProfileView.jsx), plus a safe-area-
@@ -40,7 +41,7 @@ const viewMoreStyle = { padding: '8px 0 0', fontSize: 10, fontWeight: 700, color
 
 // Inline suggestion dropdown — copied verbatim from the geocoder address
 // dropdown in AddSpot.jsx.
-const mentionDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }
+const mentionDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }
 
 export default function CommentsSection({ spotId, user, onGoProfile, scrollToCommentId }) {
   const [comments, setComments] = useState([])
@@ -380,7 +381,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
       {/* Input row — exactly one rounded box (the textarea itself carries
           the white fill + border now); the wrapper below is layout-only */}
       {user ? (
-        <div style={{ marginBottom: 96 }}>
+        <div style={{ marginBottom: 32 }}>
           {replyingTo && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>
               Replying to @{replyingTo.username}
@@ -564,9 +565,13 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
           })}
         </div>
       )}
+      {/* Extra space at the very end of the comments section, after the
+          last comment and its replies — moved here from the composer's
+          own bottom margin above, which is back to its original 32. */}
+      {topLevelComments.length > 0 && <div style={{ height: 64 }} />}
 
       {(showDeleteModal || deleteModalClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeDeleteModal} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={closeDeleteModal} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Comment</div>
@@ -586,7 +591,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
           pieces FriendsView's search results already use, in a bottom
           sheet, rather than inventing a new full profile page. */}
       {viewingProfile && createPortal(
-        <div className="modal-overlay" onClick={() => setViewingProfile(null)} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={() => setViewingProfile(null)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 20px 24px' }}>

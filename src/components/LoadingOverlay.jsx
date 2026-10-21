@@ -1,11 +1,15 @@
+import { LAYERS } from '../lib/layers'
+
 // Full-screen loading popup — extracted verbatim from the photo-upload
 // progress overlay that used to live only in AddSpot.jsx, so every
 // loading state that needs this treatment (photo upload, spot submission)
 // renders through the same component instead of re-implementing it.
+// Covers its own (already full-screen) parent, not the whole app, so it
+// stays at LAYERS.PAGE_CONTENT rather than portaling.
 export default function LoadingOverlay({ title, subtitle, current = 0, total = 0 }) {
   const frac = total > 0 ? current / total : 0
   return (
-    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: LAYERS.PAGE_CONTENT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
       <div style={{ background: '#FDF8F0', borderRadius: 12, padding: '32px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center', width: '100%', maxWidth: 300 }}>
         <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
           <circle cx="24" cy="24" r="20" stroke="#EAD8C8" strokeWidth="3" fill="none" />

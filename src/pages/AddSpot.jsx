@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { CloseIcon } from '../components/Icons'
@@ -12,6 +11,7 @@ import { checkPhotosSafe } from '../utils/moderation'
 import TermsOfService from './TermsOfService'
 import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
 import { mergeSpotIntoCache } from '../hooks/useSpots'
+import { LAYERS } from '../lib/layers'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const DRAFT_KEY = 'seshwars_spot_draft'
@@ -340,7 +340,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
               </div>
             )}
             {addr.showDropdown && addr.geoResults.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }}>
                 {addr.geoResults.map(r => (
                   <div key={r.id} onMouseDown={() => handleSelectSuggestion(r)} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
                     <div style={{ fontWeight: 700 }}>{r.text}</div>
@@ -476,7 +476,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
           total={2}
         />
       )}
-        {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
+        {showTos && <TermsOfService onClose={() => setShowTos(false)} />}
     </div>
   )
 }

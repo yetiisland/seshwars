@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { isAdminUser } from '../lib/admin'
 import SpotDetail from './SpotDetail'
 import OpenInAppSheet from '../components/OpenInAppSheet'
+import { LAYERS } from '../lib/layers'
 
 // Renders a spot's detail page ON TOP OF App (position:fixed, full screen,
 // above the tab content but below App's own TabBar) instead of replacing
@@ -126,7 +127,7 @@ export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, 
         background: '#FDF8F0',
         borderBottom: '1px solid rgba(212,120,90,0.12)',
         flexShrink: 0,
-        zIndex: 10,
+        zIndex: LAYERS.PAGE_CONTENT + 10,
       }}>
         <div
           onClick={onBack}

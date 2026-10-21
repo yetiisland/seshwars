@@ -3,6 +3,8 @@ import { BookmarkIcon, ArrowIcon, MultiSpotIcon, SunIcon } from './Icons'
 import TagsRow from './TagsRow'
 import { transformImageUrl } from '../utils/imageUrl'
 import { SHOP_STYLE } from '../lib/spotFields'
+import { LAYERS } from '../lib/layers'
+import SpotCoverImage from './SpotCoverImage'
 
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 
@@ -44,11 +46,8 @@ function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress,
       }}
       onClick={() => onClick(spot)}
     >
-      <div
-        className="spot-card-img"
-        style={spot.photos?.[0] ? undefined : { aspectRatio: 'auto', height: 84, background: isShop ? '#2e3344' : '#F0E8DE' }}
-      >
-        {spot.photos?.[0] && (
+      <div className="spot-card-img">
+        {spot.photos?.[0] ? (
           <img
             src={transformImageUrl(spot.photos[0], 400)}
             alt={spot.title}
@@ -61,8 +60,10 @@ function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress,
             draggable={false}
             onContextMenu={e => e.preventDefault()}
           />
+        ) : (
+          <SpotCoverImage spot={spot} placeholderBg={isShop ? '#2e3344' : '#F0E8DE'} />
         )}
-        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: LAYERS.PAGE_CONTENT + 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <div className="spot-badge">{displayType}</div>
           {bs && (
             <div style={{ ...bs, fontSize: 9, padding: '3px 7px', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
@@ -77,7 +78,7 @@ function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress,
           )}
         </div>
         {(spot.most_recent_report && spot.most_recent_report !== 'Skateable Again' || (spot.visibility && spot.visibility !== 'public')) && (
-          <div style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 3, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', maxWidth: 'calc(100% - 16px)' }}>
+          <div style={{ position: 'absolute', bottom: 8, left: 8, zIndex: LAYERS.PAGE_CONTENT + 3, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', maxWidth: 'calc(100% - 16px)' }}>
             {spot.visibility && spot.visibility !== 'public' && (
               <div style={{ background: '#3D4454', border: '1px solid #2e3344', borderRadius: 6, padding: '4px 10px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
@@ -99,7 +100,7 @@ function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress,
             )}
           </div>
         )}
-        <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, display: 'flex', gap: 4 }}>
+        <div style={{ position: 'absolute', top: 8, right: 8, zIndex: LAYERS.PAGE_CONTENT + 2, display: 'flex', gap: 4 }}>
           {onHidePress && (
             <div
               style={{ width: 34, height: 34, borderRadius: 6, background: '#f5e6e0', border: '1px solid #e8c0b0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
@@ -131,7 +132,7 @@ function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress,
           </div>
         </div>
         {spot.is_multi_spot && (spot.type === 'Street' || spot.type === 'DIY') && (
-          <div style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 2, display: 'flex', alignItems: 'center', gap: 5, background: '#DFEEDF', border: '1px solid #4E9A51', borderRadius: 6, padding: '3px 7px' }}>
+          <div style={{ position: 'absolute', bottom: 8, right: 8, zIndex: LAYERS.PAGE_CONTENT + 2, display: 'flex', alignItems: 'center', gap: 5, background: '#DFEEDF', border: '1px solid #4E9A51', borderRadius: 6, padding: '3px 7px' }}>
             <MultiSpotIcon color="#3d6830" holeColor="#DFEEDF" />
             <span style={{ fontSize: 9, fontWeight: 700, color: '#3d6830', letterSpacing: 1, textTransform: 'uppercase' }}>Multi-Spot</span>
           </div>

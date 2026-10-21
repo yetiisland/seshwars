@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
@@ -25,13 +25,12 @@ import { SPOT_FIELDS } from '../lib/spotFields'
 import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
 import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
 import { SpotPin, getSpotPinColors } from './MapView'
+import SpotCoverImage from '../components/SpotCoverImage'
+import { LAYERS } from '../lib/layers'
+import { buildStaticMapUrl, clampStaticMapDimension, STATIC_MAP_ZOOM } from '../lib/staticMap'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024
-// The old interactive Location map opened at zoom 15 — the static preview
-// image below renders one zoom level in so the (now non-interactive) image
-// shows a bit more detail, capped at the Static Images API's own max of 19.
-const LOCATION_MAP_ZOOM = Math.min(15 + 1, 19)
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
@@ -125,10 +124,16 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [showUnhideModal, setShowUnhideModal] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [liveReport, setLiveReport] = useState(null)
-  const [fsMapSatellite, setFsMapSatellite] = useState(false)
+  const [fsMapSatellite, setFsMapSatellite] = useState(true)
   const [avgRating, setAvgRating] = useState(spot.avg_rating ?? null)
   const [reviewCount, setReviewCount] = useState(spot.rating_count ?? 0)
-  const handleStatsChange = (avg, count) => { setAvgRating(avg); setReviewCount(count) }
+  // Stable identity — ReviewsSection's own loadReviews() depends on this
+  // prop (so it can refetch if the callback itself ever changed), and an
+  // inline function recreated on every SpotDetail render was making that
+  // effect refire on every unrelated re-render (any state change anywhere
+  // in this large component), resetting the in-progress written-review
+  // textarea mid-keystroke every time.
+  const handleStatsChange = useCallback((avg, count) => { setAvgRating(avg); setReviewCount(count) }, [])
   const [modStatus, setModStatus] = useState(spot.moderation_status || 'approved')
   const scrollAreaRef = useRef()
 
@@ -177,9 +182,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     if (!el) return
     const measure = () => {
       const rect = el.getBoundingClientRect()
-      const width = Math.min(1280, Math.round(rect.width))
-      const height = Math.min(1280, Math.round(rect.height))
-      if (width <= 0 || height <= 0) return
+      const width = clampStaticMapDimension(rect.width)
+      const height = clampStaticMapDimension(rect.height)
+      if (rect.width <= 0 || rect.height <= 0) return
       setLocationImgSize(prev => (prev && prev.width === width && prev.height === height) ? prev : { width, height })
     }
     measure()
@@ -190,7 +195,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
   const locationStaticImgUrl = useMemo(() => {
     if (!hasCoords || !locationImgSize) return null
-    return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${spot.longitude},${spot.latitude},${LOCATION_MAP_ZOOM},0/${locationImgSize.width}x${locationImgSize.height}@2x?access_token=${MAPBOX_TOKEN}`
+    return buildStaticMapUrl(spot.longitude, spot.latitude, locationImgSize.width, locationImgSize.height)
   }, [hasCoords, spot.longitude, spot.latitude, locationImgSize])
 
   // ── Data fetching ─────────────────────────────────────────────
@@ -749,24 +754,14 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </div>
             ))
           ) : (
-            // Recovered verbatim from SpotCard.jsx as it existed before
-            // commit 190662e removed it (git show 190662e^:src/components/
-            // SpotCard.jsx) — the original stacked-bars no-photo placeholder,
-            // category-tinted the same way.
-            <div style={{ width: '100%', height: '100%', background: spot.type === 'Skate Shop' ? '#2e3344' : '#F0E8DE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="60" height="34" viewBox="0 0 60 34" fill="none">
-                <rect x="2" y="22" width="56" height="8" rx="1.5" fill={spot.type === 'Skate Shop' ? '#3a3d50' : '#ddd0bc'} />
-                <rect x="6" y="12" width="48" height="8" rx="1.5" fill={spot.type === 'Skate Shop' ? '#434658' : '#e0cebc'} />
-                <rect x="10" y="4" width="40" height="7" rx="1.5" fill={spot.type === 'Skate Shop' ? '#4c5060' : '#e8d8c8'} />
-              </svg>
-            </div>
+            <SpotCoverImage spot={spot} placeholderBg={spot.type === 'Skate Shop' ? '#2e3344' : '#F0E8DE'} />
           )}
 
           {/* Gradient overlay */}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.28) 0%, transparent 40%, rgba(20,28,20,0.85) 100%)', pointerEvents: 'none' }} />
 
           {/* Top-left: type + bust badges */}
-          <div style={{ position: 'absolute', top: 10, left: 12, zIndex: 10, display: 'flex', gap: 4, alignItems: 'center' }}>
+          <div style={{ position: 'absolute', top: 10, left: 12, zIndex: LAYERS.PAGE_CONTENT + 10, display: 'flex', gap: 4, alignItems: 'center' }}>
             <div className="spot-badge">{normalizeType(spot.type)}</div>
             {spot.bust_rating && (
               <div style={{ ...bustBadgeStyle(spot.bust_rating), fontSize: 9, padding: '3px 7px', borderRadius: 6, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
@@ -782,7 +777,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           </div>
 
           {/* Top-right: hide/unhide + bookmark */}
-          <div style={{ position: 'absolute', top: 10, right: 12, zIndex: 10, display: 'flex', gap: 6 }}>
+          <div style={{ position: 'absolute', top: 10, right: 12, zIndex: LAYERS.PAGE_CONTENT + 10, display: 'flex', gap: 6 }}>
             {isHidden && user ? (
               <div
                 onClick={e => { e.stopPropagation(); setShowUnhideModal(true) }}
@@ -818,7 +813,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
           {/* Photo dots — bottom right */}
           {photos.length > 1 && (
-            <div style={{ position: 'absolute', bottom: 14, right: 14, zIndex: 10, display: 'flex', gap: 5 }}>
+            <div style={{ position: 'absolute', bottom: 14, right: 14, zIndex: LAYERS.PAGE_CONTENT + 10, display: 'flex', gap: 5 }}>
               {photos.map((_, i) => (
                 <div key={i} onClick={e => { e.stopPropagation(); setPhotoIndex(i) }}
                   style={{ width: i === photoIndex ? 7 : 5, height: i === photoIndex ? 7 : 5, borderRadius: '50%', background: i === photoIndex ? '#d4785a' : '#fff', opacity: i === photoIndex ? 1 : 0.5, cursor: 'pointer', transition: 'all 0.15s' }} />
@@ -833,7 +828,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             const hasVisibility = spot.visibility && spot.visibility !== 'public'
             if (!hasReport && !hasVisibility) return null
             return (
-              <div style={{ position: 'absolute', bottom: 14, left: 12, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', maxWidth: 'calc(100% - 24px)' }}>
+              <div style={{ position: 'absolute', bottom: 14, left: 12, zIndex: LAYERS.PAGE_CONTENT + 10, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', maxWidth: 'calc(100% - 24px)' }}>
                 {hasVisibility && (
                   <div style={{ background: '#3D4454', border: '1px solid #2e3344', borderRadius: 6, padding: '4px 10px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
@@ -867,7 +862,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               position: 'absolute',
               bottom: photos.length > 1 ? 27 : 10,
               right: photos.length > 1 ? 14 : 12,
-              zIndex: 10, display: 'flex', alignItems: 'center', gap: 5, background: '#DFEEDF', border: '1px solid #4E9A51', borderRadius: 6, padding: '3px 7px',
+              zIndex: LAYERS.PAGE_CONTENT + 10, display: 'flex', alignItems: 'center', gap: 5, background: '#DFEEDF', border: '1px solid #4E9A51', borderRadius: 6, padding: '3px 7px',
             }}>
               <MultiSpotIcon color="#3d6830" holeColor="#DFEEDF" />
               <span style={{ fontSize: 9, fontWeight: 700, color: '#3d6830', letterSpacing: 1, textTransform: 'uppercase' }}>Multi-Spot</span>
@@ -1039,11 +1034,15 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                     }}
                   />
                 )}
+                {/* Unselected size (no `selected` prop) — matches the
+                    symbol layer's baked pin icon on the Spots tab map
+                    exactly (PIN_DISPLAY_H=28 in MapView.jsx), not the
+                    larger `selected` glow variant. */}
                 <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -100%)', pointerEvents: 'none' }}>
-                  <SpotPin {...getSpotPinColors(spot)} selected />
+                  <SpotPin {...getSpotPinColors(spot)} />
                 </div>
                 <div
-                  style={{ position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 6, background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
+                  style={{ position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 6, background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: LAYERS.PAGE_CONTENT + 10 }}
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M1 5V1H5M9 1H13V5M13 9V13H9M5 13H1V9" stroke="#2a1e14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1059,7 +1058,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           {spot.address && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>{spot.address}</div>}
 
           {hasCoords && (
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 20 }}>
               <div
                 onClick={() => setShowMapsModal(true)}
                 style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
@@ -1114,9 +1113,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
       {/* ── Fullscreen map ───────────────────────────────── */}
       {showMapFullscreen && hasCoords && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000050, background: '#000' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: LAYERS.SHEET, background: '#000' }}>
           <Map
-            initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: LOCATION_MAP_ZOOM }}
+            initialViewState={{ longitude: spot.longitude, latitude: spot.latitude, zoom: STATIC_MAP_ZOOM }}
             onLoad={e => {
               // Mapbox GL JS v3+ defaults to 'globe' and auto-switches by
               // zoom level — force mercator permanently, and re-apply on
@@ -1142,7 +1141,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           {/* Satellite/street eye toggle — bottom-right */}
           <div
             onClick={() => setFsMapSatellite(s => !s)}
-            style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)', right: 10, width: 38, height: 38, borderRadius: 6, background: fsMapSatellite ? '#FDF8F0' : '#d4785a', border: fsMapSatellite ? '2px solid #d4785a' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+            style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)', right: 10, width: 38, height: 38, borderRadius: 6, background: fsMapSatellite ? '#FDF8F0' : '#d4785a', border: fsMapSatellite ? '2px solid #d4785a' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT + 10, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
           >
             <svg width="24" height="24" viewBox="0 0 20 20" fill="none">
               <path d="M1 10C1 10 4 4 10 4C16 4 19 10 19 10C19 10 16 16 10 16C4 16 1 10 1 10Z"
@@ -1156,7 +1155,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           {/* X close button */}
           <div
             onClick={() => setShowMapFullscreen(false)}
-            style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+            style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT + 10, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <line x1="3" y1="3" x2="15" y2="15" stroke="#2a1e14" strokeWidth="2" strokeLinecap="round"/>
@@ -1169,7 +1168,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
       {/* ── Maps modal ────────────────────────────────────── */}
       {showMapsModal && createPortal(
-        <div className="modal-overlay" onClick={() => setShowMapsModal(false)} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={() => setShowMapsModal(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-title" style={{ padding: '0 16px' }}>Open with</div>
@@ -1202,7 +1201,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
       {/* ── Edit password modal ───────────────────────────── */}
       {showEditAuth && createPortal(
-        <div className="modal-overlay" onClick={() => { setShowEditAuth(false); setEditPassword(''); setAuthError('') }} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={() => { setShowEditAuth(false); setEditPassword(''); setAuthError('') }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div className="modal-title" style={{ padding: '0 16px' }}>Edit Spot</div>
@@ -1221,7 +1220,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
       {/* ── Edit form overlay ─────────────────────────────── */}
       {showEditForm && editForm && createPortal(
-        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: 2000050, display: 'flex', flexDirection: 'column' }}>
+        <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.SHEET, display: 'flex', flexDirection: 'column' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
             <div style={{ width: 28 }} />
@@ -1271,7 +1270,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   </div>
                 )}
                 {editAddr.showDropdown && editAddr.geoResults.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }}>
                     {editAddr.geoResults.map(r => (
                       <div key={r.id} onMouseDown={() => handleSelectEditSuggestion(r)} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
                         <div style={{ fontWeight: 700 }}>{r.text}</div>
@@ -1418,13 +1417,13 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       {/* ── Lightbox with pinch zoom ──────────────────────── */}
       {lightboxOpen && photos.length > 0 && createPortal(
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.96)', zIndex: 2000050, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none' }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.96)', zIndex: LAYERS.SHEET, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none' }}
           onTouchStart={onLbTouchStart}
           onTouchMove={onLbTouchMove}
           onTouchEnd={onLbTouchEnd}
           onClick={() => { setLightboxOpen(false); resetLbZoom() }}
         >
-          <div onClick={e => { e.stopPropagation(); setLightboxOpen(false); resetLbZoom() }} style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000 }}>
+          <div onClick={e => { e.stopPropagation(); setLightboxOpen(false); resetLbZoom() }} style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT + 10 }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="2" y1="2" x2="12" y2="12" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" /><line x1="12" y1="2" x2="2" y2="12" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" /></svg>
           </div>
           {photos.length > 1 && (
@@ -1481,9 +1480,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         </div>,
         document.body
       )}
-      {showTos && createPortal(<TermsOfService onClose={() => setShowTos(false)} />, document.body)}
+      {showTos && <TermsOfService onClose={() => setShowTos(false)} />}
       {showUnhideModal && createPortal(
-        <div className="modal-overlay" onClick={() => setShowUnhideModal(false)} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={() => setShowUnhideModal(false)} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -1514,7 +1513,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         document.body
       )}
       {(showHideModal || hideModalClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeHideModal} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={closeHideModal} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={hideModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -1537,7 +1536,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         document.body
       )}
       {shareCopied && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000050, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           Link Copied!
         </div>,
         document.body
@@ -1546,7 +1545,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           swapped in place for the friend-picker content — never a second
           sheet animated on top of this one. */}
       {showShareSheet && createPortal(
-        <div className="modal-overlay" onClick={closeShareSheet} style={{ zIndex: 2000050 }}>
+        <div className="modal-overlay" onClick={closeShareSheet}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div className="modal-handle" />
             {shareSheetMode === 'choice' ? (
@@ -1581,7 +1580,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         document.body
       )}
       {sendToast && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000050, maxWidth: 'calc(100vw - 48px)', textAlign: 'center', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: LAYERS.TOAST, maxWidth: 'calc(100vw - 48px)', textAlign: 'center', pointerEvents: 'none' }}>
           {sendToast}
         </div>,
         document.body

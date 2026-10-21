@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { checkImageModeration } from '../utils/moderation'
 import InitialsAvatar from './InitialsAvatar'
+import { LAYERS } from '../lib/layers'
 
 function relativeTime(ts) {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
@@ -57,7 +58,7 @@ function getThumbnail(clip) {
   if (isImageUrl(clip.url)) return clip.url
   if (clip.type === 'link') {
     const ytId = extractYouTubeId(clip.url)
-    if (ytId) return `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+    if (ytId) return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`
   }
   return null
 }
@@ -158,7 +159,12 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
         .from('spot_clips')
         .insert({ spot_id: spotId, user_id: cu.id, type: 'upload', url: data.secure_url, thumbnail_url: thumbnailUrl, moderation_status: clip_mod_status })
         .select().single()
-      if (insertErr) { setUploadError(insertErr.message); setUploading(false); return }
+      if (insertErr || !clip) {
+        console.error('[ClipsSection] handlePhotoUpload insert failed:', insertErr)
+        setUploadError(insertErr?.message || 'Could not post this clip. Try again.')
+        setUploading(false)
+        return
+      }
       setUploading(false)
       setSelectedPhotoFile(null)
       closeModal()
@@ -182,7 +188,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
     const ytId = extractYouTubeId(url)
     const vimeoId = extractVimeoId(url)
     const igId = extractInstagramId(url)
-    if (ytId) thumbnailUrl = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+    if (ytId) thumbnailUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`
     else if (vimeoId) {
       try {
         const res = await fetch(`https://vimeo.com/api/v2/video/${vimeoId}.json`)
@@ -206,7 +212,12 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
       .insert({ spot_id: spotId, user_id: cu.id, type: 'link', url, thumbnail_url: thumbnailUrl, title: linkTitle.trim() || null, moderation_status: clip_mod_status })
       .select().single()
 
-    if (insertErr) { setUploadError(insertErr.message); setUploading(false); return }
+    if (insertErr || !clip) {
+      console.error('[ClipsSection] handleLinkSubmit insert failed:', insertErr)
+      setUploadError(insertErr?.message || 'Could not post this clip. Try again.')
+      setUploading(false)
+      return
+    }
     setUploading(false)
     closeModal()
     if (clip_mod_status === 'approved' || isAdmin) {
@@ -277,7 +288,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
 
       {clips.length === 0 ? null : (
         <div style={{ position: 'relative', margin: '0 -14px 12px' }}>
-          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 36, background: 'linear-gradient(to right, transparent, #FDF8F0)', zIndex: 2, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 36, background: 'linear-gradient(to right, transparent, #FDF8F0)', zIndex: LAYERS.PAGE_CONTENT + 2, pointerEvents: 'none' }} />
           <div className="hide-scroll" style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '0 14px 4px' }}>
             {clips.map(clip => {
               const thumb = getThumbnail(clip)
@@ -290,18 +301,21 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
                   >
                     {thumb && <img src={thumb} alt="" width="140" height="100" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
                     {!thumb && extractInstagramId(clip.url) && (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                        <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
-                          <rect x="3" y="3" width="26" height="26" rx="7" stroke="rgba(255,255,255,0.95)" strokeWidth="2.2" fill="none" />
-                          <circle cx="16" cy="16" r="6" stroke="rgba(255,255,255,0.95)" strokeWidth="2.2" fill="none" />
-                          <circle cx="23" cy="9" r="1.6" fill="rgba(255,255,255,0.95)" />
-                        </svg>
-                        <span style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.88)', letterSpacing: 0.8, textTransform: 'uppercase', fontFamily: 'Barlow, sans-serif', textAlign: 'center', lineHeight: 1.4 }}>View on<br />Instagram</span>
-                      </div>
+                      <iframe
+                        src={getEmbedUrl(clip)}
+                        loading="lazy"
+                        tabIndex={-1}
+                        style={{
+                          position: 'absolute', top: '50%', left: '50%',
+                          width: 400, height: 480, border: 'none',
+                          transform: 'translate(-50%, -50%) scale(0.35)',
+                          pointerEvents: 'none',
+                        }}
+                      />
                     )}
                     {(thumb || !extractInstagramId(clip.url)) && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 35%, rgba(0,0,0,0.5) 100%)' }} />}
                     {isAdmin && clip.moderation_status === 'pending' && (
-                      <div style={{ position: 'absolute', top: 5, left: 5, background: 'rgba(255,175,0,0.9)', borderRadius: 4, padding: '2px 5px', fontSize: 8, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#2a1e14', zIndex: 3 }}>PENDING</div>
+                      <div style={{ position: 'absolute', top: 5, left: 5, background: 'rgba(255,175,0,0.9)', borderRadius: 4, padding: '2px 5px', fontSize: 8, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#2a1e14', zIndex: LAYERS.PAGE_CONTENT + 3 }}>PENDING</div>
                     )}
                     {!isImageUrl(clip.url) && !extractInstagramId(clip.url) && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -451,7 +465,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
       {/* ── Video Lightbox ─────────────────────────────── */}
       {activeClip && createPortal(
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+          style={{ position: 'fixed', inset: 0, zIndex: LAYERS.SHEET, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
           onClick={closeLightbox}
           onTouchStart={e => {
             lbTouchStartY.current = e.touches[0].clientY
@@ -473,7 +487,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
           {/* X close button */}
           <div
             onClick={closeLightbox}
-            style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 20, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000 }}
+            style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 20, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT + 10 }}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <line x1="4" y1="4" x2="16" y2="16" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
@@ -485,9 +499,33 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
           {user?.id === activeClip.user_id && (
             <div
               onClick={e => { e.stopPropagation(); setClipDeleteError(''); setShowClipDeleteModal(true) }}
-              style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 20, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000 }}
+              style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 20, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT + 10 }}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 5H13M6 5V3H10V5M5 5V13H11V5H5Z" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </div>
+          )}
+
+          {/* Prev/next arrows — hidden at the first/last clip. Swipe
+              (onTouchEnd above) still wraps around via goToClip's own
+              modulo; these buttons deliberately don't. */}
+          {activeIndex > 0 && (
+            <div
+              onClick={e => { e.stopPropagation(); goToClip(activeIndex - 1) }}
+              style={{ position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT + 10 }}
+            >
+              <svg width="12" height="20" viewBox="0 0 12 20" fill="none">
+                <path d="M10 2L2 10L10 18" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          )}
+          {activeIndex < clips.length - 1 && (
+            <div
+              onClick={e => { e.stopPropagation(); goToClip(activeIndex + 1) }}
+              style={{ position: 'absolute', top: '50%', right: 10, transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT + 10 }}
+            >
+              <svg width="12" height="20" viewBox="0 0 12 20" fill="none">
+                <path d="M2 2L10 10L2 18" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
           )}
 
@@ -557,7 +595,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
           {/* Admin moderation banner for pending clips */}
           {isAdmin && activeClip.moderation_status === 'pending' && (
             <div
-              style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', left: 16, right: 16, background: 'rgba(255,175,0,0.93)', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, zIndex: 10001 }}
+              style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', left: 16, right: 16, background: 'rgba(255,175,0,0.93)', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6, zIndex: LAYERS.PAGE_CONTENT + 11 }}
               onClick={e => e.stopPropagation()}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -625,7 +663,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
 
       {/* Clip delete confirm modal */}
       {(showClipDeleteModal || clipDeleteModalClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeClipDeleteModal}>
+        <div className="modal-overlay" onClick={closeClipDeleteModal} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={clipDeleteModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delete Clip</div>

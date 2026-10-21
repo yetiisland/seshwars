@@ -10,11 +10,12 @@ import InitialsAvatar from '../components/InitialsAvatar'
 import { getProfiles } from '../utils/profileCache'
 import MapView from './MapView'
 import MembersSummary from '../components/MembersSummary'
+import { LAYERS } from '../lib/layers'
 
 // Inline suggestion dropdown — copied verbatim from the geocoder address
 // dropdown in AddSpot.jsx (same pattern CommentsSection.jsx's @mention
 // dropdown already reuses).
-const memberDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden', maxHeight: 240, overflowY: 'auto' }
+const memberDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden', maxHeight: 240, overflowY: 'auto' }
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -525,7 +526,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   }
 
   return (
-    <div className="desktop-page-root" style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
+    <div className="desktop-page-root" style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
       <div style={{
         display: 'grid',
         // Both side columns reserved at the same width — 2 buttons (36px
@@ -572,21 +573,21 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
       </div>
 
       {copied && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           Link Copied!
         </div>,
         document.body
       )}
 
       {shareError && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {shareError}
         </div>,
         document.body
       )}
 
       {deleteError && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {deleteError}
         </div>,
         document.body
@@ -594,7 +595,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
 
       {/* Delete confirmation popup */}
       {(showDeleteConfirm || deleteClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeDeleteConfirm}>
+        <div className="modal-overlay" onClick={closeDeleteConfirm} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -655,7 +656,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
       {/* Leave-list confirmation (members only) — existing confirm-dialog
           pattern, closes in both outcomes. */}
       {(showLeaveConfirm || leaveClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeLeaveConfirm}>
+        <div className="modal-overlay" onClick={closeLeaveConfirm} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={leaveClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 12px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Leave List</div>
@@ -671,7 +672,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
         document.body
       )}
       {leaveError && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {leaveError}
         </div>,
         document.body
@@ -711,7 +712,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
         document.body
       )}
       {shareToast && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {shareToast}
         </div>,
         document.body
@@ -724,10 +725,10 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           doesn't float on top of (and intercept taps meant for) whatever
           other tab's own LIST/MAP toggle occupies this same screen position. */}
       {isActive && createPortal(
-        <div ref={viewToggleTrackRef} style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
-          <div ref={viewToggleThumbRef} style={{ position: 'absolute', top: 3, bottom: 3, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
-          <div ref={el => { viewToggleSegmentRefs.current.list = el }} onClick={() => setViewMode('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-          <div ref={el => { viewToggleSegmentRefs.current.map = el }} onClick={() => setViewMode('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+        <div ref={viewToggleTrackRef} style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: LAYERS.PAGE_CONTENT, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
+          <div ref={viewToggleThumbRef} style={{ position: 'absolute', top: 3, bottom: 3, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: LAYERS.PAGE_CONTENT }} />
+          <div ref={el => { viewToggleSegmentRefs.current.list = el }} onClick={() => setViewMode('list')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+          <div ref={el => { viewToggleSegmentRefs.current.map = el }} onClick={() => setViewMode('map')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
         </div>,
         document.body
       )}

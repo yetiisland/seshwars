@@ -7,6 +7,7 @@ import SpotCard from '../components/SpotCard'
 import MapView from './MapView'
 import AuthScreen from './AuthScreen'
 import TabBar from '../components/TabBar'
+import { LAYERS } from '../lib/layers'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -246,17 +247,17 @@ export default function SharedListPage() {
 
       {/* LIST/MAP toggle pill — above TabBar */}
       {createPortal(
-        <div ref={viewToggleTrackRef} style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
-          <div ref={viewToggleThumbRef} style={{ position: 'absolute', top: 3, bottom: 3, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: 0 }} />
-          <div ref={el => { viewToggleSegmentRefs.current.list = el }} onClick={() => setViewMode('list')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-          <div ref={el => { viewToggleSegmentRefs.current.map = el }} onClick={() => setViewMode('map')} style={{ position: 'relative', zIndex: 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+        <div ref={viewToggleTrackRef} style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: '50%', transform: 'translateX(-50%)', zIndex: LAYERS.PAGE_CONTENT, display: 'flex', background: '#d4785a', borderRadius: 50, padding: 3, pointerEvents: 'auto', boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
+          <div ref={viewToggleThumbRef} style={{ position: 'absolute', top: 3, bottom: 3, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: LAYERS.PAGE_CONTENT }} />
+          <div ref={el => { viewToggleSegmentRefs.current.list = el }} onClick={() => setViewMode('list')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+          <div ref={el => { viewToggleSegmentRefs.current.map = el }} onClick={() => setViewMode('map')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: viewMode === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
         </div>,
         document.body
       )}
 
       {/* Toast — above toggle pill */}
       {toast && createPortal(
-        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 134px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: 2000, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 134px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
           {toast}
         </div>,
         document.body

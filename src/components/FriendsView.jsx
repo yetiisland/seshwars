@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import AddFriendButton from './AddFriendButton'
 import { CloseIcon, IconBox } from './Icons'
 import InitialsAvatar from './InitialsAvatar'
+import { LAYERS } from '../lib/layers'
 
 // Row container — copied verbatim from the notification card markup in
 // ProfileView.jsx (~line 1009-1035).
@@ -419,7 +420,7 @@ export default function FriendsView({ user, userLocation, locationPermission, re
           (modal-overlay/modal-sheet, solid-salmon action + outline cancel)
           copied verbatim from ReviewsSection.jsx's "Delete Rating" modal. */}
       {pendingRemoveFriend && createPortal(
-        <div className="modal-overlay" onClick={() => setPendingRemoveFriend(null)}>
+        <div className="modal-overlay" onClick={() => setPendingRemoveFriend(null)} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Friend</div>
@@ -435,7 +436,7 @@ export default function FriendsView({ user, userLocation, locationPermission, re
 
       {/* Cancel-pending-request confirmation — same pattern as above */}
       {pendingCancelPending && createPortal(
-        <div className="modal-overlay" onClick={() => setPendingCancelPending(null)}>
+        <div className="modal-overlay" onClick={() => setPendingCancelPending(null)} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cancel Request</div>

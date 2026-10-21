@@ -130,7 +130,7 @@ body {
   flex-shrink: 0;
   border-bottom: 1px solid rgba(212, 120, 90, 0.12);
   position: relative;
-  z-index: 1000;
+  z-index: 1; /* LAYERS.PAGE_CONTENT */
 }
 
 /* DROP A SPOT button */
@@ -187,7 +187,7 @@ body {
   left: 0;
   right: 0;
   width: 100%;
-  z-index: 1000;
+  z-index: 30000; /* LAYERS.BOTTOM_NAV */
 }
 
 /* Desktop top nav — hidden on mobile */
@@ -221,7 +221,7 @@ body {
     height: 64px;
     background: #FDF8F0;
     border-bottom: 1px solid #E8DDD0;
-    z-index: 1000;
+    z-index: 1; /* LAYERS.PAGE_CONTENT */
     align-items: center;
     padding: 0 24px;
     gap: 0;
@@ -309,7 +309,7 @@ body {
     border-radius: 20px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.18);
     padding: 10px 16px;
-    z-index: 999;
+    z-index: 30000; /* LAYERS.BOTTOM_NAV */
   }
 
   .desktop-float-nav .tab-item {
@@ -475,12 +475,14 @@ textarea.form-input {
   to   { transform: translateY(100%); }
 }
 
-/* Modal overlay */
+/* Modal overlay — default tier for every sheet/popup. Must match
+   LAYERS.SHEET in src/lib/layers.js; a handful of confirmation dialogs
+   override this inline to LAYERS.CONFIRM. */
 .modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.6);
-  z-index: 99999;
+  z-index: 40000;
   display: flex;
   align-items: flex-end;
 }

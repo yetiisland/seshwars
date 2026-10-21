@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { LAYERS } from '../lib/layers'
 
 function DragHandle() {
   return (
-    <div style={{ position: 'absolute', top: 3, left: 3, padding: 2, zIndex: 3, cursor: 'grab', background: 'rgba(0,0,0,0.45)', borderRadius: 3 }}>
+    <div style={{ position: 'absolute', top: 3, left: 3, padding: 2, zIndex: LAYERS.PAGE_CONTENT + 3, cursor: 'grab', background: 'rgba(0,0,0,0.45)', borderRadius: 3 }}>
       <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
         <circle cx="3" cy="2" r="1" fill="#fff" />
         <circle cx="7" cy="2" r="1" fill="#fff" />
@@ -86,7 +87,7 @@ export default function DraggablePhotos({ photos, setPhotos, onAdd, uploading, u
         top: ${rect.top}px;
         width: ${rect.width}px;
         height: ${rect.height}px;
-        z-index: 9999;
+        z-index: ${LAYERS.PAGE_CONTENT + 100};
         pointer-events: none;
         transform: scale(1.07);
         box-shadow: 0 10px 28px rgba(0,0,0,0.35);
@@ -203,7 +204,7 @@ export default function DraggablePhotos({ photos, setPhotos, onAdd, uploading, u
             {/* X button outside overflow:hidden so it's never clipped */}
             <div
               onClick={e => { e.stopPropagation(); setPendingDeleteIdx(i) }}
-              style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 4 }}
+              style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT + 4 }}
             >
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><line x1="1" y1="1" x2="7" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /><line x1="7" y1="1" x2="1" y2="7" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" /></svg>
             </div>
@@ -226,7 +227,7 @@ export default function DraggablePhotos({ photos, setPhotos, onAdd, uploading, u
       )}
 
       {(pendingDeleteIdx !== null || deleteModalClosing) && createPortal(
-        <div className="modal-overlay" onClick={closeDeleteModal}>
+        <div className="modal-overlay" onClick={closeDeleteModal} style={{ zIndex: LAYERS.CONFIRM }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={deleteModalClosing ? { animation: 'slideOutDown 0.18s ease-in forwards' } : undefined}>
             <div className="modal-handle" />
             <div style={{ padding: '4px 16px 10px', fontSize: 18, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Remove Photo</div>
