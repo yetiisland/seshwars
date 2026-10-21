@@ -168,10 +168,12 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
       setUploading(false)
       setSelectedPhotoFile(null)
       closeModal()
-      if (clip_mod_status === 'approved' || isAdmin) {
-        const profileMap = await fetchProfiles([cu.id])
-        setClips(prev => [{ ...clip, profile: profileMap[cu.id] || null }, ...prev])
-      }
+      // Same pattern as AddSpot.jsx's mergeSpotIntoCache: a verified write
+      // updates local state immediately regardless of moderation status —
+      // the poster sees their own clip right away either way; loadClips'
+      // own query is what actually hides a pending clip from other users.
+      const profileMap = await fetchProfiles([cu.id])
+      setClips(prev => [{ ...clip, profile: profileMap[cu.id] || null }, ...prev])
     }
     xhr.onerror = () => { setUploadError('Network error.'); setUploading(false) }
     xhr.send(formData)
@@ -220,12 +222,12 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
     }
     setUploading(false)
     closeModal()
-    if (clip_mod_status === 'approved' || isAdmin) {
-      const profileMap = await fetchProfiles([cu.id])
-      setClips(prev => [{ ...clip, profile: profileMap[cu.id] || null }, ...prev])
-    } else {
-      setUploadError('Your clip is under review and will appear once approved.')
-    }
+    // Same pattern as AddSpot.jsx's mergeSpotIntoCache: a verified write
+    // updates local state immediately regardless of moderation status —
+    // the poster sees their own clip right away either way; loadClips'
+    // own query is what actually hides a pending clip from other users.
+    const profileMap = await fetchProfiles([cu.id])
+    setClips(prev => [{ ...clip, profile: profileMap[cu.id] || null }, ...prev])
   }
 
   const closeClipDeleteModal = () => {

@@ -84,7 +84,7 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           border: 'none', borderRadius: 6, padding: 13,
-          cursor: 'pointer', marginBottom: 20,
+          cursor: 'pointer', marginBottom: 8,
           background: '#f5c518', opacity: submitted ? 0.55 : 1,
         }}
       >

@@ -1058,7 +1058,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           {spot.address && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 14 }}>{spot.address}</div>}
 
           {hasCoords && (
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 8 }}>
               <div
                 onClick={() => setShowMapsModal(true)}
                 style={{ width: '100%', padding: 13, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
