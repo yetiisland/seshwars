@@ -215,18 +215,18 @@ One scale for the whole app, exported as named constants from
 
 | Tier | Constant | Covers |
 |---|---|---|
-| 1 | `PAGE_CONTENT` | In-page stacking only — card badges, floating toggle pills, anchored suggestion dropdowns, status-bar cover. Never competes with anything outside its own page. |
-| 2 | `FULL_SCREEN_PAGE` | Settings, Friends, Trick List, Spots Added, Hidden Spots, Notifications, Edit Profile, Feedback, Support, Delete Account, Add Spot — pages reached from the main tabs, never opened on top of an open spot. |
-| 3 | `SPOT_OVERLAY` | The open-spot takeover (`App.jsx`) — renders above every full-screen page so opening a spot from one of them covers it instead of opening underneath. |
-| 4 | `BOTTOM_NAV` | The tab bar (mobile `.tab-bar`, desktop `.desktop-float-nav`) — always above the spot overlay, unconditionally. |
-| 5 | `SHEET` | Every bottom sheet/popup (`.modal-overlay`'s own default) — save-to-list, share, report, options, filters, and the rest. Always above the bottom nav. |
-| 6 | `CONFIRM` | Confirmation dialogs (delete/hide/leave/remove, unsaved-changes) and full-screen interrupts reachable from anywhere (sign-in, Terms, Privacy) — above sheets. |
-| 7 | `TOAST` | Transient toast/snackbar messages — always on top. |
+| 1 | `PAGE_CONTENT` | In-page stacking only — card badges, anchored suggestion dropdowns, status-bar cover, a page's own map/list content. Never competes with anything outside its own page. |
+| 2 | `FLOATING_CONTROL` | Floating controls that sit on top of a page's own content but aren't a popup — the LIST/MAP toggle pill, the map's satellite/locate/filter buttons. Above all page content (including a full-screen map), below every full-screen page. |
+| 3 | `FULL_SCREEN_PAGE` | Settings, Friends, Trick List, Spots Added, Hidden Spots, Notifications, Edit Profile, Feedback, Support, Delete Account, Add Spot — pages reached from the main tabs, never opened on top of an open spot. |
+| 4 | `SPOT_OVERLAY` | The open-spot takeover (`App.jsx`) — renders above every full-screen page so opening a spot from one of them covers it instead of opening underneath. |
+| 5 | `BOTTOM_NAV` | The tab bar (mobile `.tab-bar`, desktop `.desktop-float-nav`) — always above the spot overlay, unconditionally. |
+| 6 | `SHEET` | Every bottom sheet/popup (`.modal-overlay`'s own default) — save-to-list, share, report, options, filters, and the rest. Always above the bottom nav. |
+| 7 | `CONFIRM` | Confirmation dialogs (delete/hide/leave/remove, unsaved-changes) and full-screen interrupts reachable from anywhere (sign-in, Terms, Privacy) — above sheets. |
+| 8 | `TOAST` | Transient toast/snackbar messages — always on top. |
 
-Tiers are spaced 10,000 apart so a component needing fine-grained order
-against its own siblings (two badges on one card, a toggle pill's own
-thumb) can do `LAYERS.<TIER> + 1`, `+ 2`, ... without ever reaching the
-next tier.
+Tiers are spaced apart so a component needing fine-grained order against
+its own siblings (two badges on one card, a toggle pill's own thumb) can
+do `LAYERS.<TIER> + 1`, `+ 2`, ... without ever reaching the next tier.
 
 **Rule:** every bottom sheet, popup, modal, and confirmation dialog in the
 app renders through `createPortal(..., document.body)` at `SHEET` or

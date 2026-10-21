@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { checkImageModeration } from '../utils/moderation'
 import InitialsAvatar from './InitialsAvatar'
+import AddedByCard from './AddedByCard'
 import { LAYERS } from '../lib/layers'
 
 function relativeTime(ts) {
@@ -84,6 +85,7 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
   const [videoError, setVideoError] = useState(false)
   const [videoPlaying, setVideoPlaying] = useState(false)
   const [showVideoOverlay, setShowVideoOverlay] = useState(true)
+  const [posterFriendship, setPosterFriendship] = useState(null)
   const photoFileRef = useRef(null)
   const lbTouchStartY = useRef(null)
   const lbTouchStartX = useRef(null)
@@ -110,6 +112,26 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
     setVideoError(false)
     clearTimeout(overlayTimerRef.current)
   }, [activeClip])
+
+  // ── Friendship status for the clip's poster (for AddedByCard) — same
+  // query/shape as SpotDetail.jsx's own publisher friendship effect. ──
+  useEffect(() => {
+    setPosterFriendship(null)
+    const posterId = activeClip?.user_id
+    if (!user?.id || !posterId || posterId === user.id) return
+    supabase
+      .from('friendships')
+      .select('id, status, requester_id')
+      .or(`and(requester_id.eq.${user.id},addressee_id.eq.${posterId}),and(requester_id.eq.${posterId},addressee_id.eq.${user.id})`)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPosterFriendship({
+          status: data?.status ?? null,
+          isRequester: data ? data.requester_id === user.id : false,
+          friendshipId: data?.id ?? null,
+        })
+      })
+  }, [activeClip?.user_id, user?.id])
 
   const scheduleOverlayHide = () => {
     clearTimeout(overlayTimerRef.current)
@@ -327,6 +349,9 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
                       </div>
                     )}
                   </div>
+                  {clip.title && (
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#2a1e14', fontFamily: 'Barlow, sans-serif', padding: '6px 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{clip.title}</div>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 2px 2px' }}>
                     <InitialsAvatar profile={clip.profile} size={20} ring="0 0 0 1px #EAD8C8" />
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#2a1e14', fontFamily: 'Barlow, sans-serif', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{uname}</span>
@@ -649,13 +674,23 @@ export default function ClipsSection({ spotId, user, onGoProfile, isAdmin = fals
                 {activeIndex + 1} / {clips.length}
               </div>
             )}
-            {activeClip.title && <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 5 }}>{activeClip.title}</div>}
+            {activeClip.title && <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', lineHeight: 1.3, marginBottom: 8 }}>{activeClip.title}</div>}
             {clipDeleteError && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 5 }}>{clipDeleteError}</div>}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>
-                @{activeClip.profile?.username || activeClip.profile?.first_name || 'Anonymous'}
-              </span>
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>·</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AddedByCard
+                avatarUrl={activeClip.profile?.avatar_url}
+                initials={(activeClip.profile?.first_name || activeClip.profile?.username || '?')[0].toUpperCase()}
+                username={activeClip.profile?.username || activeClip.profile?.first_name}
+                isAnonymous={!activeClip.profile}
+                targetUserId={activeClip.user_id}
+                friendship={posterFriendship}
+                onFriendshipChange={(status, row) => setPosterFriendship(prev => ({
+                  ...prev,
+                  status,
+                  friendshipId: row?.id ?? prev.friendshipId,
+                  isRequester: row ? row.requester_id === user.id : prev.isRequester,
+                }))}
+              />
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{relativeTime(activeClip.created_at)}</span>
             </div>
           </div>

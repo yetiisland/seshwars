@@ -5,6 +5,7 @@ import FiltersModal from '../components/FiltersModal'
 import SpotCard from '../components/SpotCard'
 import { SHOP_STYLE } from '../lib/spotFields'
 import { LAYERS } from '../lib/layers'
+import SatelliteToggle from '../components/SatelliteToggle'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const FALLBACK = { longitude: -104.9903, latitude: 39.7392, zoom: 13 }
@@ -594,39 +595,14 @@ function MapView({ spots, saved, onSavePress, onSpotClick, onAddSpot, userLocati
 
         {/* Filters row — top */}
         {showFilterChips && (
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT + 10 }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: LAYERS.FLOATING_CONTROL }}>
             <FiltersModal active={activeFilters} onChange={handleFiltersChange} distance={propDistance} onDistanceChange={handleDistanceChange} sortMode={sortMode} onSortModeChange={onSortModeChange} searchLocation={searchLocation} onClearSearch={onClearSearch} />
           </div>
         )}
 
         {/* Eye/satellite toggle — bottom-right (within container on desktop) */}
         {showSatelliteToggle && (
-          <div style={{ position: 'fixed', bottom: isDesktop ? 'var(--desktop-nav-clearance)' : 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT + 10, pointerEvents: 'none' }}>
-            <div style={{ maxWidth: isDesktop ? 1200 : '100%', margin: '0 auto', display: 'flex', justifyContent: 'flex-end', paddingRight: 10, pointerEvents: 'auto' }}>
-              <div
-                onClick={() => setSatellite(s => !s)}
-                title={satellite ? 'Default map' : 'Satellite view'}
-                style={{
-                  width: 38, height: 38,
-                  background: satellite ? '#FDF8F0' : '#d4785a',
-                  border: satellite ? '2px solid #d4785a' : 'none',
-                  borderRadius: 6,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-                  pointerEvents: 'auto',
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 4L20 9L12 14L4 9L12 4Z"
-                    stroke={satellite ? '#d4785a' : '#fff'} strokeWidth="1.5" strokeLinejoin="round" />
-                  <path d="M4 13L12 18L20 13"
-                    stroke={satellite ? '#d4785a' : '#fff'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <circle cx="19" cy="5" r="2" fill={satellite ? '#d4785a' : '#fff'} />
-                </svg>
-              </div>
-            </div>
-          </div>
+          <SatelliteToggle active={satellite} onClick={() => setSatellite(s => !s)} />
         )}
 
         {/* Peek card — desktop: compact floating, mobile: full-width */}

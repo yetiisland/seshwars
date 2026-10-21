@@ -9,8 +9,10 @@ import { LAYERS } from '../lib/layers'
 // Same ~80px fixed-bottom-nav height used as BOTTOM_PAD elsewhere
 // (SpotDetail.jsx, SavedView.jsx, ProfileView.jsx), plus a safe-area-
 // inset-bottom buffer — env() isn't readable from JS directly, so this
-// approximates it rather than matching it exactly.
-const NAV_CLEARANCE_PX = 96
+// approximates it rather than matching it exactly — plus a deliberate
+// 16px gap so the (same-colored) POST COMMENT button and bottom nav
+// never visually touch while the keyboard is open.
+const NAV_CLEARANCE_PX = 112
 
 function findScrollParent(el) {
   let node = el?.parentElement
@@ -381,7 +383,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
       {/* Input row — exactly one rounded box (the textarea itself carries
           the white fill + border now); the wrapper below is layout-only */}
       {user ? (
-        <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 16 }}>
           {replyingTo && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 10, color: 'var(--text-muted)', fontWeight: 700 }}>
               Replying to @{replyingTo.username}
@@ -454,7 +456,9 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
 
       {/* Comment list */}
       {topLevelComments.length === 0 ? null : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 14 }}>
+        <>
+          <div className="section-label">Replies ({topLevelComments.length})</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 14 }}>
           {topLevelComments.map(comment => {
             const profile = profiles[comment.user_id]
             const isOwn = user?.id === comment.user_id
@@ -564,10 +568,11 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
             )
           })}
         </div>
+        </>
       )}
       {/* Extra space at the very end of the comments section, after the
           last comment and its replies — moved here from the composer's
-          own bottom margin above, which is back to its original 32. */}
+          own bottom margin above. */}
       {topLevelComments.length > 0 && <div style={{ height: 64 }} />}
 
       {(showDeleteModal || deleteModalClosing) && createPortal(

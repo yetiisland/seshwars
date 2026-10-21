@@ -19,13 +19,13 @@ import { transformImageUrl } from '../utils/imageUrl'
 import TermsOfService from './TermsOfService'
 import { isAdminUser } from '../lib/admin'
 import { haversineDistance } from '../hooks/useGeolocation'
-import AddFriendButton from '../components/AddFriendButton'
-import InitialsAvatar from '../components/InitialsAvatar'
+import AddedByCard from '../components/AddedByCard'
 import { SPOT_FIELDS } from '../lib/spotFields'
 import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
 import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
 import { SpotPin, getSpotPinColors } from './MapView'
 import SpotCoverImage from '../components/SpotCoverImage'
+import SatelliteToggle from '../components/SatelliteToggle'
 import { LAYERS } from '../lib/layers'
 import { buildStaticMapUrl, clampStaticMapDimension, STATIC_MAP_ZOOM } from '../lib/staticMap'
 
@@ -255,7 +255,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     return () => { cancelled = true; window.removeEventListener('seshwars:tricks-changed', fetchTrickSheetData) }
   }, [spot.id, user?.id])
 
-  // ── Friendship status for the publisher (for AddFriendButton) ──
+  // ── Friendship status for the publisher (for AddedByCard) ──
   useEffect(() => {
     setPublisherFriendship(null)
     if (!user?.id || !spot.added_by || spot.added_by === user.id) return
@@ -912,41 +912,25 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           {((publisherAvatar || publisherUsername || spot.added_by === null) || (avgRating != null && reviewCount > 0)) && (
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
               {(publisherAvatar || publisherUsername || spot.added_by === null) && (
-                <div style={{ display: 'inline-flex', maxWidth: '100%', alignItems: 'center', gap: 10, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '10px 12px' }}>
-                  <InitialsAvatar
-                    avatarUrl={publisherAvatar}
-                    initials={publisherInitial || '?'}
-                    size={32}
-                    bg="#ECEDF2"
-                    textColor="#6a6c7a"
-                    ring="0 0 0 1px #EAD8C8"
-                  />
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3 }}>Added by</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
-                      {spot.added_by === null ? 'Anonymous' : publisherUsername ? `@${publisherUsername}` : ''}
-                    </div>
-                  </div>
-                  {publisherFriendship && publisherFriendship.status !== 'accepted' && (
-                    <AddFriendButton
-                      targetUserId={spot.added_by}
-                      friendshipStatus={publisherFriendship.status}
-                      isRequester={publisherFriendship.isRequester}
-                      friendshipId={publisherFriendship.friendshipId}
-                      onChange={(status, row) => setPublisherFriendship(prev => ({
-                        ...prev,
-                        status,
-                        friendshipId: row?.id ?? prev.friendshipId,
-                        // A fresh request's returned row is the only place that
-                        // tells us who the requester actually is — without this,
-                        // isRequester stayed stuck at its initial "no friendship
-                        // yet" default of false, so the sender's own button
-                        // would flip to ACCEPT right after they sent a request.
-                        isRequester: row ? row.requester_id === user.id : prev.isRequester,
-                      }))}
-                    />
-                  )}
-                </div>
+                <AddedByCard
+                  avatarUrl={publisherAvatar}
+                  initials={publisherInitial}
+                  username={publisherUsername}
+                  isAnonymous={spot.added_by === null}
+                  targetUserId={spot.added_by}
+                  friendship={publisherFriendship}
+                  onFriendshipChange={(status, row) => setPublisherFriendship(prev => ({
+                    ...prev,
+                    status,
+                    friendshipId: row?.id ?? prev.friendshipId,
+                    // A fresh request's returned row is the only place that
+                    // tells us who the requester actually is — without this,
+                    // isRequester stayed stuck at its initial "no friendship
+                    // yet" default of false, so the sender's own button
+                    // would flip to ACCEPT right after they sent a request.
+                    isRequester: row ? row.requester_id === user.id : prev.isRequester,
+                  }))}
+                />
               )}
               {avgRating != null && reviewCount > 0 && (
                 <div style={{ marginLeft: 'auto', flexShrink: 0, background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6, padding: '10px 12px' }}>
@@ -1138,20 +1122,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </svg>
             </Marker>
           </Map>
-          {/* Satellite/street eye toggle — bottom-right */}
-          <div
-            onClick={() => setFsMapSatellite(s => !s)}
-            style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)', right: 10, width: 38, height: 38, borderRadius: 6, background: fsMapSatellite ? '#FDF8F0' : '#d4785a', border: fsMapSatellite ? '2px solid #d4785a' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: LAYERS.PAGE_CONTENT + 10, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
-          >
-            <svg width="24" height="24" viewBox="0 0 20 20" fill="none">
-              <path d="M1 10C1 10 4 4 10 4C16 4 19 10 19 10C19 10 16 16 10 16C4 16 1 10 1 10Z"
-                stroke={fsMapSatellite ? '#d4785a' : '#fff'} strokeWidth="1.5" strokeLinejoin="round"
-                fill={fsMapSatellite ? 'rgba(212,120,90,0.12)' : 'rgba(255,255,255,0.18)'} />
-              <circle cx="10" cy="10" r="3"
-                stroke={fsMapSatellite ? '#d4785a' : '#fff'} strokeWidth="1.5"
-                fill={fsMapSatellite ? '#d4785a' : '#fff'} />
-            </svg>
-          </div>
+          <SatelliteToggle active={fsMapSatellite} onClick={() => setFsMapSatellite(s => !s)} />
           {/* X close button */}
           <div
             onClick={() => setShowMapFullscreen(false)}

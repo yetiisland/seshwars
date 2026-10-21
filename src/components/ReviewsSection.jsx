@@ -115,6 +115,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
     if (!error && data) {
       const withProfile = { ...data, profile: profileMap[cu.id] || null }
       setMyReviewId(data.id)
+      setMyComment('')
       setReviews(prev => [withProfile, ...prev.filter(r => r.user_id !== cu.id)])
       if (onStatsChange) {
         const all = [withProfile, ...reviews.filter(r => r.user_id !== cu.id)]

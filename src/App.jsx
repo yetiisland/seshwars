@@ -319,6 +319,17 @@ export default function App() {
   }
 
   const [tab, setTab] = useState(() => normalizeTab(sessionStorage.getItem('activeTab') || 'spots'))
+  // Bumped on every bottom-nav tap (any tab, including re-tapping the one
+  // already active) — ProfileView watches this to close every full-screen
+  // page opened from it (Spots Added, Hidden Spots, Trick List, Friends,
+  // Settings and its sub-pages, Notifications, Edit Profile), the same
+  // root-level close the spot overlay already gets below. Needed because
+  // TabBar's own CSS class (.tab-bar, LAYERS.BOTTOM_NAV) is now shared by
+  // this persistent nav AND by the duplicate <TabBar> each of those
+  // full-screen pages renders internally — same z-index, so this one
+  // (rendered later in the tree) always wins the tap, making each
+  // subpage's own "close myself first" onChange wrapper unreachable.
+  const [profileSubpagesCloseSignal, setProfileSubpagesCloseSignal] = useState(0)
   const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')
   const [openListId, setOpenListId] = useState(null)
   // trick_list_invite notification tap — see handleTrickListClick below.
@@ -658,6 +669,10 @@ export default function App() {
     // tab content underneath — already mounted/intact, so this is just a
     // URL change, not a reload.
     if (spotMatch) navigate('/')
+    // Every tab tap (including re-tapping Profile while already on one of
+    // its own sub-pages) closes every full-screen page ProfileView has
+    // open, returning it to its root — see the signal's own declaration.
+    setProfileSubpagesCloseSignal(n => n + 1)
   }
 
   const handleSpotsViewChange = (v) => {
@@ -824,6 +839,7 @@ export default function App() {
                 onMarkNotificationRead={markRead}
                 onMarkAllNotificationsRead={markAllRead}
                 onTabChange={handleTabChange}
+                closeSubpagesSignal={profileSubpagesCloseSignal}
                 hiddenIds={hiddenIds}
                 onUnhideSpot={unhideSpot}
                 openTrickListId={openTrickListId}
@@ -837,11 +853,11 @@ export default function App() {
 
           {/* Spots view toggle pill for desktop */}
           {effectiveTab === 'spots' && (
-            <div style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', zIndex: LAYERS.PAGE_CONTENT }}>
+            <div style={{ position: 'fixed', bottom: 'var(--desktop-nav-clearance)', left: '50%', transform: 'translateX(-50%)', zIndex: LAYERS.FLOATING_CONTROL }}>
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)' }}>
-                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: LAYERS.PAGE_CONTENT }} />
-                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: LAYERS.FLOATING_CONTROL }} />
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: LAYERS.FLOATING_CONTROL + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: LAYERS.FLOATING_CONTROL + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
               </div>
             </div>
           )}
@@ -957,6 +973,7 @@ export default function App() {
                   onMarkNotificationRead={markRead}
                   onMarkAllNotificationsRead={markAllRead}
                   onTabChange={handleTabChange}
+                  closeSubpagesSignal={profileSubpagesCloseSignal}
                   hiddenIds={hiddenIds}
                   onUnhideSpot={unhideSpot}
                   openTrickListId={openTrickListId}
@@ -1003,11 +1020,11 @@ export default function App() {
 
           {/* Spots view toggle pill — above tab bar, only when on spots tab */}
           {effectiveTab === 'spots' && !showAdd && (
-            <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: LAYERS.PAGE_CONTENT, pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 84px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: LAYERS.FLOATING_CONTROL, pointerEvents: 'none' }}>
               <div ref={spotsToggleTrackRef} style={{ position: 'relative', display: 'flex', background: '#d4785a', borderRadius: 50, padding: '4px 5px', gap: 3, boxShadow: '0 3px 14px rgba(0,0,0,0.28)', pointerEvents: 'all' }}>
-                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: LAYERS.PAGE_CONTENT }} />
-                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
-                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: LAYERS.PAGE_CONTENT + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
+                <div ref={spotsToggleThumbRef} style={{ position: 'absolute', top: 4, bottom: 4, left: 0, borderRadius: 50, background: '#fff', transition: 'transform 340ms cubic-bezier(.32,.9,.36,1)', zIndex: LAYERS.FLOATING_CONTROL }} />
+                <div ref={el => { spotsToggleSegmentRefs.current.list = el }} onClick={() => handleSpotsViewChange('list')} style={{ position: 'relative', zIndex: LAYERS.FLOATING_CONTROL + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'list' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>LIST</div>
+                <div ref={el => { spotsToggleSegmentRefs.current.map = el }} onClick={() => handleSpotsViewChange('map')} style={{ position: 'relative', zIndex: LAYERS.FLOATING_CONTROL + 1, padding: '6px 18px', borderRadius: 50, color: spotsView === 'map' ? '#d4785a' : 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, cursor: 'pointer', userSelect: 'none' }}>MAP</div>
               </div>
             </div>
           )}

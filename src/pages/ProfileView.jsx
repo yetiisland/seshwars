@@ -82,7 +82,7 @@ function notifMessage(n) {
   return `${who} interacted with your spot`
 }
 
-export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled, openFriends, onOpenFriendsHandled, isActive = true }) {
+export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, onTabChange, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled, openFriends, onOpenFriendsHandled, isActive = true, closeSubpagesSignal }) {
   // Read via a ref inside event listeners below (not as a dep — these
   // listeners stay registered for the component's whole lifetime now that
   // it's kept mounted) so a friends/tricks-changed event or the app
@@ -162,6 +162,30 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [locationToast, setLocationToast] = useState('')
+
+  // Tapping any bottom nav tab — including re-tapping Profile while
+  // already on one of its own full-screen pages — returns Profile to its
+  // root, the same way it already closes an open spot. Skips the very
+  // first render so the sessionStorage-seeded showMySpots above (restoring
+  // "My Spots was open" across a remount) isn't wiped out on mount.
+  const closeSubpagesMountedRef = useRef(false)
+  useEffect(() => {
+    if (!closeSubpagesMountedRef.current) { closeSubpagesMountedRef.current = true; return }
+    setShowMySpots(false)
+    sessionStorage.removeItem('mySpots:open')
+    setShowHiddenSpots(false)
+    setShowFriendsScreen(false)
+    setShowTrickList(false)
+    setShowNotifications(false)
+    setShowEditSheet(false)
+    setShowSettingsSheet(false)
+    setShowFeedbackSheet(false)
+    setShowTos(false)
+    setShowPrivacy(false)
+    setShowSupport(false)
+    setShowDeleteAccountPage(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeSubpagesSignal])
 
   const handleTurnOnLocation = () => {
     if (!openLocationSettings()) {
