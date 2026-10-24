@@ -1092,6 +1092,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           <ClipsSection spotId={spot.id} user={user} onGoProfile={onGoProfile} isAdmin={isAdmin} />
           <ReviewsSection spotId={spot.id} user={user} onStatsChange={handleStatsChange} />
           <CommentsSection spotId={spot.id} user={user} onGoProfile={onGoProfile} scrollToCommentId={scrollToCommentId} />
+          <div style={{ height: 80 }} />
           <div style={{ height: sheetPad > 0 ? `calc(${BOTTOM_PAD} + ${sheetPad}px)` : BOTTOM_PAD }} />
         </div>
       </div>
