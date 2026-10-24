@@ -12,11 +12,19 @@ import { useState, useEffect, useRef } from 'react'
 // live height below — fixes detection on both.
 const KEYBOARD_HEIGHT_THRESHOLD_PX = 150
 
-// A blur on one field followed by a focus on the next (e.g. tapping a
-// mention chip, or tabbing between inputs) can report a brief instant with
-// no focused text input before the next focus event lands. Debouncing the
-// close (never the open, which should react immediately) absorbs that gap
-// instead of flashing the nav/padding back on mid-interaction.
+// Below this, the visual viewport counts as genuinely back at full height
+// (not just "no longer past the open threshold") — small enough to absorb
+// only subpixel/rounding noise between window.innerHeight samples and
+// visualViewport.height's float values, never an actual keyboard.
+const FULL_HEIGHT_EPSILON_PX = 2
+
+// A viewport reading that's dropped below the open threshold but hasn't
+// yet reached full height (mid keyboard-dismiss animation, or similar
+// transient resize noise) is ambiguous — it might still bounce back above
+// the threshold. Only while a text input is still focused is that worth
+// waiting out; an explicit blur, a tap outside the focused field, or the
+// viewport actually reaching full height all close immediately regardless,
+// overriding this.
 const CLOSE_DEBOUNCE_MS = 300
 
 // Input types that never bring up a text keyboard.
@@ -29,31 +37,44 @@ function isTextEntryElement(el) {
   return false
 }
 
-const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
-
 export default function useKeyboardOpen() {
   const [state, setState] = useState({ isOpen: false, height: 0 })
   const maxHeightRef = useRef(typeof window !== 'undefined' ? window.innerHeight : 0)
-  const focusedRef = useRef(false)
   const closeTimerRef = useRef(null)
 
   useEffect(() => {
     const vv = window.visualViewport
 
+    // Keeps focus and keyboard state from drifting apart (requirement 3):
+    // once we're actually closing, a focused text input no longer has an
+    // open keyboard behind it, so drop its focus too.
+    const closeNow = () => {
+      clearTimeout(closeTimerRef.current)
+      setState(prev => {
+        if (prev.isOpen && isTextEntryElement(document.activeElement)) document.activeElement.blur()
+        return { isOpen: false, height: 0 }
+      })
+    }
+
     const commit = () => {
       const viewportHeight = vv ? vv.height : window.innerHeight
       const diff = Math.max(0, maxHeightRef.current - viewportHeight)
       const viewportOpen = diff > KEYBOARD_HEIGHT_THRESHOLD_PX
-      // Fallback for platforms/contexts where neither innerHeight nor
-      // visualViewport ever reports the keyboard eating space.
-      const shouldBeOpen = viewportOpen || (isTouchDevice && focusedRef.current)
 
       clearTimeout(closeTimerRef.current)
-      if (shouldBeOpen) {
+      if (viewportOpen) {
         setState({ isOpen: true, height: diff })
         return
       }
-      closeTimerRef.current = setTimeout(() => setState({ isOpen: false, height: 0 }), CLOSE_DEBOUNCE_MS)
+
+      const viewportFullHeight = diff <= FULL_HEIGHT_EPSILON_PX
+      if (viewportFullHeight || !isTextEntryElement(document.activeElement)) {
+        closeNow()
+        return
+      }
+      // Below the open threshold but not yet confirmed fully recovered,
+      // and a text input is still focused — could still bounce back up.
+      closeTimerRef.current = setTimeout(closeNow, CLOSE_DEBOUNCE_MS)
     }
 
     const onWindowResize = () => {
@@ -68,30 +89,33 @@ export default function useKeyboardOpen() {
       maxHeightRef.current = window.innerHeight
       commit()
     }
-    const onFocusIn = (e) => {
-      if (!isTextEntryElement(e.target)) return
-      focusedRef.current = true
-      commit()
-    }
+    // Any blur of a text input closes immediately — never debounced, even
+    // if the viewport hasn't visibly caught up yet.
     const onFocusOut = (e) => {
       if (!isTextEntryElement(e.target)) return
-      focusedRef.current = false
-      commit()
+      closeNow()
+    }
+    // A tap landing outside the currently-focused text input closes
+    // immediately too, without waiting for the resulting blur to land.
+    // Capture phase so this runs before the tap's own click handler.
+    const onPointerDownCapture = (e) => {
+      if (isTextEntryElement(e.target)) return
+      if (isTextEntryElement(document.activeElement)) closeNow()
     }
 
     commit()
     window.addEventListener('resize', onWindowResize)
     window.addEventListener('orientationchange', onOrientationChange)
-    document.addEventListener('focusin', onFocusIn)
     document.addEventListener('focusout', onFocusOut)
+    document.addEventListener('pointerdown', onPointerDownCapture, true)
     vv?.addEventListener('resize', commit)
     vv?.addEventListener('scroll', commit)
     return () => {
       clearTimeout(closeTimerRef.current)
       window.removeEventListener('resize', onWindowResize)
       window.removeEventListener('orientationchange', onOrientationChange)
-      document.removeEventListener('focusin', onFocusIn)
       document.removeEventListener('focusout', onFocusOut)
+      document.removeEventListener('pointerdown', onPointerDownCapture, true)
       vv?.removeEventListener('resize', commit)
       vv?.removeEventListener('scroll', commit)
     }
