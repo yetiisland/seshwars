@@ -140,6 +140,23 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const scrollAreaRef = useRef()
   const { isOpen: isKeyboardOpen, height: keyboardHeight } = useKeyboardOpen()
 
+  // While this full-screen spot overlay is open, iOS can scroll the outer
+  // window itself (its own heuristic for bringing a focused input into
+  // view, unaware the real scrollable region is .scroll-area below) —
+  // that offsets every rect-based measurement (getBoundingClientRect is
+  // layout-viewport-relative, visualViewport is visual-viewport-relative)
+  // against window.scrollY without anything on screen actually moving
+  // there, which is what left the page unable to scroll. Keep window
+  // itself pinned at the origin so only .scroll-area ever scrolls.
+  useEffect(() => {
+    const resetWindowScroll = () => {
+      if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0)
+    }
+    resetWindowScroll()
+    window.visualViewport?.addEventListener('resize', resetWindowScroll)
+    return () => window.visualViewport?.removeEventListener('resize', resetWindowScroll)
+  }, [isKeyboardOpen])
+
   // Computed here (not read off spot.distance) so it never depends on
   // which source the spot object came from — router-state (has it,
   // computed client-side) or a fresh Supabase row (never has it, since

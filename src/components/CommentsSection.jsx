@@ -5,12 +5,27 @@ import { getProfiles } from '../utils/profileCache'
 import InitialsAvatar from './InitialsAvatar'
 import AddFriendButton from './AddFriendButton'
 import { LAYERS } from '../lib/layers'
+import usePrefersReducedMotion from '../hooks/usePrefersReducedMotion'
 
 // The bottom nav now hides itself while the keyboard is open (App.jsx), and
 // the spot page's own scroll container grows a temporary bottom padding
 // equal to the keyboard height (SpotDetail.jsx) — so the only clearance this
 // still needs to account for is the flat gap below the POST COMMENT button.
 const KEYBOARD_GAP_PX = 16
+
+// Mention chip row animation timings — all in milliseconds unless noted.
+const MENTION_ROW_EXPAND_MS = 180
+const MENTION_ROW_COLLAPSE_MS = 150
+const MENTION_CHIP_ENTER_MS = 180
+const MENTION_CHIP_ENTER_STAGGER_MS = 30
+const MENTION_CHIP_ENTER_STAGGER_CAP = 6
+const MENTION_CHIPS_SWAP_FADE_MS = 100
+const MENTION_CHIPS_HIDE_FADE_MS = 120
+// How long the longest-staggered chip's own enter transition runs for —
+// once past this, chips are settled/idle and stop carrying an opacity/
+// transform transition at all (only the unrelated press-scale remains,
+// via the .mention-chip CSS class).
+const MENTION_CHIP_ENTER_SETTLE_MS = MENTION_CHIP_ENTER_MS + (MENTION_CHIP_ENTER_STAGGER_CAP - 1) * MENTION_CHIP_ENTER_STAGGER_MS
 
 function findScrollParent(el) {
   let node = el?.parentElement
@@ -58,6 +73,16 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
   const [mentionProfiles, setMentionProfiles] = useState({}) // username -> profile | null
   const [viewingProfile, setViewingProfile] = useState(null)
   const [viewingProfileFriendship, setViewingProfileFriendship] = useState(null)
+  // Mention chip row animation state — see the orchestration effect below.
+  const [mentionRowMounted, setMentionRowMounted] = useState(false)
+  const [mentionRowExpanded, setMentionRowExpanded] = useState(false)
+  const [mentionRowClosing, setMentionRowClosing] = useState(false)
+  const [mentionChipsVisible, setMentionChipsVisible] = useState(false)
+  const [mentionChipsEntering, setMentionChipsEntering] = useState(false)
+  const [displayedMentionResults, setDisplayedMentionResults] = useState([])
+  const mentionAnimTimerRef = useRef(null)
+  const mentionEnterTimerRef = useRef(null)
+  const prefersReducedMotion = usePrefersReducedMotion()
   const channelRef = useRef(null)
   const textareaRef = useRef(null)
   const composerEndRef = useRef(null)
@@ -199,6 +224,84 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
     }, 300)
     return () => clearTimeout(t)
   }, [mentionQuery])
+
+  // Mention chip row open/close + chip enter/exit animation state machine,
+  // driven by (mentionQuery, mentionResults) rather than rendered directly —
+  // so the row can stay mounted through its own hide sequence (chips fade,
+  // then the row's height collapses, then it actually unmounts) instead of
+  // vanishing the instant mentionQuery/mentionResults goes empty. Also the
+  // reason tapping a chip no longer breaks scrolling: the composer-clear
+  // scroll only re-runs once this hide sequence (and the layout shift it
+  // causes) has actually finished, never mid-transition.
+  useEffect(() => {
+    const shouldShow = Boolean(mentionQuery) && mentionResults.length > 0
+    clearTimeout(mentionAnimTimerRef.current)
+    clearTimeout(mentionEnterTimerRef.current)
+
+    if (!shouldShow) {
+      if (!mentionRowMounted) return
+      if (prefersReducedMotion) {
+        setMentionRowMounted(false)
+        setMentionRowExpanded(false)
+        setMentionChipsVisible(false)
+        setMentionRowClosing(false)
+        setDisplayedMentionResults([])
+        requestAnimationFrame(scheduleComposerScroll)
+        return
+      }
+      setMentionRowClosing(true)
+      setMentionChipsVisible(false)
+      mentionAnimTimerRef.current = setTimeout(() => {
+        setMentionRowExpanded(false)
+        mentionAnimTimerRef.current = setTimeout(() => {
+          setMentionRowMounted(false)
+          setMentionRowClosing(false)
+          setDisplayedMentionResults([])
+          requestAnimationFrame(scheduleComposerScroll)
+        }, MENTION_ROW_COLLAPSE_MS)
+      }, MENTION_CHIPS_HIDE_FADE_MS)
+      return
+    }
+
+    setMentionRowClosing(false)
+
+    if (prefersReducedMotion) {
+      setDisplayedMentionResults(mentionResults)
+      setMentionRowMounted(true)
+      setMentionRowExpanded(true)
+      setMentionChipsVisible(true)
+      setMentionChipsEntering(false)
+      return
+    }
+
+    if (!mentionRowMounted) {
+      // Fresh open — expand the row and stagger the chips in together.
+      setDisplayedMentionResults(mentionResults)
+      setMentionRowMounted(true)
+      setMentionRowExpanded(false)
+      setMentionChipsVisible(false)
+      requestAnimationFrame(() => {
+        setMentionRowExpanded(true)
+        setMentionChipsVisible(true)
+        setMentionChipsEntering(true)
+      })
+      mentionEnterTimerRef.current = setTimeout(() => setMentionChipsEntering(false), MENTION_CHIP_ENTER_SETTLE_MS)
+      return
+    }
+
+    // Already open — results changed while typing. Keep showing (and fade
+    // out) whatever's currently displayed, then swap in the new results.
+    // The row's own height never replays here.
+    setMentionRowExpanded(true)
+    setMentionChipsVisible(false)
+    mentionAnimTimerRef.current = setTimeout(() => {
+      setDisplayedMentionResults(mentionResults)
+      setMentionChipsVisible(true)
+      setMentionChipsEntering(true)
+      mentionEnterTimerRef.current = setTimeout(() => setMentionChipsEntering(false), MENTION_CHIP_ENTER_SETTLE_MS)
+    }, MENTION_CHIPS_SWAP_FADE_MS)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mentionQuery, mentionResults])
 
   // Scroll to (and auto-expand, if it's a collapsed reply) the comment a
   // notification tap targeted, once it's present in the loaded list.
@@ -408,19 +511,52 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                 }
               }}
             />
-            {mentionQuery && mentionResults.length > 0 && (
-              <div style={{ borderTop: '1px solid #EAD8C8', padding: 8 }}>
-                <div className="hide-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', flexWrap: 'nowrap' }}>
-                  {mentionResults.map(p => (
-                    <div
-                      key={p.id}
-                      onMouseDown={() => handleSelectMention(p)}
-                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, borderRadius: 6, background: '#f5ede0', border: '1px solid #EAD8C8', padding: '3px 9px 3px 3px', cursor: 'pointer' }}
-                    >
-                      <InitialsAvatar profile={p} size={18} ring="0 0 0 1px #EAD8C8" />
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#2a1e14', whiteSpace: 'nowrap' }}>@{p.username}</span>
+            {mentionRowMounted && (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateRows: mentionRowExpanded ? '1fr' : '0fr',
+                  transition: prefersReducedMotion ? 'none' : `grid-template-rows ${mentionRowExpanded ? MENTION_ROW_EXPAND_MS : MENTION_ROW_COLLAPSE_MS}ms ease-out`,
+                }}
+              >
+                <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                  <div style={{ padding: 8 }}>
+                    <div className="hide-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', flexWrap: 'nowrap' }}>
+                      {displayedMentionResults.map((p, idx) => {
+                        const delayMs = Math.min(idx, MENTION_CHIP_ENTER_STAGGER_CAP - 1) * MENTION_CHIP_ENTER_STAGGER_MS
+                        const exitMs = mentionRowClosing ? MENTION_CHIPS_HIDE_FADE_MS : MENTION_CHIPS_SWAP_FADE_MS
+                        const chipTransition = prefersReducedMotion
+                          ? 'none'
+                          : !mentionChipsVisible
+                            ? `opacity ${exitMs}ms ease-out, transform ${exitMs}ms ease-out`
+                            : mentionChipsEntering
+                              ? `opacity ${MENTION_CHIP_ENTER_MS}ms ease-out ${delayMs}ms, transform ${MENTION_CHIP_ENTER_MS}ms ease-out ${delayMs}ms`
+                              : 'none'
+                        return (
+                          <div
+                            key={p.id}
+                            style={{
+                              flexShrink: 0,
+                              opacity: mentionChipsVisible ? 1 : 0,
+                              transform: `translateY(${mentionChipsVisible ? 0 : 6}px)`,
+                              transition: chipTransition,
+                            }}
+                          >
+                            <div
+                              className="mention-chip"
+                              onPointerDown={e => e.preventDefault()}
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => handleSelectMention(p)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, borderRadius: 6, background: '#FFFFFF', border: '1px solid #EAD8C8', padding: '3px 9px 3px 3px', cursor: 'pointer' }}
+                            >
+                              <InitialsAvatar profile={p} size={18} ring="0 0 0 1px #EAD8C8" />
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#2a1e14', whiteSpace: 'nowrap' }}>@{p.username}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
             )}

@@ -637,6 +637,22 @@ textarea.form-input {
 }
 .hide-scroll::-webkit-scrollbar { display: none; }
 
+/* Mention-chip press feedback (CommentsSection.jsx) — scale only, kept on
+   its own element and timing so it never fights the chip's own enter/exit
+   opacity+translateY transition (set inline, on a wrapping element) over
+   the same `transform` property. */
+.mention-chip {
+  transition: transform 80ms ease-out;
+}
+.mention-chip:active {
+  transform: scale(0.95);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mention-chip {
+    transition: none;
+  }
+}
+
 /* Pulsing user location dot */
 @keyframes user-loc-pulse {
   0%   { transform: scale(0.85); opacity: 0.7; }
