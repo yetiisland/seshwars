@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { buildStaticMapUrl, clampStaticMapDimension } from '../lib/staticMap'
+import MapAttributionButton from './MapAttributionButton'
 
 // Cover image for a spot with no photos — a static satellite image of its
 // location (no pin), used everywhere a cover appears (the spot page hero,
@@ -51,6 +52,7 @@ export default function SpotCoverImage({ spot, placeholderBg }) {
           }}
         />
       )}
+      {url && !error && loaded && <MapAttributionButton />}
     </div>
   )
 }

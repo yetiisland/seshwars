@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
+import { Capacitor } from '@capacitor/core'
+import { Geolocation } from '@capacitor/geolocation'
 import { supabase } from '../lib/supabase'
 import { CloseIcon } from '../components/Icons'
 import { slugify } from '../utils/slugify'
@@ -79,7 +81,32 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   // but only when permission isn't already known to be denied, and only
   // after checking because repeating a known-denied request is pointless
   // and can't prompt again anyway.
+  //
+  // Native: uses @capacitor/geolocation for a real OS-backed check/fetch
+  // instead of the WebView's navigator.geolocation. Never calls
+  // requestPermissions itself — if permission is still 'prompt', this
+  // silently skips the auto-locate rather than popping a bare OS prompt
+  // with no context; the app's branded pre-prompt (App.jsx, driven by the
+  // same underlying OS permission) is what asks for it with context.
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      let cancelled = false
+      Geolocation.checkPermissions().then(result => {
+        if (cancelled) return
+        if (result.location === 'denied') { setGeoPermissionDenied(true); return }
+        if (result.location !== 'granted') return // 'prompt' / 'prompt-with-rationale' — skip, don't prompt bare
+        return Geolocation.getCurrentPosition({ enableHighAccuracy: true }).then(pos => {
+          if (cancelled || draftRestoredRef.current) return
+          const { latitude: lat, longitude: lng } = pos.coords
+          setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
+          addr.handlePinMove(lat, lng)
+        })
+      }).catch(err => {
+        console.error('[AddSpot] native getCurrentPosition error:', err)
+      })
+      return () => { cancelled = true }
+    }
+
     if (!navigator.geolocation) return
     const doLocate = () => {
       navigator.geolocation.getCurrentPosition((pos) => {

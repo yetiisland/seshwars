@@ -526,7 +526,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   }
 
   return (
-    <div className="desktop-page-root" style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
+    <div className="desktop-page-root" style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: LAYERS.PAGE_CONTENT, display: 'flex', flexDirection: 'column' }}>
       <div style={{
         display: 'grid',
         // Both side columns reserved at the same width — 2 buttons (36px

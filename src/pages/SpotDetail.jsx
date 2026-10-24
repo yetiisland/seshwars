@@ -25,6 +25,7 @@ import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
 import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
 import { SpotPin, getSpotPinColors } from './MapView'
 import SpotCoverImage from '../components/SpotCoverImage'
+import MapAttributionButton from '../components/MapAttributionButton'
 import SatelliteToggle from '../components/SatelliteToggle'
 import { LAYERS } from '../lib/layers'
 import { buildStaticMapUrl, clampStaticMapDimension, STATIC_MAP_ZOOM } from '../lib/staticMap'
@@ -1018,6 +1019,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                     }}
                   />
                 )}
+                {locationStaticImgUrl && !locationImgError && locationImgLoaded && <MapAttributionButton />}
                 {/* Unselected size (no `selected` prop) — matches the
                     symbol layer's baked pin icon on the Spots tab map
                     exactly (PIN_DISPLAY_H=28 in MapView.jsx), not the
