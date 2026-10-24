@@ -6,13 +6,11 @@ import InitialsAvatar from './InitialsAvatar'
 import AddFriendButton from './AddFriendButton'
 import { LAYERS } from '../lib/layers'
 
-// Same ~80px fixed-bottom-nav height used as BOTTOM_PAD elsewhere
-// (SpotDetail.jsx, SavedView.jsx, ProfileView.jsx), plus a safe-area-
-// inset-bottom buffer — env() isn't readable from JS directly, so this
-// approximates it rather than matching it exactly — plus a deliberate
-// 16px gap so the (same-colored) POST COMMENT button and bottom nav
-// never visually touch while the keyboard is open.
-const NAV_CLEARANCE_PX = 112
+// The bottom nav now hides itself while the keyboard is open (App.jsx), and
+// the spot page's own scroll container grows a temporary bottom padding
+// equal to the keyboard height (SpotDetail.jsx) — so the only clearance this
+// still needs to account for is the flat gap below the POST COMMENT button.
+const KEYBOARD_GAP_PX = 16
 
 function findScrollParent(el) {
   let node = el?.parentElement
@@ -40,10 +38,6 @@ const inlineLinkStyle = { fontSize: 11, color: '#d4785a', fontWeight: 700, curso
 // "View N more replies" — copied verbatim from the search-results "Load
 // More" control in FriendsView.jsx.
 const viewMoreStyle = { padding: '8px 0 0', fontSize: 10, fontWeight: 700, color: '#d4785a', cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase' }
-
-// Inline suggestion dropdown — copied verbatim from the geocoder address
-// dropdown in AddSpot.jsx.
-const mentionDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }
 
 export default function CommentsSection({ spotId, user, onGoProfile, scrollToCommentId }) {
   const [comments, setComments] = useState([])
@@ -86,7 +80,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
     const vv = window.visualViewport
     const visibleBottom = vv ? vv.height + vv.offsetTop : window.innerHeight
     const rect = anchor.getBoundingClientRect()
-    const overlap = rect.bottom - (visibleBottom - NAV_CLEARANCE_PX)
+    const overlap = rect.bottom - (visibleBottom - KEYBOARD_GAP_PX)
     if (overlap > 0) scrollParent.scrollBy({ top: overlap, behavior: 'smooth' })
   }
 
@@ -195,11 +189,12 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
   }, [comments])
 
   // @mention suggestion search — debounced, same RPC/shape as the Friends
-  // search but a 5-result typeahead instead of a paginated list.
+  // search but a 10-result typeahead instead of a paginated list. Only
+  // fires once there's at least one character after the @.
   useEffect(() => {
-    if (mentionQuery === null) { setMentionResults([]); return }
+    if (!mentionQuery) { setMentionResults([]); return }
     const t = setTimeout(async () => {
-      const { data } = await supabase.rpc('search_profiles', { q: mentionQuery, p_limit: 5, p_offset: 0 })
+      const { data } = await supabase.rpc('search_profiles', { q: mentionQuery, p_limit: 10, p_offset: 0 })
       setMentionResults(data || [])
     }, 300)
     return () => clearTimeout(t)
@@ -413,18 +408,20 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                 }
               }}
             />
-            {mentionQuery !== null && mentionResults.length > 0 && (
-              <div style={mentionDropdownStyle}>
-                {mentionResults.map(p => (
-                  <div
-                    key={p.id}
-                    onMouseDown={() => handleSelectMention(p)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #ECEDF2' }}
-                  >
-                    <InitialsAvatar profile={p} size={22} ring="0 0 0 1px #EAD8C8" />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>@{p.username}</span>
-                  </div>
-                ))}
+            {mentionQuery && mentionResults.length > 0 && (
+              <div style={{ borderTop: '1px solid #EAD8C8', padding: 8 }}>
+                <div className="hide-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', flexWrap: 'nowrap' }}>
+                  {mentionResults.map(p => (
+                    <div
+                      key={p.id}
+                      onMouseDown={() => handleSelectMention(p)}
+                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, borderRadius: 6, background: '#f5ede0', border: '1px solid #EAD8C8', padding: '3px 9px 3px 3px', cursor: 'pointer' }}
+                    >
+                      <InitialsAvatar profile={p} size={18} ring="0 0 0 1px #EAD8C8" />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#2a1e14', whiteSpace: 'nowrap' }}>@{p.username}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             {text.trim().length > 0 && (

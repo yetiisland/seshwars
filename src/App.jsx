@@ -8,6 +8,7 @@ import AuthScreen from './pages/AuthScreen'
 import { useSpots, useSavedSpots, useHiddenSpots } from './hooks/useSpots'
 import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
 import { useNotifications } from './hooks/useNotifications'
+import useKeyboardOpen from './hooks/useKeyboardOpen'
 import TabBar from './components/TabBar'
 import Logo from './components/Logo'
 import { PlusIcon } from './components/Icons'
@@ -410,6 +411,7 @@ export default function App() {
   const [saveModalSpot, setSaveModalSpot] = useState(null)
   const [spotSheetPad, setSpotSheetPad] = useState(0)
   const { location: userLocation, permissionState: locationPermission, requestLocation, requestNativePermission } = useGeolocation()
+  const { isOpen: isKeyboardOpen } = useKeyboardOpen()
   // Map is the one place that needs location to do its core job (centering
   // on you); opening it is the "explicit action" that requests location
   // when permission is still in the 'prompt' state. On web this directly
@@ -1079,8 +1081,25 @@ export default function App() {
 
           {/* .tab-bar's own CSS class is already LAYERS.BOTTOM_NAV, above the
               spot overlay unconditionally — same as the old standalone
-              SpotPage.jsx, which rendered its own TabBar. */}
-          {!showAdd && <TabBar active={effectiveTab} onChange={handleTabChange} user={user} profileAvatar={profileAvatar} profileInitials={profileInitials} notificationCount={unreadCount} />}
+              SpotPage.jsx, which rendered its own TabBar. Faded out (opacity
+              + transform only, so its own position:fixed is untouched) while
+              the on-screen keyboard is open, so it never sits on top of it. */}
+          {!showAdd && (
+            <TabBar
+              active={effectiveTab}
+              onChange={handleTabChange}
+              user={user}
+              profileAvatar={profileAvatar}
+              profileInitials={profileInitials}
+              notificationCount={unreadCount}
+              style={{
+                opacity: isKeyboardOpen ? 0 : 1,
+                transform: isKeyboardOpen ? 'translateY(100%)' : 'translateY(0)',
+                transition: 'opacity 150ms, transform 150ms',
+                pointerEvents: isKeyboardOpen ? 'none' : 'auto',
+              }}
+            />
+          )}
 
           {toast && createPortal(
             <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 16, right: 16, zIndex: LAYERS.TOAST, background: '#2a1e14', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, textAlign: 'center', fontFamily: 'Barlow, sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', letterSpacing: 0.3 }}>

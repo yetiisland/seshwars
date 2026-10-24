@@ -6,9 +6,9 @@ function formatCount(n) {
   return String(n)
 }
 
-export default function TabBar({ active, onChange, user, profileAvatar, profileInitials, notificationCount = 0 }) {
+export default function TabBar({ active, onChange, user, profileAvatar, profileInitials, notificationCount = 0, style }) {
   return (
-    <div className="tab-bar">
+    <div className="tab-bar" style={style}>
       {NAV_TABS.map(({ id, label, Icon }) => (
         <div
           key={id}

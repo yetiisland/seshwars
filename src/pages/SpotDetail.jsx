@@ -10,6 +10,7 @@ import ClipsSection from '../components/ClipsSection'
 import ReviewsSection from '../components/ReviewsSection'
 import ReportSection from '../components/ReportSection'
 import CommentsSection from '../components/CommentsSection'
+import useKeyboardOpen from '../hooks/useKeyboardOpen'
 import { SendToFriendsContent } from '../components/SendToFriendsSheet'
 import AddToTrickListSheet from '../components/AddToTrickListSheet'
 import { slugify } from '../utils/slugify'
@@ -137,6 +138,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const handleStatsChange = useCallback((avg, count) => { setAvgRating(avg); setReviewCount(count) }, [])
   const [modStatus, setModStatus] = useState(spot.moderation_status || 'approved')
   const scrollAreaRef = useRef()
+  const { isOpen: isKeyboardOpen, height: keyboardHeight } = useKeyboardOpen()
 
   // Computed here (not read off spot.distance) so it never depends on
   // which source the spot object came from — router-state (has it,
@@ -722,7 +724,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative' }}>
-      <div className="scroll-area" ref={scrollAreaRef}>
+      <div className="scroll-area" ref={scrollAreaRef} style={isKeyboardOpen ? { paddingBottom: keyboardHeight } : undefined}>
 
         {/* ── Hero Photo (4:3) ───────────────────────────────── */}
         <div

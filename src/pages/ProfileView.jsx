@@ -540,7 +540,12 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
     // every destination below (the spot overlay, the saved/trick list tabs)
     // renders underneath it and was invisible/untappable until this closed first.
     setShowNotifications(false)
-    if (notif.type === 'friend_request' || notif.type === 'friend_accepted') {
+    if (notif.type === 'friend_accepted') {
+      await onMarkNotificationRead?.(notif.id)
+      setShowFriendsScreen(true)
+      return
+    }
+    if (notif.type === 'friend_request') {
       await onMarkNotificationRead?.(notif.id)
       openUserProfile(notif)
       return
