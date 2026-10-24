@@ -148,13 +148,30 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   // against window.scrollY without anything on screen actually moving
   // there, which is what left the page unable to scroll. Keep window
   // itself pinned at the origin so only .scroll-area ever scrolls.
+  //
+  // Suppressed for as long as CommentsSection.jsx's own composer scroll is
+  // scheduled or running (its 'seshwars:composer-scroll-active' signal) —
+  // otherwise this and that scroll fight over the page's position mid-
+  // scroll, which is part of why focusing the composer used to jump
+  // between several positions before settling. Applied once, right after,
+  // only if window.scrollY actually ended up above 0.
   useEffect(() => {
+    let composerScrollActive = false
     const resetWindowScroll = () => {
+      if (composerScrollActive) return
       if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0)
+    }
+    const onComposerScrollActiveChange = (e) => {
+      composerScrollActive = Boolean(e.detail)
+      if (!composerScrollActive) resetWindowScroll()
     }
     resetWindowScroll()
     window.visualViewport?.addEventListener('resize', resetWindowScroll)
-    return () => window.visualViewport?.removeEventListener('resize', resetWindowScroll)
+    window.addEventListener('seshwars:composer-scroll-active', onComposerScrollActiveChange)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', resetWindowScroll)
+      window.removeEventListener('seshwars:composer-scroll-active', onComposerScrollActiveChange)
+    }
   }, [isKeyboardOpen])
 
   // Computed here (not read off spot.distance) so it never depends on
