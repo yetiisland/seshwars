@@ -170,7 +170,7 @@ export default function ReviewsSection({ spotId, user, sectionRef, onStatsChange
               rows={2}
               style={{
                 width: '100%', resize: 'none', border: '1px solid #EAD8C8', borderRadius: 6,
-                padding: '8px 10px', fontSize: 12, fontFamily: 'Barlow, sans-serif',
+                padding: '8px 10px', fontSize: 16, fontFamily: 'Barlow, sans-serif',
                 color: 'var(--text-primary)', background: '#FFFFFF', outline: 'none',
                 lineHeight: 1.5, boxSizing: 'border-box', marginBottom: 10,
               }}

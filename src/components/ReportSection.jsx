@@ -133,7 +133,7 @@ export default function ReportSection({ spotId, spot, user, onGoProfile, onRepor
                   rows={2}
                   style={{
                     width: '100%', resize: 'none', border: '1px solid #E8DDD0', borderRadius: 6,
-                    padding: '8px 10px', fontSize: 12, fontFamily: 'Barlow, sans-serif',
+                    padding: '8px 10px', fontSize: 16, fontFamily: 'Barlow, sans-serif',
                     color: 'var(--text-primary)', background: '#FAF5EE', outline: 'none',
                     lineHeight: 1.5, boxSizing: 'border-box',
                   }}

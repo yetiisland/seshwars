@@ -116,7 +116,7 @@ export default function SearchPage({ spots, onSelect, onClose }) {
             style={{
               width: '100%', background: '#FFFFFF', border: '1.5px solid #d4785a',
               borderRadius: 6, padding: '10px 36px 10px 32px',
-              fontSize: 13, color: 'var(--text-primary)', fontFamily: 'Barlow, sans-serif', outline: 'none',
+              fontSize: 16, color: 'var(--text-primary)', fontFamily: 'Barlow, sans-serif', outline: 'none',
             }}
           />
           {query.length > 0 && (
