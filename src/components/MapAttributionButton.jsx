@@ -5,14 +5,15 @@ import { LAYERS } from '../lib/layers'
 // attribution=false (src/lib/staticMap.js) — the API's own gray
 // attribution text is removed there (the Mapbox logo stays), so Mapbox
 // requires the credit to be shown some other way. This is that other
-// way: a small "i" button, positioned by the caller directly to the
-// right of the Mapbox logo (bottom-left of the image — the logo is
-// about 57px wide starting about 2px from the image's left edge, so
-// left: 64 clears it), that toggles a small pill with the required
-// links. Tapping anywhere else closes it; tapping the button or a link
-// never reaches an ancestor's own onClick (e.g. a SpotCard opening the
-// spot), since every tap here stops propagation.
-export default function MapAttributionButton() {
+// way: a small "i" button in the bottom-right corner of the image, that
+// toggles a small pill with the required links. The caller positions it
+// via bottom/right (matching whatever MULTI-SPOT chip inset applies in
+// that spot, or shifted further right of it — see SpotCoverImage.jsx —
+// when that chip is also showing on the same image, so the two never
+// overlap). Tapping anywhere else closes it; tapping the button or a
+// link never reaches an ancestor's own onClick (e.g. a SpotCard opening
+// the spot), since every tap here stops propagation.
+export default function MapAttributionButton({ bottom = 8, right = 8 }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
 
@@ -30,13 +31,13 @@ export default function MapAttributionButton() {
   return (
     <div
       ref={rootRef}
-      style={{ position: 'absolute', bottom: 6, left: 64, zIndex: LAYERS.PAGE_CONTENT + 1 }}
+      style={{ position: 'absolute', bottom, right, zIndex: LAYERS.PAGE_CONTENT + 1 }}
       onClick={stop}
     >
       {open && (
         <div
           style={{
-            position: 'absolute', bottom: '100%', left: 0, marginBottom: 4,
+            position: 'absolute', bottom: '100%', right: 0, marginBottom: 4,
             background: '#2a1e14', borderRadius: 20, padding: '5px 10px',
             whiteSpace: 'nowrap', display: 'flex', gap: 6, alignItems: 'center',
           }}

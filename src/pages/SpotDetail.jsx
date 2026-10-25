@@ -755,7 +755,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </div>
             ))
           ) : (
-            <SpotCoverImage spot={spot} placeholderBg={spot.type === 'Skate Shop' ? '#2e3344' : '#F0E8DE'} />
+            <SpotCoverImage spot={spot} placeholderBg={spot.type === 'Skate Shop' ? '#2e3344' : '#F0E8DE'} chipBottom={10} chipRight={12} />
           )}
 
           {/* Gradient overlay */}
@@ -1019,7 +1019,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                     }}
                   />
                 )}
-                {locationStaticImgUrl && !locationImgError && locationImgLoaded && <MapAttributionButton />}
+                {locationStaticImgUrl && !locationImgError && locationImgLoaded && <MapAttributionButton bottom={10} right={12} />}
                 {/* Unselected size (no `selected` prop) — matches the
                     symbol layer's baked pin icon on the Spots tab map
                     exactly (PIN_DISPLAY_H=28 in MapView.jsx), not the
