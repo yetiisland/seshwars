@@ -21,6 +21,13 @@ const KEYBOARD_GAP_PX = 16
 // same resize events) has already settled.
 const COMPOSER_SCROLL_SETTLE_MS = 100
 
+// Hard cap from the moment of focus, never reset by a resize event — in
+// case no resize event ever arrives at all (or they keep arriving often
+// enough to keep re-arming the settle timer above), the scroll still runs
+// once this elapses. Whichever of the two fires first wins; the other is
+// cancelled.
+const COMPOSER_SCROLL_MAX_WAIT_MS = 350
+
 // Upper-bound fallback for how long the smooth scroll itself can take, used
 // only if the browser never fires the scroll container's own 'scrollend'
 // event (not supported everywhere) — either one clears the active signal.
@@ -54,7 +61,14 @@ function findScrollParent(el) {
   let node = el?.parentElement
   while (node) {
     const style = getComputedStyle(node)
-    if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight) return node
+    // Matches on the CSS alone (overflow-y: auto|scroll), not also on
+    // scrollHeight > clientHeight — the designated scroll container
+    // (.scroll-area) is identified by its own stylesheet regardless of
+    // whether it happens to be overflowing at this exact instant (e.g.
+    // before the keyboard-height padding that makes it overflow has
+    // actually been applied), so requiring that too could walk straight
+    // past it and return the document itself as a false-positive target.
+    if (/(auto|scroll)/.test(style.overflowY)) return node
     node = node.parentElement
   }
   return document.scrollingElement || document.documentElement
@@ -114,16 +128,19 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
   const mentionBlurTimer = useRef(null)
   const composerScrollSettleTimerRef = useRef(null)
   const composerScrollSettleListenerRef = useRef(null)
+  const composerScrollMaxWaitTimerRef = useRef(null)
   const composerScrollEndTimerRef = useRef(null)
   const composerScrollEndListenerRef = useRef(null)
   const composerScrollEndTargetRef = useRef(null)
 
   // Cancels whatever part of the composer-scroll sequence is currently in
-  // flight — the pre-settle wait (resize listener + timer) and/or the
-  // post-settle wait for the scroll itself to finish — without touching the
-  // active signal, so callers can cleanly restart the whole sequence fresh.
+  // flight — the pre-run wait (resize listener + settle timer + max-wait
+  // timer) and/or the post-run wait for the scroll itself to finish —
+  // without touching the active signal, so callers can cleanly restart the
+  // whole sequence fresh.
   const cancelComposerScroll = () => {
     clearTimeout(composerScrollSettleTimerRef.current)
+    clearTimeout(composerScrollMaxWaitTimerRef.current)
     if (composerScrollSettleListenerRef.current) {
       window.visualViewport?.removeEventListener('resize', composerScrollSettleListenerRef.current)
       composerScrollSettleListenerRef.current = null
@@ -140,17 +157,23 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
 
   // Keeps the composer (and the POST COMMENT button once it appears) fully
   // above both the fixed bottom nav and the on-screen keyboard when the
-  // textarea is focused. Scrolls the nearest actual scroll container
-  // (found via findScrollParent, not necessarily window) by whatever
-  // overlap remains against the real visible viewport — visualViewport
-  // shrinks to exclude the keyboard on platforms that report it; where
-  // it's unavailable this falls back to window.innerHeight (nav-only
-  // clearance, no keyboard-aware correction). Does nothing if the button is
-  // already clear. Called from the settle timer in scheduleComposerScroll
-  // below (focus, starting a reply, a chip tap's row finishing its hide —
-  // only once things have actually settled), and directly from
-  // handleTextChange when the button first mounts (nothing keyboard-related
-  // to wait out there, just a fresh measurement).
+  // textarea is focused. Scrolls the actual scroll container (found via
+  // findScrollParent — the .scroll-area ancestor, identified by its own
+  // overflow-y CSS, not by whether it happens to be overflowing at this
+  // instant) by whatever overlap remains against the real visible area —
+  // always visualViewport.offsetTop + visualViewport.height, never
+  // window.innerHeight (which on iOS Safari the keyboard can overlay
+  // without shrinking at all); the innerHeight fallback below only exists
+  // for a browser with no visualViewport support whatsoever. Measures
+  // composerEndRef, a 1px marker placed immediately after the POST COMMENT
+  // button (or after the textarea when the button doesn't exist yet,
+  // before any text has been typed) rather than the button itself, so
+  // there's always something to measure against regardless of whether the
+  // button has mounted. Does nothing if that point is already clear.
+  // Called once per call site from scheduleComposerScroll below (focus,
+  // starting a reply, a chip tap's row finishing its hide), and directly
+  // from handleTextChange when the button first mounts (nothing keyboard-
+  // related to wait out there, just a fresh measurement).
   const scrollComposerClear = () => {
     const anchor = composerEndRef.current
     if (!anchor) { setComposerScrollActive(false); return }
@@ -176,28 +199,35 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
   }
 
   // Runs the single scroll above exactly once per call site (composer
-  // focus, starting a reply, or a mention chip's row finishing its hide) —
-  // waits for visualViewport resize events to stop for COMPOSER_SCROLL_SETTLE_MS
-  // first, since the keyboard's own open animation fires several of them,
-  // each at a different, still-shifting height. Signals "active" for the
-  // whole wait-and-scroll span so SpotDetail.jsx can hold off its own
-  // window-scroll reset until this is completely done.
+  // focus, starting a reply, or a mention chip's row finishing its hide).
+  // Races two timers and runs on whichever fires first, cancelling the
+  // other: a settle timer that waits for visualViewport resize events to
+  // stop for COMPOSER_SCROLL_SETTLE_MS (the keyboard's own open animation
+  // fires several of them, not one, each re-arming this), and a hard cap
+  // of COMPOSER_SCROLL_MAX_WAIT_MS from focus that is never re-armed — so
+  // the scroll still runs even if no resize event ever arrives at all, or
+  // if they keep arriving often enough to keep re-arming the settle timer
+  // past a reasonable wait. Signals "active" for the whole span so
+  // SpotDetail.jsx can hold off its own window-scroll reset until this is
+  // completely done.
   const scheduleComposerScroll = () => {
     cancelComposerScroll()
     setComposerScrollActive(true)
     const vv = window.visualViewport
+    const runOnce = () => {
+      cancelComposerScroll()
+      scrollComposerClear()
+    }
     const armSettleTimer = () => {
       clearTimeout(composerScrollSettleTimerRef.current)
-      composerScrollSettleTimerRef.current = setTimeout(() => {
-        cancelComposerScroll()
-        scrollComposerClear()
-      }, COMPOSER_SCROLL_SETTLE_MS)
+      composerScrollSettleTimerRef.current = setTimeout(runOnce, COMPOSER_SCROLL_SETTLE_MS)
     }
     if (vv) {
       composerScrollSettleListenerRef.current = armSettleTimer
       vv.addEventListener('resize', armSettleTimer)
     }
     armSettleTimer()
+    composerScrollMaxWaitTimerRef.current = setTimeout(runOnce, COMPOSER_SCROLL_MAX_WAIT_MS)
   }
 
   const closeDeleteModal = () => {

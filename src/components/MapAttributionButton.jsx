@@ -6,11 +6,12 @@ import { LAYERS } from '../lib/layers'
 // attribution text is removed there (the Mapbox logo stays), so Mapbox
 // requires the credit to be shown some other way. This is that other
 // way: a small "i" button, positioned by the caller directly to the
-// right of the Mapbox logo (bottom-left of the image), that toggles a
-// small pill with the required links. Tapping anywhere else closes it;
-// tapping the button or a link never reaches an ancestor's own onClick
-// (e.g. a SpotCard opening the spot), since every tap here stops
-// propagation.
+// right of the Mapbox logo (bottom-left of the image — the logo is
+// about 57px wide starting about 2px from the image's left edge, so
+// left: 64 clears it), that toggles a small pill with the required
+// links. Tapping anywhere else closes it; tapping the button or a link
+// never reaches an ancestor's own onClick (e.g. a SpotCard opening the
+// spot), since every tap here stops propagation.
 export default function MapAttributionButton() {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
@@ -29,7 +30,7 @@ export default function MapAttributionButton() {
   return (
     <div
       ref={rootRef}
-      style={{ position: 'absolute', bottom: 6, left: 30, zIndex: LAYERS.PAGE_CONTENT + 1 }}
+      style={{ position: 'absolute', bottom: 6, left: 64, zIndex: LAYERS.PAGE_CONTENT + 1 }}
       onClick={stop}
     >
       {open && (
