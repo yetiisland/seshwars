@@ -427,7 +427,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
               <span onClick={() => setReplyingTo(null)} style={{ cursor: 'pointer', color: '#d4785a', fontSize: 12 }}>✕</span>
             </div>
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}>
+          <div data-keyboard-zone style={{ display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}>
             <textarea
               ref={textareaRef}
               value={text}
@@ -482,10 +482,14 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                             }}
                           >
                             <div
+                              data-keyboard-zone
                               className="mention-chip"
-                              onPointerDown={e => e.preventDefault()}
+                              onPointerDown={e => {
+                                e.preventDefault()
+                                clearTimeout(mentionBlurTimer.current)
+                                handleSelectMention(p)
+                              }}
                               onMouseDown={e => e.preventDefault()}
-                              onClick={() => handleSelectMention(p)}
                               style={{ display: 'flex', alignItems: 'center', gap: 5, borderRadius: 6, background: '#FFFFFF', border: '1px solid #EAD8C8', padding: '3px 9px 3px 3px', cursor: 'pointer' }}
                             >
                               <InitialsAvatar profile={p} size={18} ring="0 0 0 1px #EAD8C8" />

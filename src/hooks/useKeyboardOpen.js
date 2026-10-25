@@ -97,9 +97,18 @@ export default function useKeyboardOpen() {
     }
     // A tap landing outside the currently-focused text input closes
     // immediately too, without waiting for the resulting blur to land.
-    // Capture phase so this runs before the tap's own click handler.
+    // Capture phase so this runs before the tap's own click handler —
+    // which also means it runs before that handler's own preventDefault,
+    // so anything meant to keep focus on tap (a mention chip) must be
+    // exempted here directly rather than relying on preventDefault to
+    // stop it downstream. data-keyboard-zone marks exactly that: the
+    // comment composer card (textarea, mention chip row, POST COMMENT),
+    // tagged in CommentsSection.jsx, is the whole reason this exemption
+    // exists — tapping a chip must never close the keyboard or blur the
+    // textarea, since the chip row itself hides on blur.
     const onPointerDownCapture = (e) => {
       if (isTextEntryElement(e.target)) return
+      if (e.target.closest?.('[data-keyboard-zone]')) return
       if (isTextEntryElement(document.activeElement)) closeNow()
     }
 
