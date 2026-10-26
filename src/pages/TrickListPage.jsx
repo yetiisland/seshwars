@@ -449,38 +449,39 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onListRenamed
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <div style={{
-        display: 'grid', gridTemplateColumns: '80px 1fr 80px', alignItems: 'center',
-        padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
-        background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
-      }}>
-        <div onClick={onBack} style={{ justifySelf: 'start', width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <div style={{ minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase', overflowWrap: 'break-word' }}>
-          {listName}
-        </div>
-        <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
-          {isOwner ? (
-            <>
-              <div onClick={openSettings} style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <SettingsIcon color="#d4785a" size={17} />
-              </div>
-              <div onClick={() => setShowShareSheet(true)} style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <ShareIcon color="#d4785a" />
-              </div>
-            </>
-          ) : (
-            <div onClick={() => { setLeaveError(''); setPendingLeave(true) }} style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <LeaveIcon color="#d4785a" size={15} />
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="scroll-area">
+        <div style={{
+          position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+          display: 'grid', gridTemplateColumns: '80px 1fr 80px', alignItems: 'center',
+          padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
+          background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',
+        }}>
+          <div onClick={onBack} style={{ justifySelf: 'start', width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div style={{ minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase', overflowWrap: 'break-word' }}>
+            {listName}
+          </div>
+          <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
+            {isOwner ? (
+              <>
+                <div onClick={openSettings} style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  <SettingsIcon color="#d4785a" size={17} />
+                </div>
+                <div onClick={() => setShowShareSheet(true)} style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  <ShareIcon color="#d4785a" />
+                </div>
+              </>
+            ) : (
+              <div onClick={() => { setLeaveError(''); setPendingLeave(true) }} style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <LeaveIcon color="#d4785a" size={15} />
+              </div>
+            )}
+          </div>
+        </div>
+
         <div style={{ padding: '10px 14px 0', maxWidth: 480, margin: '0 auto' }}>
           {members.length > 0 && (
             <div style={{ marginBottom: 14 }}>
@@ -799,23 +800,24 @@ export default function TrickListPage({ user, spots, onSpotClick, onClose, openL
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center',
-        padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
-        background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
-      }}>
-        <div onClick={onClose} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-          Trick Lists
-        </div>
-        <div style={{ width: 36 }} />
-      </div>
-
       <div className="scroll-area">
+        <div style={{
+          position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+          display: 'flex', alignItems: 'center',
+          padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+          background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',
+        }}>
+          <div onClick={onClose} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+            Trick Lists
+          </div>
+          <div style={{ width: 36 }} />
+        </div>
+
         <div style={{ padding: '8px 16px 0', maxWidth: 480, margin: '0 auto' }}>
           {!loading && combined.map(list => {
             const isShared = list._kind === 'shared'

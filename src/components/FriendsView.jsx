@@ -266,19 +266,18 @@ export default function FriendsView({ user, userLocation, locationPermission, re
         </div>
       </div>
 
-      {/* Persistent "@" prefix — a separate absolutely-positioned element, not
-          part of the input's value, so it can't be edited or deleted. Any
-          leading "@" typed/pasted into the input is stripped in onChange. */}
-      <div style={{ position: 'relative', marginBottom: 12 }}>
-        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#d4785a', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
+      {/* Persistent "@" prefix — a normal flex child, not part of the
+          input's value, so it can't be edited or deleted. Any leading "@"
+          typed/pasted into the input is stripped in onChange. */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, background: '#FFFFFF', border: '1.5px solid #d4785a', borderRadius: 6 }}>
+        <span style={{ paddingLeft: 12, fontSize: 16, color: '#d4785a', fontFamily: 'Barlow, sans-serif', flexShrink: 0 }}>@</span>
         <input
           ref={searchInputRef}
-          className="form-input"
           placeholder="Search for skaters..."
           value={query}
           onChange={e => setQuery(e.target.value.replace(/^@+/, ''))}
           onFocus={() => { setHasFocusedSearch(true); requestLocation?.() }}
-          style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
+          style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', padding: '10px 12px 10px 4px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'Barlow, sans-serif' }}
         />
       </div>
 

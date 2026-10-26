@@ -12,7 +12,6 @@ import MapView from './MapView'
 import MembersSummary from '../components/MembersSummary'
 import { LAYERS } from '../lib/layers'
 import useBlurOnScroll from '../hooks/useBlurOnScroll'
-import useKeyboardAwareScrollStyle from '../hooks/useKeyboardAwareScrollStyle'
 
 // Inline suggestion dropdown — copied verbatim from the geocoder address
 // dropdown in AddSpot.jsx (same pattern CommentsSection.jsx's @mention
@@ -234,10 +233,6 @@ function ShareSavedListFriends({ listId, userId, onBack, onShared, onGoToFriends
 }
 
 function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, onFavoritesListCreated, onLeft, spots, saved, onSavePress, onSpotClick, onBack, onGoToFriends, onListDeleted, initialScrollTop, onSaveScrollTop, isActive = true }) {
-  // Sized to the visible area while the keyboard is open (see the hook) so
-  // the add-skaters list scrolls natively instead of the whole page
-  // rubber-banding.
-  const collectionScrollStyle = useKeyboardAwareScrollStyle(LAYERS.PAGE_CONTENT)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteClosing, setDeleteClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -540,50 +535,56 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
 
   return (
     <div className="desktop-page-root" style={{ position: 'absolute', inset: 0, background: '#FDF8F0', zIndex: LAYERS.PAGE_CONTENT, display: 'flex', flexDirection: 'column' }}>
-      <div style={{
-        display: 'grid',
-        // Both side columns reserved at the same width — 2 buttons (36px
-        // each) + 8px gap = 80px, the widest side this header ever shows
-        // (trash + share) — so the title's center column is always truly
-        // centered on the full header width, regardless of whether the
-        // right side renders one button, two, or the plain 36px spacer.
-        gridTemplateColumns: '80px 1fr 80px',
-        alignItems: 'center',
-        padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
-        background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
-      }}>
-        <div
-          onClick={onBack}
-          style={{ justifySelf: 'start', width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <div style={{ minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase', overflowWrap: 'break-word' }}>
-          {title}
-        </div>
-        {(isList || isFavorites) ? (
-          <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
-            {isList && (
-              <div
-                onClick={() => setShowSettingsSheet(true)}
-                style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-              >
-                <SettingsIcon color="#d4785a" size={17} />
-              </div>
-            )}
-            <div
-              onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
-              style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-            >
-              <ShareIcon color="#d4785a" />
-            </div>
+      {/* Map mode has no text field and no scroll container of its own, so
+          its header stays a plain flexShrink:0 sibling here, unchanged.
+          List mode's own copy (below, inside .scroll-area) is sticky
+          instead, since that's the branch with the add-skaters field. */}
+      {viewMode === 'map' && (
+        <div style={{
+          display: 'grid',
+          // Both side columns reserved at the same width — 2 buttons (36px
+          // each) + 8px gap = 80px, the widest side this header ever shows
+          // (trash + share) — so the title's center column is always truly
+          // centered on the full header width, regardless of whether the
+          // right side renders one button, two, or the plain 36px spacer.
+          gridTemplateColumns: '80px 1fr 80px',
+          alignItems: 'center',
+          padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
+          background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
+        }}>
+          <div
+            onClick={onBack}
+            style={{ justifySelf: 'start', width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
-        ) : (
-          <div style={{ justifySelf: 'end', width: 36 }} />
-        )}
-      </div>
+          <div style={{ minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase', overflowWrap: 'break-word' }}>
+            {title}
+          </div>
+          {(isList || isFavorites) ? (
+            <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
+              {isList && (
+                <div
+                  onClick={() => setShowSettingsSheet(true)}
+                  style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                >
+                  <SettingsIcon color="#d4785a" size={17} />
+                </div>
+              )}
+              <div
+                onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
+                style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <ShareIcon color="#d4785a" />
+              </div>
+            </div>
+          ) : (
+            <div style={{ justifySelf: 'end', width: 36 }} />
+          )}
+        </div>
+      )}
 
       {copied && createPortal(
         <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#2a1e14', color: '#fff', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
@@ -754,23 +755,65 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           )}
         </div>
       ) : (
-        <div className="scroll-area" ref={scrollRef} style={{ paddingTop: 14, ...collectionScrollStyle }}>
+        <div className="scroll-area" ref={scrollRef}>
+          <div style={{
+            position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+            display: 'grid',
+            gridTemplateColumns: '80px 1fr 80px',
+            alignItems: 'center',
+            padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
+            background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',
+          }}>
+            <div
+              onClick={onBack}
+              style={{ justifySelf: 'start', width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div style={{ minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase', overflowWrap: 'break-word' }}>
+              {title}
+            </div>
+            {(isList || isFavorites) ? (
+              <div style={{ justifySelf: 'end', display: 'flex', gap: 8, flexShrink: 0 }}>
+                {isList && (
+                  <div
+                    onClick={() => setShowSettingsSheet(true)}
+                    style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    <SettingsIcon color="#d4785a" size={17} />
+                  </div>
+                )}
+                <div
+                  onClick={() => { setShareSheetMode('choice'); setShowShareSheet(true) }}
+                  style={{ width: 36, height: 36, borderRadius: 6, border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <ShareIcon color="#d4785a" />
+                </div>
+              </div>
+            ) : (
+              <div style={{ justifySelf: 'end', width: 36 }} />
+            )}
+          </div>
+          <div style={{ paddingTop: 14 }}>
           {isList && (
             <div style={{ padding: '0 16px 14px' }}>
               {isOwner && (
                 <div style={{ marginBottom: 10 }}>
                   {/* Persistent "@" prefix — same pattern as FriendsView's search input */}
-                  <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#d4785a', pointerEvents: 'none', fontFamily: 'Barlow, sans-serif' }}>@</span>
-                    <input
-                      ref={memberInputRef}
-                      className="form-input"
-                      placeholder="Add skaters to this list..."
-                      value={memberQuery}
-                      onChange={e => setMemberQuery(e.target.value.replace(/^@+/, ''))}
-                      onFocus={handleMemberInputFocus}
-                      style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
-                    />
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#FFFFFF', border: '1.5px solid #d4785a', borderRadius: 6 }}>
+                      <span style={{ paddingLeft: 12, fontSize: 16, color: '#d4785a', fontFamily: 'Barlow, sans-serif', flexShrink: 0 }}>@</span>
+                      <input
+                        ref={memberInputRef}
+                        placeholder="Add skaters to this list..."
+                        value={memberQuery}
+                        onChange={e => setMemberQuery(e.target.value.replace(/^@+/, ''))}
+                        onFocus={handleMemberInputFocus}
+                        style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', padding: '10px 12px 10px 4px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'Barlow, sans-serif' }}
+                      />
+                    </div>
                     {(hasFocusedMemberInput || memberQuery.trim().length > 0) && (
                       <div style={memberDropdownStyle} {...memberScrollDismiss}>
                         {memberResults.length === 0 ? (
@@ -828,6 +871,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
             </div>
           )}
           <div style={{ height: BOTTOM_PAD }} />
+          </div>
         </div>
       )}
     </div>

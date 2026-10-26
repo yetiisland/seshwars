@@ -21,7 +21,6 @@ import { LAYERS } from '../lib/layers'
 import { TrickListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
 import { transformImageUrl } from '../utils/imageUrl'
 import { openLocationSettings } from '../lib/locationSettings'
-import useKeyboardAwareScrollStyle from '../hooks/useKeyboardAwareScrollStyle'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -83,10 +82,6 @@ function notifMessage(n) {
 }
 
 export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled, openFriends, onOpenFriendsHandled, isActive = true, closeSubpagesSignal }) {
-  // Friends page's own scroll container — sized to the visible area while
-  // the keyboard is open (see the hook) so the suggestions/results list
-  // scrolls natively instead of the whole page rubber-banding.
-  const friendsScrollStyle = useKeyboardAwareScrollStyle(LAYERS.FULL_SCREEN_PAGE)
   // Read via a ref inside event listeners below (not as a dep — these
   // listeners stay registered for the component's whole lifetime now that
   // it's kept mounted) so a friends/tricks-changed event or the app
@@ -1316,22 +1311,23 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
           stat card. Same shell as My Spots; FriendsView supplies the body. */}
       {showFriendsScreen && createPortal(
         <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center',
-            padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
-            background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
-          }}>
-            <div onClick={() => setShowFriendsScreen(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+          <div className="scroll-area">
+            <div style={{
+              position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+              display: 'flex', alignItems: 'center',
+              padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+              background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',
+            }}>
+              <div onClick={() => setShowFriendsScreen(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+                Friends
+              </div>
+              <div style={{ width: 36 }} />
             </div>
-            <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-              Friends
-            </div>
-            <div style={{ width: 36 }} />
-          </div>
-          <div className="scroll-area" style={friendsScrollStyle}>
             <div style={{ padding: '14px 14px 0', maxWidth: 480, margin: '0 auto', width: '100%' }}>
               <FriendsView user={user} userLocation={userLocation} locationPermission={locationPermission} requestLocation={requestLocation} onFriendsChanged={fetchFriendCount} />
             </div>

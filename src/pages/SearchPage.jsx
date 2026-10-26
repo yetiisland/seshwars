@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { fetchLocationSuggestions, toSearchLocationEntry } from '../lib/locationSearch'
+import { LAYERS } from '../lib/layers'
 
 const LS_RECENT_KEY = 'seshwars_recent_searches'
 
@@ -82,62 +83,62 @@ export default function SearchPage({ spots, onSelect, onClose }) {
     // Sitting in normal flow after Navbar removes the z-index dependency
     // entirely — it can't cover what comes before it in the layout.
     <div className="desktop-page-root" style={{ width: '100%', flex: 1, minHeight: 0, background: '#FDF8F0', display: 'flex', flexDirection: 'column' }}>
-      {/* Header — no borderBottom since the Navbar above provides separation */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px 12px',
-        background: '#FDF8F0', flexShrink: 0,
-      }}>
-        <div onClick={onClose} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-          Search Spots
-        </div>
-        <div style={{ width: 36 }} />
-      </div>
-
-      {/* Search input */}
-      <div style={{ padding: '14px 16px 8px', flexShrink: 0 }}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <div style={{ position: 'absolute', left: 10, pointerEvents: 'none', display: 'flex' }}>
-            <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
-              <circle cx="6" cy="6" r="4" stroke="#d4785a" strokeWidth="1.3" />
-              <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
+      <div className="scroll-area">
+        {/* Header — no borderBottom since the Navbar above provides separation */}
+        <div style={{
+          position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 16px 12px',
+          background: '#FDF8F0',
+        }}>
+          <div onClick={onClose} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="City, state or zip code..."
-            style={{
-              width: '100%', background: '#FFFFFF', border: '1.5px solid #d4785a',
-              borderRadius: 6, padding: '10px 36px 10px 32px',
-              fontSize: 16, color: 'var(--text-primary)', fontFamily: 'Barlow, sans-serif', outline: 'none',
-            }}
-          />
-          {query.length > 0 && (
-            <div onClick={() => setQuery('')} style={{ position: 'absolute', right: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="7" fill="#ECEDF2" />
-                <line x1="5" y1="5" x2="11" y2="11" stroke="#6a6c7a" strokeWidth="1.3" strokeLinecap="round" />
-                <line x1="11" y1="5" x2="5" y2="11" stroke="#6a6c7a" strokeWidth="1.3" strokeLinecap="round" />
+          <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+            Search Spots
+          </div>
+          <div style={{ width: 36 }} />
+        </div>
+
+        {/* Search input */}
+        <div style={{ padding: '14px 16px 8px' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div style={{ position: 'absolute', left: 10, pointerEvents: 'none', display: 'flex' }}>
+              <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
+                <circle cx="6" cy="6" r="4" stroke="#d4785a" strokeWidth="1.3" />
+                <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="#d4785a" strokeWidth="1.3" strokeLinecap="round" />
               </svg>
             </div>
-          )}
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="City, state or zip code..."
+              style={{
+                width: '100%', background: '#FFFFFF', border: '1.5px solid #d4785a',
+                borderRadius: 6, padding: '10px 36px 10px 32px',
+                fontSize: 16, color: 'var(--text-primary)', fontFamily: 'Barlow, sans-serif', outline: 'none',
+              }}
+            />
+            {query.length > 0 && (
+              <div onClick={() => setQuery('')} style={{ position: 'absolute', right: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="7" fill="#ECEDF2" />
+                  <line x1="5" y1="5" x2="11" y2="11" stroke="#6a6c7a" strokeWidth="1.3" strokeLinecap="round" />
+                  <line x1="11" y1="5" x2="5" y2="11" stroke="#6a6c7a" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Section label */}
-      <div style={{ padding: '4px 16px 4px', fontSize: 9, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#6a6c7a', flexShrink: 0 }}>
-        {showSuggestions ? (loading ? 'Searching…' : 'Suggestions') : 'Recent Searches'}
-      </div>
+        {/* Section label */}
+        <div style={{ padding: '4px 16px 4px', fontSize: 9, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#6a6c7a' }}>
+          {showSuggestions ? (loading ? 'Searching…' : 'Suggestions') : 'Recent Searches'}
+        </div>
 
-      {/* Results */}
-      <div className="scroll-area">
         {!showSuggestions && recentSearches.length === 0 && (
           <div style={{ padding: '48px 24px', textAlign: 'center' }}>
             <svg width="32" height="32" viewBox="0 0 14 14" fill="none" style={{ marginBottom: 12, opacity: 0.35 }}>

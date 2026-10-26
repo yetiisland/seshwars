@@ -15,6 +15,9 @@ const MENTION_CHIP_ENTER_STAGGER_MS = 30
 const MENTION_CHIP_ENTER_STAGGER_CAP = 6
 const MENTION_CHIPS_SWAP_FADE_MS = 100
 const MENTION_CHIPS_HIDE_FADE_MS = 120
+// A pointerdown on a chip that moves less than this (in any direction)
+// before pointerup is a tap; past it, it's a swipe meant to scroll the row.
+const MENTION_CHIP_TAP_SLOP_PX = 8
 // How long the longest-staggered chip's own enter transition runs for —
 // once past this, chips are settled/idle and stop carrying an opacity/
 // transform transition at all (only the unrelated press-scale remains,
@@ -64,6 +67,9 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
   const [mentionChipsVisible, setMentionChipsVisible] = useState(false)
   const [mentionChipsEntering, setMentionChipsEntering] = useState(false)
   const [displayedMentionResults, setDisplayedMentionResults] = useState([])
+  // Tap-vs-swipe tracking for the mention chip row — see handleChip* below.
+  const [pressedChipId, setPressedChipId] = useState(null)
+  const chipGestureRef = useRef(null) // { id, startX, startY, moved } | null
   const mentionAnimTimerRef = useRef(null)
   const mentionEnterTimerRef = useRef(null)
   const prefersReducedMotion = usePrefersReducedMotion()
@@ -292,6 +298,44 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
     })
   }
 
+  // Tap-vs-swipe on a mention chip: selecting on pointerdown (the old
+  // behavior) fired before a sideways swipe could be recognized as a
+  // scroll, so any swipe starting on a chip selected it instead of
+  // scrolling the row. Recording the start position here and deciding on
+  // pointerup (only if movement stayed under the slop) lets the row's
+  // native touch-scrolling run uninterrupted for an actual swipe.
+  const handleChipPointerDown = (e, profileId) => {
+    e.preventDefault()
+    clearTimeout(mentionBlurTimer.current)
+    chipGestureRef.current = { id: profileId, startX: e.clientX, startY: e.clientY, moved: false }
+    setPressedChipId(profileId)
+  }
+
+  const handleChipPointerMove = (e) => {
+    const g = chipGestureRef.current
+    if (!g || g.moved) return
+    const dx = e.clientX - g.startX
+    const dy = e.clientY - g.startY
+    if (Math.hypot(dx, dy) > MENTION_CHIP_TAP_SLOP_PX) {
+      g.moved = true
+      setPressedChipId(null)
+    }
+  }
+
+  const handleChipPointerUp = (profile) => {
+    const g = chipGestureRef.current
+    chipGestureRef.current = null
+    setPressedChipId(null)
+    if (g && g.id === profile.id && !g.moved) {
+      handleSelectMention(profile)
+    }
+  }
+
+  const handleChipPointerCancel = () => {
+    chipGestureRef.current = null
+    setPressedChipId(null)
+  }
+
   // Shared by both "Reply" entry points — a top-level comment, or a reply
   // to a reply. Threads stay flat (one level visually): replying to a
   // reply still targets the top-level comment's id as parent_id, with the
@@ -460,7 +504,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
               >
                 <div style={{ minHeight: 0, overflow: 'hidden' }}>
                   <div style={{ padding: 8 }}>
-                    <div className="hide-scroll" onPointerDown={() => clearTimeout(mentionBlurTimer.current)} style={{ display: 'flex', gap: 6, overflowX: 'auto', flexWrap: 'nowrap' }}>
+                    <div className="hide-scroll" onPointerDown={() => clearTimeout(mentionBlurTimer.current)} style={{ display: 'flex', gap: 6, overflowX: 'auto', flexWrap: 'nowrap', touchAction: 'pan-x' }}>
                       {displayedMentionResults.map((p, idx) => {
                         const delayMs = Math.min(idx, MENTION_CHIP_ENTER_STAGGER_CAP - 1) * MENTION_CHIP_ENTER_STAGGER_MS
                         const exitMs = mentionRowClosing ? MENTION_CHIPS_HIDE_FADE_MS : MENTION_CHIPS_SWAP_FADE_MS
@@ -483,13 +527,12 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                           >
                             <div
                               className="mention-chip"
-                              onPointerDown={e => {
-                                e.preventDefault()
-                                clearTimeout(mentionBlurTimer.current)
-                                handleSelectMention(p)
-                              }}
+                              onPointerDown={e => handleChipPointerDown(e, p.id)}
+                              onPointerMove={handleChipPointerMove}
+                              onPointerUp={() => handleChipPointerUp(p)}
+                              onPointerCancel={handleChipPointerCancel}
                               onMouseDown={e => e.preventDefault()}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, borderRadius: 6, background: '#FFFFFF', border: '1px solid #EAD8C8', padding: '3px 9px 3px 3px', cursor: 'pointer' }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, borderRadius: 6, background: '#FFFFFF', border: '1px solid #EAD8C8', padding: '3px 9px 3px 3px', cursor: 'pointer', transform: pressedChipId === p.id ? 'scale(0.95)' : 'scale(1)' }}
                             >
                               <InitialsAvatar profile={p} size={18} ring="0 0 0 1px #EAD8C8" />
                               <span style={{ fontSize: 11, fontWeight: 700, color: '#2a1e14', whiteSpace: 'nowrap' }}>@{p.username}</span>
