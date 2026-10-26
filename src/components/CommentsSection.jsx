@@ -427,7 +427,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
               <span onClick={() => setReplyingTo(null)} style={{ cursor: 'pointer', color: '#d4785a', fontSize: 12 }}>✕</span>
             </div>
           )}
-          <div data-keyboard-zone style={{ display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}>
             <textarea
               ref={textareaRef}
               value={text}
@@ -460,7 +460,7 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
               >
                 <div style={{ minHeight: 0, overflow: 'hidden' }}>
                   <div style={{ padding: 8 }}>
-                    <div className="hide-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', flexWrap: 'nowrap' }}>
+                    <div className="hide-scroll" onPointerDown={() => clearTimeout(mentionBlurTimer.current)} style={{ display: 'flex', gap: 6, overflowX: 'auto', flexWrap: 'nowrap' }}>
                       {displayedMentionResults.map((p, idx) => {
                         const delayMs = Math.min(idx, MENTION_CHIP_ENTER_STAGGER_CAP - 1) * MENTION_CHIP_ENTER_STAGGER_MS
                         const exitMs = mentionRowClosing ? MENTION_CHIPS_HIDE_FADE_MS : MENTION_CHIPS_SWAP_FADE_MS
@@ -482,7 +482,6 @@ export default function CommentsSection({ spotId, user, onGoProfile, scrollToCom
                             }}
                           >
                             <div
-                              data-keyboard-zone
                               className="mention-chip"
                               onPointerDown={e => {
                                 e.preventDefault()

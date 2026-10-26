@@ -63,6 +63,7 @@ export default function FriendsView({ user, userLocation, locationPermission, re
   const [inputFocused, setInputFocused] = useState(false)
   const nearbyFetchedRef = useRef(false)
   const searchInputRef = useRef(null)
+  const inputBlurTimerRef = useRef(null)
 
   // Reuses the location the spots list already gets from useGeolocation()
   // (passed down via App.jsx -> ProfileView -> here) — no separate geolocation
@@ -255,8 +256,8 @@ export default function FriendsView({ user, userLocation, locationPermission, re
           placeholder="Search for skaters..."
           value={query}
           onChange={e => setQuery(e.target.value.replace(/^@+/, ''))}
-          onFocus={() => { setInputFocused(true); requestLocation?.() }}
-          onBlur={() => setTimeout(() => setInputFocused(false), 150)}
+          onFocus={() => { clearTimeout(inputBlurTimerRef.current); setInputFocused(true); requestLocation?.() }}
+          onBlur={() => { inputBlurTimerRef.current = setTimeout(() => setInputFocused(false), 150) }}
           style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
         />
       </div>
@@ -268,7 +269,7 @@ export default function FriendsView({ user, userLocation, locationPermission, re
       )}
 
       {inputFocused && nearbySkaters.length > 0 && query.trim().length === 0 && (
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 20 }} onPointerDown={() => clearTimeout(inputBlurTimerRef.current)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <div className="section-label" style={{ marginBottom: 0 }}>Skaters Near You</div>
             <div style={countBadgeStyle}>

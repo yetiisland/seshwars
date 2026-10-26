@@ -22,9 +22,8 @@ const FULL_HEIGHT_EPSILON_PX = 2
 // yet reached full height (mid keyboard-dismiss animation, or similar
 // transient resize noise) is ambiguous — it might still bounce back above
 // the threshold. Only while a text input is still focused is that worth
-// waiting out; an explicit blur, a tap outside the focused field, or the
-// viewport actually reaching full height all close immediately regardless,
-// overriding this.
+// waiting out; an explicit blur or the viewport actually reaching full
+// height both close immediately regardless, overriding this.
 const CLOSE_DEBOUNCE_MS = 300
 
 // Input types that never bring up a text keyboard.
@@ -37,6 +36,21 @@ function isTextEntryElement(el) {
   return false
 }
 
+// This hook only ever reads state (viewport dimensions, focus/blur events
+// that already happened) — it must never call .focus()/.blur() or
+// otherwise change what's focused. It previously had a document-level
+// pointerdown listener that blurred the focused input on any tap judged
+// to be "outside" it, meant to catch taps away from a composer — that
+// broke tapping *any* unrelated suggestion/result list elsewhere in the
+// app (address suggestions, friend search results, mention chips): the
+// blur it forced fired before the tapped item's own handler, so whatever
+// list the item belonged to hid itself on blur before the tap or a
+// scroll could register. Removed entirely, along with the data-
+// keyboard-zone exemption it needed. Each such list is now responsible
+// for its own "don't hide out from under a tap" handling (pointerdown
+// selection, a delayed/cancelable blur-hide) — see CommentsSection.jsx,
+// AddSpot.jsx, SpotDetail.jsx, FriendsView.jsx, SavedView.jsx,
+// AddToTrickListSheet.jsx.
 export default function useKeyboardOpen() {
   const [state, setState] = useState({ isOpen: false, height: 0 })
   const maxHeightRef = useRef(typeof window !== 'undefined' ? window.innerHeight : 0)
@@ -45,15 +59,9 @@ export default function useKeyboardOpen() {
   useEffect(() => {
     const vv = window.visualViewport
 
-    // Keeps focus and keyboard state from drifting apart (requirement 3):
-    // once we're actually closing, a focused text input no longer has an
-    // open keyboard behind it, so drop its focus too.
     const closeNow = () => {
       clearTimeout(closeTimerRef.current)
-      setState(prev => {
-        if (prev.isOpen && isTextEntryElement(document.activeElement)) document.activeElement.blur()
-        return { isOpen: false, height: 0 }
-      })
+      setState({ isOpen: false, height: 0 })
     }
 
     const commit = () => {
@@ -89,34 +97,17 @@ export default function useKeyboardOpen() {
       maxHeightRef.current = window.innerHeight
       commit()
     }
-    // Any blur of a text input closes immediately — never debounced, even
-    // if the viewport hasn't visibly caught up yet.
+    // Reacts to a blur that already happened (for a snappier close than
+    // waiting on the viewport to visibly catch up) — never causes one.
     const onFocusOut = (e) => {
       if (!isTextEntryElement(e.target)) return
       closeNow()
-    }
-    // A tap landing outside the currently-focused text input closes
-    // immediately too, without waiting for the resulting blur to land.
-    // Capture phase so this runs before the tap's own click handler —
-    // which also means it runs before that handler's own preventDefault,
-    // so anything meant to keep focus on tap (a mention chip) must be
-    // exempted here directly rather than relying on preventDefault to
-    // stop it downstream. data-keyboard-zone marks exactly that: the
-    // comment composer card (textarea, mention chip row, POST COMMENT),
-    // tagged in CommentsSection.jsx, is the whole reason this exemption
-    // exists — tapping a chip must never close the keyboard or blur the
-    // textarea, since the chip row itself hides on blur.
-    const onPointerDownCapture = (e) => {
-      if (isTextEntryElement(e.target)) return
-      if (e.target.closest?.('[data-keyboard-zone]')) return
-      if (isTextEntryElement(document.activeElement)) closeNow()
     }
 
     commit()
     window.addEventListener('resize', onWindowResize)
     window.addEventListener('orientationchange', onOrientationChange)
     document.addEventListener('focusout', onFocusOut)
-    document.addEventListener('pointerdown', onPointerDownCapture, true)
     vv?.addEventListener('resize', commit)
     vv?.addEventListener('scroll', commit)
     return () => {
@@ -124,7 +115,6 @@ export default function useKeyboardOpen() {
       window.removeEventListener('resize', onWindowResize)
       window.removeEventListener('orientationchange', onOrientationChange)
       document.removeEventListener('focusout', onFocusOut)
-      document.removeEventListener('pointerdown', onPointerDownCapture, true)
       vv?.removeEventListener('resize', commit)
       vv?.removeEventListener('scroll', commit)
     }

@@ -50,6 +50,7 @@ export function useAddressConfirmation(onConfirm) {
   const skipSearchRef = useRef(false)
   const geocodeTimer = useRef(null)
   const inputFocusedRef = useRef(false)
+  const dropdownHideTimerRef = useRef(null)
   const onConfirmRef = useRef(onConfirm)
   onConfirmRef.current = onConfirm
 
@@ -141,12 +142,20 @@ export function useAddressConfirmation(onConfirm) {
 
   const onInputFocus = useCallback(() => {
     inputFocusedRef.current = true
+    clearTimeout(dropdownHideTimerRef.current)
     if (geoResults.length > 0) setShowDropdown(true)
   }, [geoResults])
 
   const onInputBlur = useCallback(() => {
     inputFocusedRef.current = false
-    setTimeout(() => setShowDropdown(false), 150)
+    dropdownHideTimerRef.current = setTimeout(() => setShowDropdown(false), 150)
+  }, [])
+
+  // Called on a suggestion's own pointerdown, before selecting it — a
+  // blur this hook didn't expect (the tap landed on the dropdown, not the
+  // input) would otherwise still hide the dropdown out from under the tap.
+  const cancelDropdownHide = useCallback(() => {
+    clearTimeout(dropdownHideTimerRef.current)
   }, [])
 
   // For restoring a saved draft (AddSpot) or an existing spot's address
@@ -165,6 +174,6 @@ export function useAddressConfirmation(onConfirm) {
   return {
     addressText, latitude, longitude, status, geoResults, showDropdown, rangeError,
     handleTextChange, selectSuggestion, handlePinMove, hydrate,
-    onInputFocus, onInputBlur,
+    onInputFocus, onInputBlur, cancelDropdownHide,
   }
 }

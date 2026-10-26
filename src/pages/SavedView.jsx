@@ -311,6 +311,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const [memberInputFocused, setMemberInputFocused] = useState(false)
   const [addMemberError, setAddMemberError] = useState('')
   const memberInputRef = useRef(null)
+  const memberDropdownHideTimerRef = useRef(null)
   // Guards against refetching suggestions on every refocus of the add-
   // skaters input — set once the first fetch (for this list) lands, cleared
   // only by a fresh mount (i.e. switching lists, since CollectionView is
@@ -339,6 +340,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   // Suggestions are only useful once the owner opens the add-skaters input,
   // so fetch them on first focus instead of unconditionally on mount.
   const handleMemberInputFocus = () => {
+    clearTimeout(memberDropdownHideTimerRef.current)
     setMemberInputFocused(true)
     if (!isOwner || suggestionsFetchedRef.current) return
     suggestionsFetchedRef.current = true
@@ -756,11 +758,11 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                       value={memberQuery}
                       onChange={e => setMemberQuery(e.target.value.replace(/^@+/, ''))}
                       onFocus={handleMemberInputFocus}
-                      onBlur={() => setTimeout(() => setMemberInputFocused(false), 150)}
+                      onBlur={() => { memberDropdownHideTimerRef.current = setTimeout(() => setMemberInputFocused(false), 150) }}
                       style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
                     />
                     {memberInputFocused && (
-                      <div style={memberDropdownStyle}>
+                      <div style={memberDropdownStyle} onPointerDown={() => clearTimeout(memberDropdownHideTimerRef.current)}>
                         {memberResults.length === 0 ? (
                           <div style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>
                             {memberQuery.trim() ? 'No users found' : 'No friends to suggest'}
@@ -772,7 +774,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                               <InitialsAvatar profile={p} size={28} />
                               <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.username}</span>
                               {!already && p.id !== userId && (
-                                <IconBox size={28} onMouseDown={() => handleAddMember(p)}>
+                                <IconBox size={28} onPointerDown={e => { e.preventDefault(); handleAddMember(p) }}>
                                   <PlusIcon color="#d4785a" />
                                 </IconBox>
                               )}

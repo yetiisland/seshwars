@@ -1246,7 +1246,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 {editAddr.showDropdown && editAddr.geoResults.length > 0 && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }}>
                     {editAddr.geoResults.map(r => (
-                      <div key={r.id} onMouseDown={() => handleSelectEditSuggestion(r)} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
+                      <div key={r.id} onPointerDown={e => { e.preventDefault(); editAddr.cancelDropdownHide(); handleSelectEditSuggestion(r) }} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
                         <div style={{ fontWeight: 700 }}>{r.text}</div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: 10 }}>{r.place_name}</div>
                       </div>
