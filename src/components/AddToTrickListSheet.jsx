@@ -9,6 +9,7 @@ import TrickCheckmark from './TrickCheckmark'
 import TrickEditPanel from './TrickEditPanel'
 import { PlusIcon, IconBox, PencilIcon, TrickListIcon } from './Icons'
 import useBlurOnScroll from '../hooks/useBlurOnScroll'
+import useKeyboardOpen from '../hooks/useKeyboardOpen'
 
 const NAME_MAX = 60
 
@@ -101,6 +102,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
   const [addError, setAddError] = useState('')
   const addInputRef = useRef(null)
   const trickListScrollDismiss = useBlurOnScroll(addInputRef)
+  const { isOpen: isKeyboardOpen } = useKeyboardOpen()
   const [landedError, setLandedError] = useState('')
 
   // Trick options — pencil icon per row, swapped into this same sheet
@@ -440,7 +442,15 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                 <div style={{ padding: '8px 20px 0', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{addError}</div>
               )}
 
-              <div style={{ padding: '14px 20px 0' }}>
+              <div
+                style={{
+                  padding: '14px 20px 0',
+                  opacity: isKeyboardOpen ? 0 : 1,
+                  transform: isKeyboardOpen ? 'translateY(100%)' : 'translateY(0)',
+                  transition: 'opacity 150ms, transform 150ms',
+                  pointerEvents: isKeyboardOpen ? 'none' : 'auto',
+                }}
+              >
                 <button className="btn-salmon" onClick={() => setStep(2)} disabled={!hasNewTrick} style={{ opacity: !hasNewTrick ? 0.5 : 1 }}>
                   Save Tricks To List
                 </button>
@@ -523,7 +533,15 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
               {saveError && (
                 <div style={{ padding: '8px 14px 0', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{saveError}</div>
               )}
-              <div style={{ padding: '10px 14px 0' }}>
+              <div
+                style={{
+                  padding: '10px 14px 0',
+                  opacity: isKeyboardOpen ? 0 : 1,
+                  transform: isKeyboardOpen ? 'translateY(100%)' : 'translateY(0)',
+                  transition: 'opacity 150ms, transform 150ms',
+                  pointerEvents: isKeyboardOpen ? 'none' : 'auto',
+                }}
+              >
                 <button
                   onClick={handleSave}
                   disabled={!anyListChecked || saving}

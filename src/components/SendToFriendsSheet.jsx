@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { getProfiles } from '../utils/profileCache'
 import InitialsAvatar from './InitialsAvatar'
+import useKeyboardOpen from '../hooks/useKeyboardOpen'
 
 const NOTE_MAX = 200
 
@@ -38,6 +39,7 @@ export function SendToFriendsContent({ spot, onSent, onGoProfile, onBack, onClos
   const [selected, setSelected] = useState(new Set())
   const [note, setNote] = useState('')
   const [sending, setSending] = useState(false)
+  const { isOpen: isKeyboardOpen } = useKeyboardOpen()
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -162,7 +164,15 @@ export function SendToFriendsContent({ spot, onSent, onGoProfile, onBack, onClos
               <div style={{ padding: '8px 20px 0', fontSize: 11, color: '#e07070', fontWeight: 700 }}>{error}</div>
             )}
 
-            <div style={{ padding: '10px 14px 0' }}>
+            <div
+              style={{
+                padding: '10px 14px 0',
+                opacity: isKeyboardOpen ? 0 : 1,
+                transform: isKeyboardOpen ? 'translateY(100%)' : 'translateY(0)',
+                transition: 'opacity 150ms, transform 150ms',
+                pointerEvents: isKeyboardOpen ? 'none' : 'auto',
+              }}
+            >
               <button
                 className="btn-salmon"
                 onClick={handleSend}

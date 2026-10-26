@@ -18,6 +18,7 @@ import { LAYERS } from '../lib/layers'
 import { validateSpotForm, friendlySaveErrorMessage } from '../lib/spotSaveValidation'
 import useBlurOnScroll from '../hooks/useBlurOnScroll'
 import useKeyboardAwareScrollStyle from '../hooks/useKeyboardAwareScrollStyle'
+import useKeyboardOpen from '../hooks/useKeyboardOpen'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const DRAFT_KEY = 'seshwars_spot_draft'
@@ -44,6 +45,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const addressScrollDismiss = useBlurOnScroll(addressInputRef)
   // AddSpot's own portal (App.jsx) renders at LAYERS.SHEET.
   const keyboardAwareScrollStyle = useKeyboardAwareScrollStyle(LAYERS.SHEET)
+  const { isOpen: isKeyboardOpen } = useKeyboardOpen()
   const [photoError, setPhotoError] = useState('')
   const [spotPending, setSpotPending] = useState(false)
   const [spotRejected, setSpotRejected] = useState(false)
@@ -494,7 +496,15 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
       </div>
 
-      <div style={{ flex: '0 0 auto', padding: '12px 14px calc(12px + env(safe-area-inset-bottom))', borderTop: '1px solid #E8DDD0', background: '#FDF8F0' }}>
+      <div
+        style={{
+          flex: '0 0 auto', padding: '12px 14px calc(12px + env(safe-area-inset-bottom))', borderTop: '1px solid #E8DDD0', background: '#FDF8F0',
+          opacity: isKeyboardOpen ? 0 : 1,
+          transform: isKeyboardOpen ? 'translateY(100%)' : 'translateY(0)',
+          transition: 'opacity 150ms, transform 150ms',
+          pointerEvents: isKeyboardOpen ? 'none' : 'auto',
+        }}
+      >
         <button className="btn-salmon" onClick={handleSubmit} disabled={uploading}>
           Drop This Spot
         </button>
