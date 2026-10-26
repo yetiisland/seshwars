@@ -834,10 +834,29 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   )
 }
 
-export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user, openListId, onOpenListIdHandled, onGoToFriends, isActive = true }) {
+export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAddSpot, onSearch, searchOverlay, showNav = true, user, openListId, onOpenListIdHandled, onGoToFriends, isActive = true, closeSubpagesSignal }) {
   const [lists, setLists] = useState(() => _listsUserId === user?.id ? _cachedLists : [])
   const [listSpotIds, setListSpotIds] = useState(() => _listsUserId === user?.id ? _cachedListSpotIds : {})
   const [openCollection, setOpenCollection] = useState(_savedOpenCollection)
+
+  // Tapping any bottom nav tab — including re-tapping Saved while already
+  // inside a list — closes the open list back to the main list page,
+  // scrolled to the top: CollectionView (sheets, LIST/MAP state) unmounts
+  // entirely once openCollection is null, so none of that needs resetting
+  // separately. Skips the very first render so an openCollection restored
+  // from _savedOpenCollection on mount (e.g. after a param-only route
+  // change) isn't immediately wiped out. Same pattern as ProfileView's own
+  // closeSubpagesSignal effect.
+  const closeListMountedRef = useRef(false)
+  const mainScrollRef = useRef(null)
+  useEffect(() => {
+    if (!closeListMountedRef.current) { closeListMountedRef.current = true; return }
+    setOpenCollection(null)
+    _savedOpenCollection = null
+    _savedCollectionScrollTop = 0
+    if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeSubpagesSignal])
   const [showCreateList, setShowCreateList] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -1113,7 +1132,7 @@ export default function SavedView({ spots, saved, onSavePress, onSpotClick, onAd
       {showNav && <Navbar onAddSpot={onAddSpot} onSearch={onSearch} />}
       {searchOverlay || (
       <>
-      <div className="scroll-area">
+      <div className="scroll-area" ref={mainScrollRef}>
         <div style={{ padding: '8px 16px 0' }}>
         {/* Saved Spots (was Favorites) */}
         <div

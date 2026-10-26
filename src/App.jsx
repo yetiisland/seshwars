@@ -328,8 +328,10 @@ export default function App() {
   // (rendered once here) is the app's only bottom nav — those full-screen
   // pages used to render their own duplicate TabBar to close themselves
   // on a tap, back when each one needed its own; now that this signal
-  // closes them at the root, those duplicates were removed.
-  const [profileSubpagesCloseSignal, setProfileSubpagesCloseSignal] = useState(0)
+  // closes them at the root, those duplicates were removed. SavedView
+  // also watches it, to close an open saved list back to the main list
+  // page on any tab tap, including re-tapping Saved itself.
+  const [tabTapSignal, setTabTapSignal] = useState(0)
   const [spotsView, setSpotsView] = useState(() => sessionStorage.getItem('spotsView') || 'list')
   const [openListId, setOpenListId] = useState(null)
   // trick_list_invite notification tap — see handleTrickListClick below.
@@ -692,10 +694,11 @@ export default function App() {
     // tab content underneath — already mounted/intact, so this is just a
     // URL change, not a reload.
     if (spotMatch) navigate('/')
-    // Every tab tap (including re-tapping Profile while already on one of
-    // its own sub-pages) closes every full-screen page ProfileView has
-    // open, returning it to its root — see the signal's own declaration.
-    setProfileSubpagesCloseSignal(n => n + 1)
+    // Every tab tap (including re-tapping the one already active) closes
+    // any full-screen page ProfileView has open and any saved list
+    // SavedView has open, returning each to its own root — see the
+    // signal's own declaration.
+    setTabTapSignal(n => n + 1)
   }
 
   const handleSpotsViewChange = (v) => {
@@ -835,6 +838,7 @@ export default function App() {
                 openListId={openListId}
                 onOpenListIdHandled={() => setOpenListId(null)}
                 onGoToFriends={handleGoToFriends}
+                closeSubpagesSignal={tabTapSignal}
               />
             </div>
             {/* Kept mounted (hidden) like ListView/MapView/SavedView above —
@@ -861,7 +865,7 @@ export default function App() {
                 onFetchNotifications={fetchNotifications}
                 onMarkNotificationRead={markRead}
                 onMarkAllNotificationsRead={markAllRead}
-                closeSubpagesSignal={profileSubpagesCloseSignal}
+                closeSubpagesSignal={tabTapSignal}
                 hiddenIds={hiddenIds}
                 onUnhideSpot={unhideSpot}
                 openTrickListId={openTrickListId}
@@ -968,6 +972,7 @@ export default function App() {
                   openListId={openListId}
                   onOpenListIdHandled={() => setOpenListId(null)}
                   onGoToFriends={handleGoToFriends}
+                  closeSubpagesSignal={tabTapSignal}
                 />
               </div>
               {/* Kept mounted (hidden) like ListView/MapView/SavedView
@@ -998,7 +1003,7 @@ export default function App() {
                   onFetchNotifications={fetchNotifications}
                   onMarkNotificationRead={markRead}
                   onMarkAllNotificationsRead={markAllRead}
-                  closeSubpagesSignal={profileSubpagesCloseSignal}
+                  closeSubpagesSignal={tabTapSignal}
                   hiddenIds={hiddenIds}
                   onUnhideSpot={unhideSpot}
                   openTrickListId={openTrickListId}
