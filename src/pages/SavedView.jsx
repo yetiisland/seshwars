@@ -390,6 +390,9 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
     setMembers(prev => prev.some(m => m.id === profile.id) ? prev : [...prev, profile])
     setMemberSuggestions(prev => prev.filter(p => p.id !== profile.id))
     setMemberSearchResults(prev => prev.filter(p => p.id !== profile.id))
+    setMemberQuery('')
+    setHasFocusedMemberInput(false)
+    memberInputRef.current?.blur()
   }
 
   const handleRemoveMember = async (memberId) => {
