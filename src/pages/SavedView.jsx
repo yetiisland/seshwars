@@ -408,6 +408,11 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   }
 
   const memberResults = memberQuery.trim() ? memberSearchResults : memberSuggestions
+  // A typed query always shows its container, even with zero results (so
+  // "No users found" has somewhere to render). An empty query only shows
+  // the container when there's actually a suggestion to show — otherwise
+  // render nothing at all, not even an empty box.
+  const showMemberDropdown = memberQuery.trim().length > 0 || (hasFocusedMemberInput && memberResults.length > 0)
 
   const spotRowVirtualizer = useVirtualizer({
     count: spots.length,
@@ -830,11 +835,11 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                         style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', padding: '10px 12px 10px 4px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'Barlow, sans-serif' }}
                       />
                     </div>
-                    {(hasFocusedMemberInput || memberQuery.trim().length > 0) && (
+                    {showMemberDropdown && (
                       <div style={memberDropdownStyle} {...memberScrollDismiss}>
                         {memberResults.length === 0 ? (
                           <div style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>
-                            {memberQuery.trim() ? 'No users found' : 'No friends to suggest'}
+                            No users found
                           </div>
                         ) : memberResults.map(p => {
                           const already = members.some(m => m.id === p.id)
