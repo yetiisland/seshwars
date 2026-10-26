@@ -8,6 +8,7 @@ import { formatTrickDates } from '../lib/trickDates'
 import TrickCheckmark from './TrickCheckmark'
 import TrickEditPanel from './TrickEditPanel'
 import { PlusIcon, IconBox, PencilIcon, TrickListIcon } from './Icons'
+import useBlurOnScroll from '../hooks/useBlurOnScroll'
 
 const NAME_MAX = 60
 
@@ -99,6 +100,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
   const [nameInput, setNameInput] = useState('')
   const [addError, setAddError] = useState('')
   const addInputRef = useRef(null)
+  const trickListScrollDismiss = useBlurOnScroll(addInputRef)
   const [landedError, setLandedError] = useState('')
 
   // Trick options — pencil icon per row, swapped into this same sheet
@@ -112,6 +114,8 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
   const [draftNewLists, setDraftNewLists] = useState([]) // { id: tempId, name, checked }
   const [showCreateList, setShowCreateList] = useState(false)
   const [newListName, setNewListName] = useState('')
+  const newListNameInputRef = useRef(null)
+  const existingListsScrollDismiss = useBlurOnScroll(newListNameInputRef)
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -389,7 +393,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
               <div className="modal-title" style={{ padding: '0 20px', marginBottom: 16 }}>Your Trick List</div>
 
               {!noTricksYet && (
-                <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px', overscrollBehavior: 'contain', touchAction: 'pan-y' }}>
+                <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px', overscrollBehavior: 'contain', touchAction: 'pan-y' }} {...trickListScrollDismiss}>
                   <div className="section-label">Tricks at this spot</div>
                   <div style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6 }}>
                     {orderedTricks.map((trick, i) => (
@@ -457,7 +461,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                 </div>
               </div>
 
-              <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, overscrollBehavior: 'contain', touchAction: 'pan-y' }}>
+              <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, overscrollBehavior: 'contain', touchAction: 'pan-y' }} {...existingListsScrollDismiss}>
                 {trickLists.map(list => {
                   const isIn = existingListChecked.has(list.id)
                   return (
@@ -483,6 +487,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                 {showCreateList ? (
                   <div style={{ padding: '12px 20px' }}>
                     <input
+                      ref={newListNameInputRef}
                       className="form-input"
                       placeholder="List name..."
                       value={newListName}

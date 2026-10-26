@@ -11,11 +11,16 @@ import { getProfiles } from '../utils/profileCache'
 import MapView from './MapView'
 import MembersSummary from '../components/MembersSummary'
 import { LAYERS } from '../lib/layers'
+import useBlurOnScroll from '../hooks/useBlurOnScroll'
+import useKeyboardAwareScrollStyle from '../hooks/useKeyboardAwareScrollStyle'
 
 // Inline suggestion dropdown — copied verbatim from the geocoder address
 // dropdown in AddSpot.jsx (same pattern CommentsSection.jsx's @mention
 // dropdown already reuses).
-const memberDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden', maxHeight: 240, overflowY: 'auto', overscrollBehavior: 'contain', touchAction: 'pan-y' }
+// Flows normally below the input now (not its own absolutely-positioned,
+// independently-scrolling box) — it scrolls as part of the page's single
+// scroll-area, same as the Friends/add-skaters lists everywhere else.
+const memberDropdownStyle = { marginTop: 8, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, overflow: 'hidden' }
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -229,6 +234,10 @@ function ShareSavedListFriends({ listId, userId, onBack, onShared, onGoToFriends
 }
 
 function CollectionView({ title, isList, isFavorites, isOwner = true, userId, listId, onFavoritesListCreated, onLeft, spots, saved, onSavePress, onSpotClick, onBack, onGoToFriends, onListDeleted, initialScrollTop, onSaveScrollTop, isActive = true }) {
+  // Sized to the visible area while the keyboard is open (see the hook) so
+  // the add-skaters list scrolls natively instead of the whole page
+  // rubber-banding.
+  const collectionScrollStyle = useKeyboardAwareScrollStyle(LAYERS.PAGE_CONTENT)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteClosing, setDeleteClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -308,10 +317,13 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   const [memberQuery, setMemberQuery] = useState('')
   const [memberSuggestions, setMemberSuggestions] = useState([])
   const [memberSearchResults, setMemberSearchResults] = useState([])
-  const [memberInputFocused, setMemberInputFocused] = useState(false)
+  // Set on the first focus of the add-skaters field and never cleared on
+  // blur — the suggestions list no longer depends on the keyboard being
+  // open, only on whether the field has ever been focused this visit.
+  const [hasFocusedMemberInput, setHasFocusedMemberInput] = useState(false)
   const [addMemberError, setAddMemberError] = useState('')
   const memberInputRef = useRef(null)
-  const memberDropdownHideTimerRef = useRef(null)
+  const memberScrollDismiss = useBlurOnScroll(memberInputRef)
   // Guards against refetching suggestions on every refocus of the add-
   // skaters input — set once the first fetch (for this list) lands, cleared
   // only by a fresh mount (i.e. switching lists, since CollectionView is
@@ -340,8 +352,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
   // Suggestions are only useful once the owner opens the add-skaters input,
   // so fetch them on first focus instead of unconditionally on mount.
   const handleMemberInputFocus = () => {
-    clearTimeout(memberDropdownHideTimerRef.current)
-    setMemberInputFocused(true)
+    setHasFocusedMemberInput(true)
     if (!isOwner || suggestionsFetchedRef.current) return
     suggestionsFetchedRef.current = true
     fetchMemberSuggestions()
@@ -743,7 +754,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
           )}
         </div>
       ) : (
-        <div className="scroll-area" ref={scrollRef} style={{ paddingTop: 14 }}>
+        <div className="scroll-area" ref={scrollRef} style={{ paddingTop: 14, ...collectionScrollStyle }}>
           {isList && (
             <div style={{ padding: '0 16px 14px' }}>
               {isOwner && (
@@ -758,11 +769,10 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
                       value={memberQuery}
                       onChange={e => setMemberQuery(e.target.value.replace(/^@+/, ''))}
                       onFocus={handleMemberInputFocus}
-                      onBlur={() => { memberDropdownHideTimerRef.current = setTimeout(() => setMemberInputFocused(false), 150) }}
                       style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
                     />
-                    {memberInputFocused && (
-                      <div style={memberDropdownStyle} onPointerDown={() => clearTimeout(memberDropdownHideTimerRef.current)}>
+                    {(hasFocusedMemberInput || memberQuery.trim().length > 0) && (
+                      <div style={memberDropdownStyle} {...memberScrollDismiss}>
                         {memberResults.length === 0 ? (
                           <div style={{ padding: '10px 12px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>
                             {memberQuery.trim() ? 'No users found' : 'No friends to suggest'}

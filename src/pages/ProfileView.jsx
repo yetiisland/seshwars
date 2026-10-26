@@ -21,6 +21,7 @@ import { LAYERS } from '../lib/layers'
 import { TrickListIcon, ProfileIcon, HiddenEyeIcon } from '../components/Icons'
 import { transformImageUrl } from '../utils/imageUrl'
 import { openLocationSettings } from '../lib/locationSettings'
+import useKeyboardAwareScrollStyle from '../hooks/useKeyboardAwareScrollStyle'
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 
@@ -82,6 +83,10 @@ function notifMessage(n) {
 }
 
 export default function ProfileView({ user, spots, onAddSpot, showNav = true, onSearch, searchOverlay, userLocation, locationPermission, requestLocation, saved, onSavePress, onSpotClick, onListClick, onTrickListClick, notifications = [], unreadCount = 0, notifLoading = false, notifHasMore = false, onFetchNotifications, onMarkNotificationRead, onMarkAllNotificationsRead, hiddenIds, onUnhideSpot, openTrickListId, onOpenTrickListIdHandled, openFriends, onOpenFriendsHandled, isActive = true, closeSubpagesSignal }) {
+  // Friends page's own scroll container — sized to the visible area while
+  // the keyboard is open (see the hook) so the suggestions/results list
+  // scrolls natively instead of the whole page rubber-banding.
+  const friendsScrollStyle = useKeyboardAwareScrollStyle(LAYERS.FULL_SCREEN_PAGE)
   // Read via a ref inside event listeners below (not as a dep — these
   // listeners stay registered for the component's whole lifetime now that
   // it's kept mounted) so a friends/tricks-changed event or the app
@@ -1325,7 +1330,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             </div>
             <div style={{ width: 36 }} />
           </div>
-          <div className="scroll-area">
+          <div className="scroll-area" style={friendsScrollStyle}>
             <div style={{ padding: '14px 14px 0', maxWidth: 480, margin: '0 auto', width: '100%' }}>
               <FriendsView user={user} userLocation={userLocation} locationPermission={locationPermission} requestLocation={requestLocation} onFriendsChanged={fetchFriendCount} />
             </div>

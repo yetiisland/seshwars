@@ -49,8 +49,6 @@ export function useAddressConfirmation(onConfirm) {
 
   const skipSearchRef = useRef(false)
   const geocodeTimer = useRef(null)
-  const inputFocusedRef = useRef(false)
-  const dropdownHideTimerRef = useRef(null)
   const onConfirmRef = useRef(onConfirm)
   onConfirmRef.current = onConfirm
 
@@ -131,32 +129,20 @@ export function useAddressConfirmation(onConfirm) {
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json?access_token=${MAPBOX_TOKEN}&limit=5`
         )
         const data = await res.json()
-        setGeoResults(data.features || [])
-        if (inputFocusedRef.current) setShowDropdown(true)
+        const features = data.features || []
+        // Shown whenever there's unconfirmed text with results, regardless
+        // of focus/keyboard state — hidden again once the text is cleared
+        // or a coordinate match resolves (above), or once a suggestion is
+        // actually picked (applyConfirmed).
+        setGeoResults(features)
+        setShowDropdown(features.length > 0)
       } catch {
         setGeoResults([])
+        setShowDropdown(false)
       }
     }, 300)
     return () => clearTimeout(geocodeTimer.current)
   }, [addressText, confirmFromPin])
-
-  const onInputFocus = useCallback(() => {
-    inputFocusedRef.current = true
-    clearTimeout(dropdownHideTimerRef.current)
-    if (geoResults.length > 0) setShowDropdown(true)
-  }, [geoResults])
-
-  const onInputBlur = useCallback(() => {
-    inputFocusedRef.current = false
-    dropdownHideTimerRef.current = setTimeout(() => setShowDropdown(false), 150)
-  }, [])
-
-  // Called on a suggestion's own pointerdown, before selecting it — a
-  // blur this hook didn't expect (the tap landed on the dropdown, not the
-  // input) would otherwise still hide the dropdown out from under the tap.
-  const cancelDropdownHide = useCallback(() => {
-    clearTimeout(dropdownHideTimerRef.current)
-  }, [])
 
   // For restoring a saved draft (AddSpot) or an existing spot's address
   // (Edit Spot) without going through the typing/confirm flow. `confirmed`
@@ -174,6 +160,5 @@ export function useAddressConfirmation(onConfirm) {
   return {
     addressText, latitude, longitude, status, geoResults, showDropdown, rangeError,
     handleTextChange, selectSuggestion, handlePinMove, hydrate,
-    onInputFocus, onInputBlur, cancelDropdownHide,
   }
 }

@@ -16,6 +16,8 @@ import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
 import { mergeSpotIntoCache } from '../hooks/useSpots'
 import { LAYERS } from '../lib/layers'
 import { validateSpotForm, friendlySaveErrorMessage } from '../lib/spotSaveValidation'
+import useBlurOnScroll from '../hooks/useBlurOnScroll'
+import useKeyboardAwareScrollStyle from '../hooks/useKeyboardAwareScrollStyle'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const DRAFT_KEY = 'seshwars_spot_draft'
@@ -38,6 +40,10 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [fieldErrors, setFieldErrors] = useState({})
   const fieldRefs = useRef({})
   const locationSectionRef = useRef(null)
+  const addressInputRef = useRef(null)
+  const addressScrollDismiss = useBlurOnScroll(addressInputRef)
+  // AddSpot's own portal (App.jsx) renders at LAYERS.SHEET.
+  const keyboardAwareScrollStyle = useKeyboardAwareScrollStyle(LAYERS.SHEET)
   const [photoError, setPhotoError] = useState('')
   const [spotPending, setSpotPending] = useState(false)
   const [spotRejected, setSpotRejected] = useState(false)
@@ -339,7 +345,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
         </div>
       </div>
 
-      <div className="scroll-area" style={{ flex: '1 1 auto', minHeight: 0, padding: '16px 14px' }}>
+      <div className="scroll-area" style={{ flex: '1 1 auto', minHeight: 0, padding: '16px 14px', ...keyboardAwareScrollStyle }}>
 
         <SpotFormFields form={form} setForm={setForm} fieldErrors={fieldErrors} fieldRefs={fieldRefs} />
 
@@ -370,12 +376,11 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
           )}
           <div style={{ position: 'relative', marginBottom: 4 }}>
             <input
+              ref={addressInputRef}
               className="form-input"
               placeholder="Search address, place, or coordinates..."
               value={addr.addressText}
               onChange={e => addr.handleTextChange(e.target.value)}
-              onFocus={addr.onInputFocus}
-              onBlur={addr.onInputBlur}
               style={addr.status === 'confirmed' ? { paddingRight: 36 } : undefined}
             />
             {addr.status === 'confirmed' && (
@@ -386,9 +391,9 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
               </div>
             )}
             {addr.showDropdown && addr.geoResults.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }} {...addressScrollDismiss}>
                 {addr.geoResults.map(r => (
-                  <div key={r.id} onPointerDown={e => { e.preventDefault(); addr.cancelDropdownHide(); handleSelectSuggestion(r) }} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
+                  <div key={r.id} onPointerDown={e => { e.preventDefault(); handleSelectSuggestion(r) }} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
                     <div style={{ fontWeight: 700 }}>{r.text}</div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: 10 }}>{r.place_name}</div>
                   </div>

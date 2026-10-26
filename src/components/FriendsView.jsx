@@ -6,6 +6,7 @@ import { CloseIcon, IconBox } from './Icons'
 import InitialsAvatar from './InitialsAvatar'
 import { LAYERS } from '../lib/layers'
 import { haversineDistance } from '../hooks/useGeolocation'
+import useBlurOnScroll from '../hooks/useBlurOnScroll'
 
 // haversineDistance returns miles; refetch only once the user has moved
 // meaningfully, not on every watchPosition update (which fires often
@@ -67,10 +68,14 @@ export default function FriendsView({ user, userLocation, locationPermission, re
   const [pendingRemoveFriend, setPendingRemoveFriend] = useState(null) // { friendshipId, username }
   const [pendingCancelPending, setPendingCancelPending] = useState(null) // { friendshipId, username }
   const [nearbySkaters, setNearbySkaters] = useState([])
-  const [inputFocused, setInputFocused] = useState(false)
+  // Set on the first focus of the search field and never cleared on blur —
+  // the suggestions list no longer depends on the keyboard being open, only
+  // on whether the user has opened the search field at all this visit, and
+  // on query being empty (still gates "stay visible until the user types").
+  const [hasFocusedSearch, setHasFocusedSearch] = useState(false)
   const lastNearbyFetchLocationRef = useRef(null) // { latitude, longitude } | null
   const searchInputRef = useRef(null)
-  const inputBlurTimerRef = useRef(null)
+  const scrollDismiss = useBlurOnScroll(searchInputRef)
 
   // Reuses the location the spots list already gets from useGeolocation()
   // (passed down via App.jsx -> ProfileView -> here) — no separate geolocation
@@ -272,20 +277,19 @@ export default function FriendsView({ user, userLocation, locationPermission, re
           placeholder="Search for skaters..."
           value={query}
           onChange={e => setQuery(e.target.value.replace(/^@+/, ''))}
-          onFocus={() => { clearTimeout(inputBlurTimerRef.current); setInputFocused(true); requestLocation?.() }}
-          onBlur={() => { inputBlurTimerRef.current = setTimeout(() => setInputFocused(false), 150) }}
+          onFocus={() => { setHasFocusedSearch(true); requestLocation?.() }}
           style={{ paddingLeft: 24, border: '1.5px solid #d4785a' }}
         />
       </div>
 
-      {inputFocused && query.trim().length === 0 && locationPermission === 'denied' && (
+      {hasFocusedSearch && query.trim().length === 0 && locationPermission === 'denied' && (
         <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, marginBottom: 20, lineHeight: 1.5 }}>
           Location is blocked, so skaters near you can't be shown. Re-enable location for this app in your browser or device settings.
         </div>
       )}
 
-      {inputFocused && nearbySkaters.length > 0 && query.trim().length === 0 && (
-        <div style={{ marginBottom: 20 }} onPointerDown={() => clearTimeout(inputBlurTimerRef.current)}>
+      {hasFocusedSearch && nearbySkaters.length > 0 && query.trim().length === 0 && (
+        <div style={{ marginBottom: 20 }} {...scrollDismiss}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <div className="section-label" style={{ marginBottom: 0 }}>Skaters Near You</div>
             <div style={countBadgeStyle}>
@@ -311,7 +315,7 @@ export default function FriendsView({ user, userLocation, locationPermission, re
       )}
 
       {query.trim().length >= 1 && (
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 20 }} {...scrollDismiss}>
           {!searching && !searchError && results.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <div className="section-label" style={{ marginBottom: 0 }}>Results</div>

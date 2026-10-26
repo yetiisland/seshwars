@@ -28,6 +28,8 @@ import SpotCoverImage from '../components/SpotCoverImage'
 import MapAttributionButton from '../components/MapAttributionButton'
 import SatelliteToggle from '../components/SatelliteToggle'
 import SpotSaveErrorModal from '../components/SpotSaveErrorModal'
+import useBlurOnScroll from '../hooks/useBlurOnScroll'
+import useKeyboardAwareScrollStyle from '../hooks/useKeyboardAwareScrollStyle'
 import { validateSpotForm, friendlySaveErrorMessage } from '../lib/spotSaveValidation'
 import { LAYERS } from '../lib/layers'
 import { buildStaticMapUrl, clampStaticMapDimension, STATIC_MAP_ZOOM } from '../lib/staticMap'
@@ -119,6 +121,10 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [editFieldErrors, setEditFieldErrors] = useState({})
   const editFieldRefs = useRef({})
   const editLocationSectionRef = useRef(null)
+  const editAddressInputRef = useRef(null)
+  const editAddressScrollDismiss = useBlurOnScroll(editAddressInputRef)
+  // Edit Spot's own portal (below) renders at LAYERS.SHEET.
+  const editKeyboardAwareScrollStyle = useKeyboardAwareScrollStyle(LAYERS.SHEET)
   const [modActionError, setModActionError] = useState('')
   const [skateableAgainError, setSkateableAgainError] = useState('')
   const [editUploading, setEditUploading] = useState(false)
@@ -1233,7 +1239,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             </div>
           </div>
 
-          <div className="scroll-area" style={{ padding: '16px 14px' }}>
+          <div className="scroll-area" style={{ padding: '16px 14px', ...editKeyboardAwareScrollStyle }}>
             <SpotFormFields form={editForm} setForm={setEditForm} fieldErrors={editFieldErrors} fieldRefs={editFieldRefs} />
 
             <div className="divider" />
@@ -1259,12 +1265,11 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               {editFieldErrors.location && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 8 }}>{editFieldErrors.location}</div>}
               <div style={{ position: 'relative', marginBottom: 4 }}>
                 <input
+                  ref={editAddressInputRef}
                   className="form-input"
                   placeholder="Search address, place, or coordinates..."
                   value={editAddr.addressText}
                   onChange={e => editAddr.handleTextChange(e.target.value)}
-                  onFocus={editAddr.onInputFocus}
-                  onBlur={editAddr.onInputBlur}
                   style={editAddr.status === 'confirmed' ? { paddingRight: 36 } : undefined}
                 />
                 {editAddr.status === 'confirmed' && (
@@ -1275,9 +1280,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   </div>
                 )}
                 {editAddr.showDropdown && editAddr.geoResults.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden' }} {...editAddressScrollDismiss}>
                     {editAddr.geoResults.map(r => (
-                      <div key={r.id} onPointerDown={e => { e.preventDefault(); editAddr.cancelDropdownHide(); handleSelectEditSuggestion(r) }} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
+                      <div key={r.id} onPointerDown={e => { e.preventDefault(); handleSelectEditSuggestion(r) }} style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-primary)', borderBottom: '1px solid #ECEDF2', cursor: 'pointer', lineHeight: 1.4 }}>
                         <div style={{ fontWeight: 700 }}>{r.text}</div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: 10 }}>{r.place_name}</div>
                       </div>
