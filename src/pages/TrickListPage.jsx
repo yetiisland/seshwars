@@ -451,7 +451,7 @@ function TrickListDetail({ list, user, spots, onSpotClick, onBack, onListRenamed
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div className="scroll-area">
         <div style={{
-          position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+          position: 'sticky', top: 0, zIndex: LAYERS.STICKY_HEADER,
           display: 'grid', gridTemplateColumns: '80px 1fr 80px', alignItems: 'center',
           padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)',
           background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',
@@ -802,7 +802,7 @@ export default function TrickListPage({ user, spots, onSpotClick, onClose, openL
     <div style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
       <div className="scroll-area">
         <div style={{
-          position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+          position: 'sticky', top: 0, zIndex: LAYERS.STICKY_HEADER,
           display: 'flex', alignItems: 'center',
           padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
           background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',

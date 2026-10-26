@@ -335,7 +335,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, background: '#FDF8F0', position: 'relative' }}>
       <div className="scroll-area">
-        <div style={{ position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', background: '#FDF8F0' }}>
+        <div style={{ position: 'sticky', top: 0, zIndex: LAYERS.STICKY_HEADER, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', background: '#FDF8F0' }}>
           <div style={{ width: 28 }} />
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Add a Spot</div>
           <div onClick={handleClose} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>

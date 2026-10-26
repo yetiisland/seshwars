@@ -773,7 +773,7 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
       ) : (
         <div className="scroll-area" ref={scrollRef}>
           <div style={{
-            position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+            position: 'sticky', top: 0, zIndex: LAYERS.STICKY_HEADER,
             display: 'grid',
             gridTemplateColumns: '80px 1fr 80px',
             alignItems: 'center',

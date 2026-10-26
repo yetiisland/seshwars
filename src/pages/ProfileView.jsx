@@ -958,7 +958,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
             <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
               <div className="scroll-area">
                 <div style={{
-                  position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+                  position: 'sticky', top: 0, zIndex: LAYERS.STICKY_HEADER,
                   display: 'flex', alignItems: 'center',
                   padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
                   background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',
@@ -1313,7 +1313,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
           <div className="scroll-area">
             <div style={{
-              position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+              position: 'sticky', top: 0, zIndex: LAYERS.STICKY_HEADER,
               display: 'flex', alignItems: 'center',
               padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
               background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',
@@ -1361,7 +1361,7 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
         <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
           <div className="scroll-area">
             <div style={{
-              position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+              position: 'sticky', top: 0, zIndex: LAYERS.STICKY_HEADER,
               display: 'flex', alignItems: 'center',
               padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
               background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',

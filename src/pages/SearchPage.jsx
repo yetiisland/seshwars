@@ -86,7 +86,7 @@ export default function SearchPage({ spots, onSelect, onClose }) {
       <div className="scroll-area">
         {/* Header — no borderBottom since the Navbar above provides separation */}
         <div style={{
-          position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+          position: 'sticky', top: 0, zIndex: LAYERS.STICKY_HEADER,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 16px 12px',
           background: '#FDF8F0',

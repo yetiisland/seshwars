@@ -217,12 +217,13 @@ One scale for the whole app, exported as named constants from
 |---|---|---|
 | 1 | `PAGE_CONTENT` | In-page stacking only — card badges, anchored suggestion dropdowns, status-bar cover, a page's own map/list content. Never competes with anything outside its own page. |
 | 2 | `FLOATING_CONTROL` | Floating controls that sit on top of a page's own content but aren't a popup — the LIST/MAP toggle pill, the map's satellite/locate/filter buttons. Above all page content (including a full-screen map), below every full-screen page. |
-| 3 | `FULL_SCREEN_PAGE` | Settings, Friends, Trick List, Spots Added, Hidden Spots, Notifications, Edit Profile, Feedback, Support, Delete Account — pages reached from the main tabs, never opened on top of an open spot. |
-| 4 | `SPOT_OVERLAY` | The open-spot takeover (`App.jsx`) — renders above every full-screen page so opening a spot from one of them covers it instead of opening underneath. |
-| 5 | `BOTTOM_NAV` | The tab bar (mobile `.tab-bar`, desktop `.desktop-float-nav`) — always above the spot overlay, unconditionally. |
-| 6 | `SHEET` | Every bottom sheet/popup (`.modal-overlay`'s own default) — save-to-list, share, report, options, filters, and the rest. Always above the bottom nav. Also Add Spot and Edit Spot (`App.jsx`, `SpotDetail.jsx`) — both also hide the bottom nav outright while open rather than relying on the tier alone. |
-| 7 | `CONFIRM` | Confirmation dialogs (delete/hide/leave/remove, unsaved-changes) and full-screen interrupts reachable from anywhere (sign-in, Terms, Privacy) — above sheets. |
-| 8 | `TOAST` | Transient toast/snackbar messages — always on top. |
+| 3 | `STICKY_HEADER` | Every `position: sticky` header inside a page's own scroll container — Drop a Spot, Edit Spot, Friends, saved list pages, trick list pages, Settings sub-pages (Edit Profile, Send Feedback), the main spot search screen. Above page content and floating controls' in-page content, so nothing scrolling beneath it can draw on top of it — below every full-screen page. Any element that uses z-index internally for its own layout (overlapping avatars, chips) must also set `isolation: isolate` so its own stacking order can never leak out to outrank this tier. |
+| 4 | `FULL_SCREEN_PAGE` | Settings, Friends, Trick List, Spots Added, Hidden Spots, Notifications, Edit Profile, Feedback, Support, Delete Account — pages reached from the main tabs, never opened on top of an open spot. |
+| 5 | `SPOT_OVERLAY` | The open-spot takeover (`App.jsx`) — renders above every full-screen page so opening a spot from one of them covers it instead of opening underneath. |
+| 6 | `BOTTOM_NAV` | The tab bar (mobile `.tab-bar`, desktop `.desktop-float-nav`) — always above the spot overlay, unconditionally. |
+| 7 | `SHEET` | Every bottom sheet/popup (`.modal-overlay`'s own default) — save-to-list, share, report, options, filters, and the rest. Always above the bottom nav. Also Add Spot and Edit Spot (`App.jsx`, `SpotDetail.jsx`) — both also hide the bottom nav outright while open rather than relying on the tier alone. |
+| 8 | `CONFIRM` | Confirmation dialogs (delete/hide/leave/remove, unsaved-changes) and full-screen interrupts reachable from anywhere (sign-in, Terms, Privacy) — above sheets. |
+| 9 | `TOAST` | Transient toast/snackbar messages — always on top. |
 
 Tiers are spaced apart so a component needing fine-grained order against
 its own siblings (two badges on one card, a toggle pill's own thumb) can

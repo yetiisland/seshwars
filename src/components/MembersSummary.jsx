@@ -43,7 +43,10 @@ export default function MembersSummary({ members, isOwner, onRemove }) {
         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
           Added:
         </span>
-        <div style={{ display: 'flex' }}>
+        {/* isolation: isolate — the avatars' own z-index (below) only has
+            to out-rank each other to overlap correctly; it must never be
+            able to escape this row and outrank a page's sticky header. */}
+        <div style={{ display: 'flex', isolation: 'isolate' }}>
           {members.map((m, i) => (
             <div key={m.id} style={{ marginLeft: i === 0 ? 0 : -12, zIndex: LAYERS.PAGE_CONTENT + (members.length - i) }}>
               <InitialsAvatar profile={m} size={32} ring="0 0 0 2px #FDF8F0" />
