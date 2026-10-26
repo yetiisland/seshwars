@@ -17,8 +17,6 @@ import { mergeSpotIntoCache } from '../hooks/useSpots'
 import { LAYERS } from '../lib/layers'
 import { validateSpotForm, friendlySaveErrorMessage } from '../lib/spotSaveValidation'
 import useBlurOnScroll from '../hooks/useBlurOnScroll'
-import useKeyboardAwareScrollStyle from '../hooks/useKeyboardAwareScrollStyle'
-import useKeyboardOpen from '../hooks/useKeyboardOpen'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const DRAFT_KEY = 'seshwars_spot_draft'
@@ -43,9 +41,6 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const locationSectionRef = useRef(null)
   const addressInputRef = useRef(null)
   const addressScrollDismiss = useBlurOnScroll(addressInputRef)
-  // AddSpot's own portal (App.jsx) renders at LAYERS.SHEET.
-  const keyboardAwareScrollStyle = useKeyboardAwareScrollStyle(LAYERS.SHEET)
-  const { isOpen: isKeyboardOpen } = useKeyboardOpen()
   const [photoError, setPhotoError] = useState('')
   const [spotPending, setSpotPending] = useState(false)
   const [spotRejected, setSpotRejected] = useState(false)
@@ -339,15 +334,16 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, background: '#FDF8F0', position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
-        <div style={{ width: 28 }} />
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Add a Spot</div>
-        <div onClick={handleClose} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <CloseIcon />
+      <div className="scroll-area">
+        <div style={{ position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', background: '#FDF8F0' }}>
+          <div style={{ width: 28 }} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Add a Spot</div>
+          <div onClick={handleClose} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <CloseIcon />
+          </div>
         </div>
-      </div>
 
-      <div className="scroll-area" style={{ flex: '1 1 auto', minHeight: 0, padding: '16px 14px', ...keyboardAwareScrollStyle }}>
+        <div style={{ padding: '16px 14px' }}>
 
         <SpotFormFields form={form} setForm={setForm} fieldErrors={fieldErrors} fieldRefs={fieldRefs} />
 
@@ -494,20 +490,12 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
           </div>
         </div>
 
-      </div>
-
-      <div
-        style={{
-          flex: '0 0 auto', padding: '12px 14px calc(12px + env(safe-area-inset-bottom))', borderTop: '1px solid #E8DDD0', background: '#FDF8F0',
-          opacity: isKeyboardOpen ? 0 : 1,
-          transform: isKeyboardOpen ? 'translateY(100%)' : 'translateY(0)',
-          transition: 'opacity 150ms, transform 150ms',
-          pointerEvents: isKeyboardOpen ? 'none' : 'auto',
-        }}
-      >
-        <button className="btn-salmon" onClick={handleSubmit} disabled={uploading}>
+        <button className="btn-salmon" onClick={handleSubmit} disabled={uploading} style={{ marginTop: 4 }}>
           Drop This Spot
         </button>
+        </div>
+
+        <div style={{ height: 'calc(12px + env(safe-area-inset-bottom))' }} />
       </div>
 
       {/* Photo upload progress overlay */}

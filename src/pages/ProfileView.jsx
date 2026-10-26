@@ -961,20 +961,21 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
               triggers them is now rendered for all 3 tabs. */}
           {showFeedbackSheet && createPortal(
             <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center',
-                padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
-                background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
-              }}>
-                <div onClick={() => setShowFeedbackSheet(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Send Feedback</div>
-                <div style={{ width: 36 }} />
-              </div>
               <div className="scroll-area">
+                <div style={{
+                  position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+                  display: 'flex', alignItems: 'center',
+                  padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+                  background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',
+                }}>
+                  <div onClick={() => setShowFeedbackSheet(false)} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Send Feedback</div>
+                  <div style={{ width: 36 }} />
+                </div>
                 <div style={{ padding: '16px 16px 28px', maxWidth: 480, margin: '0 auto', width: '100%' }}>
                   {feedbackSent ? (
                     <div style={{ fontSize: 13, color: '#4a9a5a', fontWeight: 700, textAlign: 'center', padding: '20px 0' }}>
@@ -1362,20 +1363,21 @@ export default function ProfileView({ user, spots, onAddSpot, showNav = true, on
       {/* Edit Profile — full page (Section E), reached from Settings */}
       {showEditSheet && createPortal(
         <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', flexDirection: 'column' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center',
-            padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
-            background: '#FDF8F0', borderBottom: '1px solid #E8DDD0', flexShrink: 0,
-          }}>
-            <div onClick={closeEditSheet} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Edit Profile</div>
-            <div style={{ width: 36 }} />
-          </div>
           <div className="scroll-area">
+            <div style={{
+              position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1,
+              display: 'flex', alignItems: 'center',
+              padding: '12px 16px', paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+              background: '#FDF8F0', borderBottom: '1px solid #E8DDD0',
+            }}>
+              <div onClick={closeEditSheet} style={{ width: 36, height: 36, borderRadius: 6, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M8 2L4 6L8 10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Edit Profile</div>
+              <div style={{ width: 36 }} />
+            </div>
             <div style={{ padding: '16px 16px 28px', maxWidth: 480, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
               {/* Avatar */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>

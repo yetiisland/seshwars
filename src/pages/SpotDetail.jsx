@@ -29,7 +29,6 @@ import MapAttributionButton from '../components/MapAttributionButton'
 import SatelliteToggle from '../components/SatelliteToggle'
 import SpotSaveErrorModal from '../components/SpotSaveErrorModal'
 import useBlurOnScroll from '../hooks/useBlurOnScroll'
-import useKeyboardAwareScrollStyle from '../hooks/useKeyboardAwareScrollStyle'
 import { validateSpotForm, friendlySaveErrorMessage } from '../lib/spotSaveValidation'
 import { LAYERS } from '../lib/layers'
 import { buildStaticMapUrl, clampStaticMapDimension, STATIC_MAP_ZOOM } from '../lib/staticMap'
@@ -123,8 +122,6 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const editLocationSectionRef = useRef(null)
   const editAddressInputRef = useRef(null)
   const editAddressScrollDismiss = useBlurOnScroll(editAddressInputRef)
-  // Edit Spot's own portal (below) renders at LAYERS.SHEET.
-  const editKeyboardAwareScrollStyle = useKeyboardAwareScrollStyle(LAYERS.SHEET)
   const [modActionError, setModActionError] = useState('')
   const [skateableAgainError, setSkateableAgainError] = useState('')
   const [editUploading, setEditUploading] = useState(false)
@@ -1230,16 +1227,16 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       {/* ── Edit form overlay ─────────────────────────────── */}
       {showEditForm && editForm && createPortal(
         <div className="desktop-page-root" style={{ position: 'fixed', inset: 0, background: '#FDF8F0', zIndex: LAYERS.SHEET, display: 'flex', flexDirection: 'column' }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', flexShrink: 0, background: '#FDF8F0' }}>
-            <div style={{ width: 28 }} />
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Edit Spot</div>
-            <div onClick={() => setShowEditForm(false)} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /><line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></svg>
+          <div className="scroll-area">
+            <div style={{ position: 'sticky', top: 0, zIndex: LAYERS.PAGE_CONTENT + 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px', paddingTop: 'calc(env(safe-area-inset-top) + 10px)', borderBottom: '1px solid #E8DDD0', background: '#FDF8F0' }}>
+              <div style={{ width: 28 }} />
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>Edit Spot</div>
+              <div onClick={() => setShowEditForm(false)} style={{ width: 28, height: 28, borderRadius: 4, background: '#d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="2" y1="2" x2="10" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /><line x1="10" y1="2" x2="2" y2="10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></svg>
+              </div>
             </div>
-          </div>
 
-          <div className="scroll-area" style={{ padding: '16px 14px', ...editKeyboardAwareScrollStyle }}>
+            <div style={{ padding: '16px 14px' }}>
             <SpotFormFields form={editForm} setForm={setEditForm} fieldErrors={editFieldErrors} fieldRefs={editFieldRefs} />
 
             <div className="divider" />
@@ -1386,6 +1383,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               <button onClick={() => setShowDeleteConfirm(true)} style={{ width: '100%', padding: 11, borderRadius: 6, background: 'transparent', border: '1px solid rgba(212,120,90,0.45)', color: '#d4785a', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'Barlow, sans-serif' }}>
                 Delete Spot
               </button>
+            </div>
             </div>
 
             <div style={{ height: sheetPad > 0 ? `calc(${BOTTOM_PAD} + ${sheetPad}px)` : BOTTOM_PAD }} />
