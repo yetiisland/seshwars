@@ -27,6 +27,8 @@ import { SpotPin, getSpotPinColors } from './MapView'
 import SpotCoverImage from '../components/SpotCoverImage'
 import MapAttributionButton from '../components/MapAttributionButton'
 import SatelliteToggle from '../components/SatelliteToggle'
+import SpotSaveErrorModal from '../components/SpotSaveErrorModal'
+import { validateSpotForm, friendlySaveErrorMessage } from '../lib/spotSaveValidation'
 import { LAYERS } from '../lib/layers'
 import { buildStaticMapUrl, clampStaticMapDimension, STATIC_MAP_ZOOM } from '../lib/staticMap'
 
@@ -47,7 +49,7 @@ function bustBadgeStyle(rating) {
   return { background: '#3D4454', color: '#FFFFFF', border: '1px solid #2e3344' }
 }
 
-const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, isHidden, onUnhidePress, onHidePress, sheetPad = 0, scrollToCommentId, userLocation }, ref) {
+const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, onBack, onEditSuccess, onSearch, user, onGoProfile, isHidden, onUnhidePress, onHidePress, sheetPad = 0, scrollToCommentId, userLocation, onEditingChange }, ref) {
   // ── Photo / hero state ────────────────────────────────────────
   const [photoIndex, setPhotoIndex] = useState(0)
   const [dragX, setDragX] = useState(0)
@@ -101,10 +103,22 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [editPassword, setEditPassword] = useState('')
   const [authError, setAuthError] = useState('')
   const [showEditForm, setShowEditForm] = useState(false)
+  // Lets App.jsx hide the bottom nav (mobile tab bar and desktop floating
+  // pill) for as long as the edit form is open, same as it already does
+  // for Drop a Spot — the form itself already renders above the nav
+  // (LAYERS.SHEET), this just keeps the nav out of the DOM/tab order too.
+  useEffect(() => {
+    onEditingChange?.(showEditForm)
+    return () => { if (showEditForm) onEditingChange?.(false) }
+  }, [showEditForm, onEditingChange])
   const [editForm, setEditForm] = useState(null)
   const [editPhotos, setEditPhotos] = useState([])
   const [editSaving, setEditSaving] = useState(false)
-  const [editError, setEditError] = useState('')
+  const [editPhotoError, setEditPhotoError] = useState('')
+  const [editSaveProblems, setEditSaveProblems] = useState([])
+  const [editFieldErrors, setEditFieldErrors] = useState({})
+  const editFieldRefs = useRef({})
+  const editLocationSectionRef = useRef(null)
   const [modActionError, setModActionError] = useState('')
   const [skateableAgainError, setSkateableAgainError] = useState('')
   const [editUploading, setEditUploading] = useState(false)
@@ -510,22 +524,37 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
         errors.push(`${file.name} failed to upload.`)
       }
     }
-    if (errors.length) setEditError(errors.join(' '))
+    if (errors.length) setEditPhotoError(errors.join(' '))
     setEditPhotos(p => [...p, ...urls])
     setEditUploading(false)
   }
 
+  // Scrolls to the first field still carrying a problem, in the same
+  // order the popup listed them (title, type, location) — the field's own
+  // inline error line (set alongside editSaveProblems in handleEditSave)
+  // stays visible after this; only the popup itself closes.
+  const closeEditSaveProblems = () => {
+    setEditSaveProblems([])
+    requestAnimationFrame(() => {
+      if (editFieldErrors.title) { editFieldRefs.current.title?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return }
+      if (editFieldErrors.type) { editFieldRefs.current.type?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return }
+      if (editFieldErrors.location) { editLocationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+    })
+  }
+
   const handleEditSave = async () => {
-    if (!editForm.title) { setEditError('Spot name is required'); return }
-    if (!editForm.type) { setEditError('Please select a type'); return }
     // CORE RULE: the pin is the single source of truth for the address —
-    // same A-E states as Drop a Spot, applied here too.
-    if (editAddr.status !== 'confirmed') {
-      setEditError(editAddr.status === 'empty' ? 'Spot location is required' : 'Select a location from the list, enter coordinates, or tap the map')
+    // same A-E states as Drop a Spot, applied here too. validateSpotForm
+    // checks all three required fields at once so the popup can list every
+    // problem found, not just the first.
+    const errors = validateSpotForm(editForm, editAddr.status)
+    if (Object.keys(errors).length > 0) {
+      setEditFieldErrors(errors)
+      setEditSaveProblems(Object.values(errors))
       return
     }
+    setEditFieldErrors({})
     setEditSaving(true)
-    setEditError('')
     const originalPhotos = spot.photos || []
     const newPhotos = editPhotos.filter(url => !originalPhotos.includes(url))
     const photosChanged = editPhotos.length !== originalPhotos.length ||
@@ -562,9 +591,9 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
     if (photosChanged) payload.moderation_status = newModerationStatus
     const { data, error } = await supabase.from('spots').update(payload).eq('id', spot.id).select()
     setEditSaving(false)
-    if (error) { setEditError(error.message); return }
+    if (error) { setEditSaveProblems([friendlySaveErrorMessage(error)]); return }
     if (!data || data.length === 0) {
-      setEditError('Update failed. You may not have permission to edit this spot.')
+      setEditSaveProblems(['Update failed. You may not have permission to edit this spot.'])
       return
     }
     if (photosChanged) setModStatus(newModerationStatus)
@@ -1205,7 +1234,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           </div>
 
           <div className="scroll-area" style={{ padding: '16px 14px' }}>
-            <SpotFormFields form={editForm} setForm={setEditForm} />
+            <SpotFormFields form={editForm} setForm={setEditForm} fieldErrors={editFieldErrors} fieldRefs={editFieldRefs} />
 
             <div className="divider" />
 
@@ -1219,13 +1248,15 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                 uploading={editUploading}
               />
               <input ref={editFileRef} type="file" accept="image/*" multiple hidden onChange={handleEditPhotos} />
+              {editPhotoError && <div style={{ fontSize: 11, color: '#e07070', marginTop: 6, fontWeight: 700 }}>{editPhotoError}</div>}
             </div>
 
             <div className="divider" />
 
             {/* Location */}
-            <div style={{ marginBottom: 14 }}>
+            <div ref={editLocationSectionRef} style={{ marginBottom: 14 }}>
               <div className="section-label">Location</div>
+              {editFieldErrors.location && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 8 }}>{editFieldErrors.location}</div>}
               <div style={{ position: 'relative', marginBottom: 4 }}>
                 <input
                   className="form-input"
@@ -1334,8 +1365,6 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </div>
             </div>
 
-            {editError && <div style={{ fontSize: 11, color: '#e07070', marginBottom: 10, fontWeight: 700 }}>{editError}</div>}
-
             {/* Respect The Spot note */}
             <div style={{ background: '#F5F0EA', border: '1px solid #E8DDD0', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
               <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
@@ -1384,6 +1413,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </div>
             </div>
           )}
+          <SpotSaveErrorModal problems={editSaveProblems} onClose={closeEditSaveProblems} />
         </div>,
         document.body
       )}

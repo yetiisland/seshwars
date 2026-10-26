@@ -8,12 +8,14 @@ import { slugify } from '../utils/slugify'
 import DraggablePhotos from '../components/DraggablePhotos'
 import LoadingOverlay from '../components/LoadingOverlay'
 import SpotFormFields from '../components/SpotFormFields'
+import SpotSaveErrorModal from '../components/SpotSaveErrorModal'
 import { compressImage } from '../utils/compressImage'
 import { checkPhotosSafe } from '../utils/moderation'
 import TermsOfService from './TermsOfService'
 import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
 import { mergeSpotIntoCache } from '../hooks/useSpots'
 import { LAYERS } from '../lib/layers'
+import { validateSpotForm, friendlySaveErrorMessage } from '../lib/spotSaveValidation'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const DRAFT_KEY = 'seshwars_spot_draft'
@@ -32,7 +34,10 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [photos, setPhotos] = useState([])
   const [uploading, setUploading] = useState(false)
   const [uploadingText, setUploadingText] = useState('Compressing...')
-  const [error, setError] = useState('')
+  const [saveProblems, setSaveProblems] = useState([])
+  const [fieldErrors, setFieldErrors] = useState({})
+  const fieldRefs = useRef({})
+  const locationSectionRef = useRef(null)
   const [photoError, setPhotoError] = useState('')
   const [spotPending, setSpotPending] = useState(false)
   const [spotRejected, setSpotRejected] = useState(false)
@@ -150,6 +155,19 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     onClose()
   }
 
+  // Scrolls to the first field still carrying a problem, in the same
+  // order the popup listed them (title, type, location) — the field's own
+  // inline error line (set alongside saveProblems in handleSubmit) stays
+  // visible after this; only the popup itself closes.
+  const closeSaveProblems = () => {
+    setSaveProblems([])
+    requestAnimationFrame(() => {
+      if (fieldErrors.title) { fieldRefs.current.title?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return }
+      if (fieldErrors.type) { fieldRefs.current.type?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return }
+      if (fieldErrors.location) { locationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+    })
+  }
+
   const handleSelectSuggestion = (feature) => {
     const [lng, lat] = feature.geometry.coordinates
     addr.selectSuggestion(feature)
@@ -194,18 +212,18 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   }
 
   const handleSubmit = async () => {
-    if (!form.title) { setError('Spot name is required'); return }
-    if (!form.type) { setError('Please select a type'); return }
     // CORE RULE: the pin is the single source of truth for the address —
     // only a CONFIRMED location (one the hook itself derived from the pin)
-    // may be saved. EMPTY uses the same required-field treatment as title/
-    // type above; UNCONFIRMED has its own standing inline hint, but still
-    // blocks here too rather than failing silently.
-    if (addr.status !== 'confirmed') {
-      setError(addr.status === 'empty' ? 'Spot location is required' : 'Select a location from the list, enter coordinates, or tap the map')
+    // may be saved. validateSpotForm checks all three required fields at
+    // once (not one-at-a-time) so the popup can list every problem found,
+    // not just the first.
+    const errors = validateSpotForm(form, addr.status)
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      setSaveProblems(Object.values(errors))
       return
     }
-    setError('')
+    setFieldErrors({})
     setUploading(true)
     setUploadingText('Checking content...')
     const { safe: allSafe, autoReject } = await checkPhotosSafe(photos)
@@ -236,7 +254,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     setUploading(false)
     if (error || !data) {
       console.error('[AddSpot] handleSubmit insert failed:', error)
-      setError(error?.message || 'Could not save this spot. Try again.')
+      setSaveProblems([friendlySaveErrorMessage(error)])
       return
     }
     sessionStorage.removeItem(DRAFT_KEY)
@@ -323,7 +341,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
       <div className="scroll-area" style={{ flex: '1 1 auto', minHeight: 0, padding: '16px 14px' }}>
 
-        <SpotFormFields form={form} setForm={setForm} />
+        <SpotFormFields form={form} setForm={setForm} fieldErrors={fieldErrors} fieldRefs={fieldRefs} />
 
         <div className="divider" />
 
@@ -342,8 +360,9 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
 
         <div className="divider" />
 
-        <div style={{ marginBottom: 14 }}>
+        <div ref={locationSectionRef} style={{ marginBottom: 14 }}>
           <div className="section-label">Location</div>
+          {fieldErrors.location && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 8 }}>{fieldErrors.location}</div>}
           {geoPermissionDenied && (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, lineHeight: 1.5, marginBottom: 8 }}>
               Location is blocked, so this can't be auto-filled. Search for the address below, or re-enable location for this app in your browser or device settings.
@@ -457,8 +476,6 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
           </div>
         </div>
 
-        {error && <div style={{ fontSize: 11, color: '#e07070', marginBottom: 10, fontWeight: 700 }}>{error}</div>}
-
         {/* Respect The Spot note */}
         <div style={{ background: '#F5F0EA', border: '1px solid #E8DDD0', borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
           <div style={{ fontSize: 10, fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
@@ -504,6 +521,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
         />
       )}
         {showTos && <TermsOfService onClose={() => setShowTos(false)} />}
+      <SpotSaveErrorModal problems={saveProblems} onClose={closeSaveProblems} />
     </div>
   )
 }

@@ -5,6 +5,13 @@ import AddFriendButton from './AddFriendButton'
 import { CloseIcon, IconBox } from './Icons'
 import InitialsAvatar from './InitialsAvatar'
 import { LAYERS } from '../lib/layers'
+import { haversineDistance } from '../hooks/useGeolocation'
+
+// haversineDistance returns miles; refetch only once the user has moved
+// meaningfully, not on every watchPosition update (which fires often
+// enough, with no movement threshold of its own, to re-render this list
+// mid-scroll and interrupt it).
+const NEARBY_REFETCH_THRESHOLD_MILES = 200 / 1609.344
 
 // Row container — copied verbatim from the notification card markup in
 // ProfileView.jsx (~line 1009-1035).
@@ -61,16 +68,25 @@ export default function FriendsView({ user, userLocation, locationPermission, re
   const [pendingCancelPending, setPendingCancelPending] = useState(null) // { friendshipId, username }
   const [nearbySkaters, setNearbySkaters] = useState([])
   const [inputFocused, setInputFocused] = useState(false)
-  const nearbyFetchedRef = useRef(false)
+  const lastNearbyFetchLocationRef = useRef(null) // { latitude, longitude } | null
   const searchInputRef = useRef(null)
   const inputBlurTimerRef = useRef(null)
 
   // Reuses the location the spots list already gets from useGeolocation()
   // (passed down via App.jsx -> ProfileView -> here) — no separate geolocation
-  // request/permission prompt. Fetched once, not re-run on every GPS update.
+  // request/permission prompt. Fetches once the first location arrives, then
+  // only again once the user has moved more than 200m from where the last
+  // fetch happened — watchPosition fires far more often than that, and
+  // refetching (re-rendering this list) on every update was interrupting an
+  // in-progress scroll.
   useEffect(() => {
-    if (!userLocation || nearbyFetchedRef.current) return
-    nearbyFetchedRef.current = true
+    if (!userLocation) return
+    const last = lastNearbyFetchLocationRef.current
+    if (last) {
+      const movedMiles = haversineDistance(last.latitude, last.longitude, userLocation.latitude, userLocation.longitude)
+      if (movedMiles < NEARBY_REFETCH_THRESHOLD_MILES) return
+    }
+    lastNearbyFetchLocationRef.current = { latitude: userLocation.latitude, longitude: userLocation.longitude }
     supabase.rpc('get_nearby_skaters', {
       p_lat: userLocation.latitude,
       p_lng: userLocation.longitude,

@@ -391,6 +391,11 @@ export default function App() {
   const profileAvatar = profile?.avatar_url || null
   const profileInitials = profile?.initials || ''
   const [showAdd, setShowAdd] = useState(false)
+  // Mirrors SpotDetail.jsx's own showEditForm — lets the mobile tab bar
+  // and desktop floating nav hide for Edit Spot the same way they already
+  // do for Drop a Spot (showAdd), even though Edit Spot's own portal
+  // already renders above both (LAYERS.SHEET).
+  const [isEditingSpot, setIsEditingSpot] = useState(false)
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -913,37 +918,41 @@ export default function App() {
             </div>
           )}
 
-          {/* Floating bottom nav pill */}
-          <div className="desktop-float-nav">
-            {NAV_TABS.map(({ id, label, Icon }) => (
-              <div
-                key={id}
-                className={`tab-item ${effectiveTab === id ? 'active' : ''}`}
-                onClick={() => handleTabChange(id)}
-                style={{ flex: 1 }}
-              >
-                {id === 'profile' ? (
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <InitialsAvatar
-                      avatarUrl={profileAvatar}
-                      initials={profileInitials}
-                      size={33}
-                      bg="#d4785a"
-                      ring={tab === 'profile' ? '0 0 0 2.5px #fff' : '0 0 0 2.5px rgba(255,255,255,0.3)'}
-                    />
-                    {unreadCount > 0 && (
-                      <div style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: '#d4785a', border: '2px solid #FDF8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
-                        <span style={{ fontSize: 8, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{unreadCount > 99 ? '99+' : String(unreadCount)}</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <Icon color="#ffffff" size={36} filled={tab === id} />
-                )}
-                <span className="tab-label">{label}</span>
-              </div>
-            ))}
-          </div>
+          {/* Floating bottom nav pill — hidden for Drop a Spot/Edit Spot
+              the same way the mobile tab bar is, even though both already
+              render above it (LAYERS.SHEET vs. LAYERS.BOTTOM_NAV). */}
+          {!showAdd && !isEditingSpot && (
+            <div className="desktop-float-nav">
+              {NAV_TABS.map(({ id, label, Icon }) => (
+                <div
+                  key={id}
+                  className={`tab-item ${effectiveTab === id ? 'active' : ''}`}
+                  onClick={() => handleTabChange(id)}
+                  style={{ flex: 1 }}
+                >
+                  {id === 'profile' ? (
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <InitialsAvatar
+                        avatarUrl={profileAvatar}
+                        initials={profileInitials}
+                        size={33}
+                        bg="#d4785a"
+                        ring={tab === 'profile' ? '0 0 0 2.5px #fff' : '0 0 0 2.5px rgba(255,255,255,0.3)'}
+                      />
+                      {unreadCount > 0 && (
+                        <div style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, background: '#d4785a', border: '2px solid #FDF8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                          <span style={{ fontSize: 8, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{unreadCount > 99 ? '99+' : String(unreadCount)}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Icon color="#ffffff" size={36} filled={tab === id} />
+                  )}
+                  <span className="tab-label">{label}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -1084,7 +1093,7 @@ export default function App() {
               SpotPage.jsx, which rendered its own TabBar. Faded out (opacity
               + transform only, so its own position:fixed is untouched) while
               the on-screen keyboard is open, so it never sits on top of it. */}
-          {!showAdd && (
+          {!showAdd && !isEditingSpot && (
             <TabBar
               active={effectiveTab}
               onChange={handleTabChange}
@@ -1154,17 +1163,22 @@ export default function App() {
             sheetPad={spotSheetPad}
             onSheetPad={setSpotSheetPad}
             userLocation={userLocation}
+            onEditingChange={setIsEditingSpot}
           />
         </div>
       )}
 
       {/* AddSpot — single portal instance outside the isDesktop branch; React identity
-          is preserved when the viewport crosses the mobile/desktop threshold */}
+          is preserved when the viewport crosses the mobile/desktop threshold.
+          LAYERS.SHEET, same tier Edit Spot already uses — above
+          LAYERS.BOTTOM_NAV so the desktop floating nav (and the mobile tab
+          bar) can never cover it; both are also hidden outright while this
+          is open (see showAdd checks on each). */}
       {showAdd && createPortal(
         <div
           style={isDesktop
-            ? { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: LAYERS.FULL_SCREEN_PAGE, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }
-            : { position: 'fixed', inset: 0, zIndex: LAYERS.FULL_SCREEN_PAGE }
+            ? { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: LAYERS.SHEET, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }
+            : { position: 'fixed', inset: 0, zIndex: LAYERS.SHEET }
           }
           onClick={isDesktop ? () => setShowAdd(false) : undefined}
         >

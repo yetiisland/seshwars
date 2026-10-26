@@ -15,7 +15,7 @@ import { LAYERS } from '../lib/layers'
 // the save/sign-in modals are App's own already-loaded state, passed down
 // as props — this component only owns the spot fetch itself and the
 // header chrome SpotPage.jsx used to render standalone.
-export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, onBack, onGoProfile, onGoAuth, onSavePress, sheetPad, onSheetPad, userLocation }) {
+export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, onBack, onGoProfile, onGoAuth, onSavePress, sheetPad, onSheetPad, userLocation, onEditingChange }) {
   const location = useLocation()
   const stateSpot = location.state?.spot?.title ? location.state.spot : null
   const [spot, setSpot] = useState(stateSpot)
@@ -176,6 +176,7 @@ export default function SpotOverlay({ slug, user, saved, hiddenIds, unhideSpot, 
           onUnhidePress={() => unhideSpot(spot.id)}
           sheetPad={sheetPad}
           scrollToCommentId={location.state?.scrollToCommentId}
+          onEditingChange={onEditingChange}
         />
       </div>
 

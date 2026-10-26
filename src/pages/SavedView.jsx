@@ -15,7 +15,7 @@ import { LAYERS } from '../lib/layers'
 // Inline suggestion dropdown — copied verbatim from the geocoder address
 // dropdown in AddSpot.jsx (same pattern CommentsSection.jsx's @mention
 // dropdown already reuses).
-const memberDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden', maxHeight: 240, overflowY: 'auto' }
+const memberDropdownStyle = { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: LAYERS.PAGE_CONTENT, background: '#FFFFFF', border: '1px solid #C8CAD4', borderRadius: 4, marginTop: 2, overflow: 'hidden', maxHeight: 240, overflowY: 'auto', overscrollBehavior: 'contain', touchAction: 'pan-y' }
 
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
 

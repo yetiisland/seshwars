@@ -73,6 +73,8 @@ body {
 .scroll-area {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   flex: 1;
   min-height: 0;
 }

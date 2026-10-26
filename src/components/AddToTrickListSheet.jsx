@@ -389,7 +389,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
               <div className="modal-title" style={{ padding: '0 20px', marginBottom: 16 }}>Your Trick List</div>
 
               {!noTricksYet && (
-                <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px' }}>
+                <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '0 20px 14px', overscrollBehavior: 'contain', touchAction: 'pan-y' }}>
                   <div className="section-label">Tricks at this spot</div>
                   <div style={{ background: '#FFFFFF', border: '1px solid #EAD8C8', borderRadius: 6 }}>
                     {orderedTricks.map((trick, i) => (
@@ -457,7 +457,7 @@ export default function AddToTrickListSheet({ spot, user, initialData, onClose, 
                 </div>
               </div>
 
-              <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+              <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, overscrollBehavior: 'contain', touchAction: 'pan-y' }}>
                 {trickLists.map(list => {
                   const isIn = existingListChecked.has(list.id)
                   return (

@@ -217,10 +217,10 @@ One scale for the whole app, exported as named constants from
 |---|---|---|
 | 1 | `PAGE_CONTENT` | In-page stacking only — card badges, anchored suggestion dropdowns, status-bar cover, a page's own map/list content. Never competes with anything outside its own page. |
 | 2 | `FLOATING_CONTROL` | Floating controls that sit on top of a page's own content but aren't a popup — the LIST/MAP toggle pill, the map's satellite/locate/filter buttons. Above all page content (including a full-screen map), below every full-screen page. |
-| 3 | `FULL_SCREEN_PAGE` | Settings, Friends, Trick List, Spots Added, Hidden Spots, Notifications, Edit Profile, Feedback, Support, Delete Account, Add Spot — pages reached from the main tabs, never opened on top of an open spot. |
+| 3 | `FULL_SCREEN_PAGE` | Settings, Friends, Trick List, Spots Added, Hidden Spots, Notifications, Edit Profile, Feedback, Support, Delete Account — pages reached from the main tabs, never opened on top of an open spot. |
 | 4 | `SPOT_OVERLAY` | The open-spot takeover (`App.jsx`) — renders above every full-screen page so opening a spot from one of them covers it instead of opening underneath. |
 | 5 | `BOTTOM_NAV` | The tab bar (mobile `.tab-bar`, desktop `.desktop-float-nav`) — always above the spot overlay, unconditionally. |
-| 6 | `SHEET` | Every bottom sheet/popup (`.modal-overlay`'s own default) — save-to-list, share, report, options, filters, and the rest. Always above the bottom nav. |
+| 6 | `SHEET` | Every bottom sheet/popup (`.modal-overlay`'s own default) — save-to-list, share, report, options, filters, and the rest. Always above the bottom nav. Also Add Spot and Edit Spot (`App.jsx`, `SpotDetail.jsx`) — both also hide the bottom nav outright while open rather than relying on the tier alone. |
 | 7 | `CONFIRM` | Confirmation dialogs (delete/hide/leave/remove, unsaved-changes) and full-screen interrupts reachable from anywhere (sign-in, Terms, Privacy) — above sheets. |
 | 8 | `TOAST` | Transient toast/snackbar messages — always on top. |
 
