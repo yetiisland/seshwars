@@ -370,8 +370,21 @@ function CollectionView({ title, isList, isFavorites, isOwner = true, userId, li
     setAddMemberError('')
     const { data, error } = await supabase.from('list_members').insert({ list_id: listId, user_id: profile.id, added_by: userId }).select().single()
     if (error || !data) {
-      console.error('[SavedView] handleAddMember failed:', error)
-      setAddMemberError(`Could not add @${profile.username}. Try again.`)
+      console.error('[SavedView] handleAddMember failed:', {
+        code: error?.code,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+      })
+      const isRlsRejection = error?.code === '42501' || /row-level security/i.test(error?.message || '')
+      const message = error?.code === '23505'
+        ? `@${profile.username} is already on this list.`
+        : isRlsRejection
+          ? 'You don\'t have permission to add people to this list.'
+          : error?.code === '23503'
+            ? 'That skater or list no longer exists.'
+            : `Could not add @${profile.username}. Try again.`
+      setAddMemberError(message)
       return
     }
     setMembers(prev => prev.some(m => m.id === profile.id) ? prev : [...prev, profile])
