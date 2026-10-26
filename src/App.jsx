@@ -130,30 +130,6 @@ function LocationPermissionPopup({ onTurnOn, onDismiss }) {
   )
 }
 
-// Branded pre-prompt shown before the real OS location permission dialog
-// on native — same shape as LocationPermissionPopup above (modal-overlay/
-// modal-sheet/handle, centered title+body, single salmon CTA, modal-cancel
-// dismiss row).
-function LocationPrePromptSheet({ onContinue, onDismiss }) {
-  return (
-    <div className="modal-overlay" onClick={onDismiss}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-handle" />
-        <div style={{ padding: '0 20px 8px', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Find spots near you</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            Turn on location to see the closest spots and how far away they are.
-          </div>
-        </div>
-        <div style={{ padding: '8px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button className="btn-salmon" onClick={onContinue}>Continue</button>
-        </div>
-        <div className="modal-cancel" onClick={onDismiss}>Not now</div>
-      </div>
-    </div>
-  )
-}
-
 function SearchBtn({ onClick }) {
   return (
     <div onClick={onClick} style={{ width: 34, height: 34, borderRadius: 6, background: '#FDF8F0', border: '1.5px solid #d4785a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
@@ -450,28 +426,18 @@ export default function App() {
     if (!openLocationSettings()) showToast('Re-enable location for this app in your browser or device settings.')
   }
 
-  // Branded pre-prompt — native only, shown before the real OS permission
-  // dialog so the ask has context instead of a bare system prompt. Never
-  // shows on web (no requestNativePermission there) and never once
-  // permission is granted or denied. Dismissing with NOT NOW asks again
-  // on the next launch only — locationPrePromptDismissedRef is in-memory,
-  // not persisted, so it naturally resets on a fresh app launch.
-  const [showLocationPrePrompt, setShowLocationPrePrompt] = useState(false)
-  const locationPrePromptDismissedRef = useRef(false)
+  // On native, ask for the real OS location permission once, as soon as
+  // the app opens, if it's still in the 'prompt' state — no branded sheet
+  // first. requestNativePermission is undefined on web, so this is a
+  // no-op there.
+  const nativeLocationPromptedRef = useRef(false)
   useEffect(() => {
     if (!requestNativePermission) return
     if (locationPermission !== 'prompt') return
-    if (locationPrePromptDismissedRef.current) return
-    setShowLocationPrePrompt(true)
+    if (nativeLocationPromptedRef.current) return
+    nativeLocationPromptedRef.current = true
+    requestNativePermission()
   }, [locationPermission, requestNativePermission])
-  const dismissLocationPrePrompt = () => {
-    setShowLocationPrePrompt(false)
-    locationPrePromptDismissedRef.current = true
-  }
-  const continueLocationPrePrompt = () => {
-    setShowLocationPrePrompt(false)
-    requestNativePermission?.()
-  }
   const isAdmin = isAdminUser(user)
   const { notifications, unreadCount, loading: notifLoading, hasMore: notifHasMore, fetchNotifications, markRead, markAllRead } = useNotifications(user?.id)
 
@@ -1122,13 +1088,6 @@ export default function App() {
             <LocationPermissionPopup
               onTurnOn={() => { dismissLocationPopup(); handleTurnOnLocation() }}
               onDismiss={dismissLocationPopup}
-            />,
-            document.body
-          )}
-          {showLocationPrePrompt && createPortal(
-            <LocationPrePromptSheet
-              onContinue={continueLocationPrePrompt}
-              onDismiss={dismissLocationPrePrompt}
             />,
             document.body
           )}

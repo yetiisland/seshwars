@@ -49,6 +49,8 @@
 	<string>Sesh Wars uses your camera to take photos of skate spots.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Sesh Wars uses your location to show skate spots near you and how far away they are.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Sesh Wars uses your location to show skate spots near you and how far away they are.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Sesh Wars uses your photo library to add photos to skate spots.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
