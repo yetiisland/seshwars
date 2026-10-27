@@ -213,7 +213,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
 
   const locationStaticImgUrl = useMemo(() => {
     if (!hasCoords || !locationImgSize) return null
-    return buildStaticMapUrl(spot.longitude, spot.latitude, locationImgSize.width, locationImgSize.height)
+    return buildStaticMapUrl(spot.longitude, spot.latitude, locationImgSize.width, locationImgSize.height, import.meta.env.VITE_MAPBOX_TOKEN)
   }, [hasCoords, spot.longitude, spot.latitude, locationImgSize])
 
   // ── Data fetching ─────────────────────────────────────────────

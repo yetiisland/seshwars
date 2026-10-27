@@ -1,5 +1,3 @@
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
-
 // Same zoom the spot page's Location static image uses (SpotDetail.jsx) —
 // the old interactive map's zoom (15) + 1, capped at the Static Images
 // API's own max of 19. Shared here so every static-map image in the app
@@ -18,10 +16,15 @@ export function clampStaticMapDimension(px) {
 // capped at 1280 (clampStaticMapDimension). No pin is ever baked into the
 // image itself; callers that want one render it as a separate overlay.
 //
+// `token` is the caller's own Mapbox access token — this module is shared
+// by the Vite client build and by Vercel serverless/edge functions, which
+// read it from different places (import.meta.env.VITE_MAPBOX_TOKEN vs.
+// process.env.VITE_MAPBOX_TOKEN), so it can't be read here directly.
+//
 // attribution=false removes the API's own gray attribution text (the
 // Mapbox logo stays, logo=false is never passed) — Mapbox still requires
 // attribution somewhere on screen for this, which every caller provides
 // via the shared MapAttributionButton component.
-export function buildStaticMapUrl(longitude, latitude, width, height) {
-  return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${longitude},${latitude},${STATIC_MAP_ZOOM},0/${width}x${height}@2x?access_token=${MAPBOX_TOKEN}&attribution=false`
+export function buildStaticMapUrl(longitude, latitude, width, height, token) {
+  return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${longitude},${latitude},${STATIC_MAP_ZOOM},0/${width}x${height}@2x?access_token=${token}&attribution=false`
 }

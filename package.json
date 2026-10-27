@@ -19,6 +19,7 @@
     "@supabase/supabase-js": "^2.105.3",
     "@tanstack/react-virtual": "^3.14.17",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/og": "^1.0.3",
     "lucide-react": "^1.14.0",
     "mapbox-gl": "^3.23.1",
     "react": "^19.2.5",

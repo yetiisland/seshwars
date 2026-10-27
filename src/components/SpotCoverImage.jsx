@@ -49,7 +49,7 @@ export default function SpotCoverImage({ spot, placeholderBg, chipBottom = 8, ch
     return () => ro.disconnect()
   }, [hasCoords])
 
-  const url = hasCoords && size ? buildStaticMapUrl(spot.longitude, spot.latitude, size.width, size.height) : null
+  const url = hasCoords && size ? buildStaticMapUrl(spot.longitude, spot.latitude, size.width, size.height, import.meta.env.VITE_MAPBOX_TOKEN) : null
   const showsMultiSpotChip = Boolean(spot?.is_multi_spot) && (spot?.type === 'Street' || spot?.type === 'DIY')
   const attributionRight = showsMultiSpotChip ? chipRight + MULTI_SPOT_CHIP_WIDTH_ESTIMATE_PX + MULTI_SPOT_CHIP_GAP_PX : chipRight
 
