@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { transformImageUrl } from '../../src/utils/imageUrl.js'
 
 export default async function handler(req, res) {
   const { slug } = req.query
@@ -9,11 +10,11 @@ export default async function handler(req, res) {
   )
 
   let spot = null
-  const { data: bySlug } = await supabase.from('spots').select('title,description,slug,id').eq('slug', slug).maybeSingle()
+  const { data: bySlug } = await supabase.from('spots').select('title,description,photos,slug,id').eq('slug', slug).maybeSingle()
   if (bySlug) {
     spot = bySlug
   } else {
-    const { data: byId } = await supabase.from('spots').select('title,description,slug,id').eq('id', slug).maybeSingle()
+    const { data: byId } = await supabase.from('spots').select('title,description,photos,slug,id').eq('id', slug).maybeSingle()
     spot = byId
   }
 
@@ -22,13 +23,9 @@ export default async function handler(req, res) {
   const origin = `${proto}://${host}`
 
   const canonicalSlug = spot?.slug || slug
-  const title = spot ? `${spot.title} - Seshwars` : 'Seshwars'
+  const title = spot ? `${spot.title} — Seshwars` : 'Seshwars'
   const description = spot?.description || 'Discover and share skate spots near you.'
-  // Branded preview image (api/og/spot.jsx) instead of the raw spot photo —
-  // the raw photo had no Seshwars branding and Messages tinted its caption
-  // bar gray without one. `v=1` is a manual cache-buster: bump it to
-  // invalidate every previously-cached copy of this image at once.
-  const image = `${origin}/api/og/spot?slug=${encodeURIComponent(canonicalSlug)}&v=1`
+  const image = spot?.photos?.[0] ? transformImageUrl(spot.photos[0], 1200) : `${origin}/sw-webclip.png`
   const canonicalUrl = `https://seshwars.com/spot/${canonicalSlug}`
   const appUrl = `/spots/${canonicalSlug}`
 
@@ -38,6 +35,7 @@ export default async function handler(req, res) {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="theme-color" content="#d4785a" />
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}" />
   <meta property="og:type" content="website" />
@@ -45,8 +43,6 @@ export default async function handler(req, res) {
   <meta property="og:title" content="${esc(spot?.title || 'Seshwars')}" />
   <meta property="og:description" content="${esc(description)}" />
   <meta property="og:image" content="${esc(image)}" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
   <meta property="og:url" content="${esc(canonicalUrl)}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${esc(spot?.title || 'Seshwars')}" />
