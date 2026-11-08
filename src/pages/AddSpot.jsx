@@ -59,19 +59,25 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [geoPermissionDenied, setGeoPermissionDenied] = useState(false)
   const fileRef = useRef()
   const draftTimer = useRef(null)
-  // Mirrors "does the form already have a pin or address" on every render
-  // (a plain assignment in the render body, not inside an effect) so the
-  // geolocation callbacks below — which can resolve much later than the
-  // render that started them, since a backgrounded browser tab throttles
-  // pending permission queries and position fetches until it regains
-  // visibility — always check the form's LIVE state at the moment they
-  // actually fire, never a stale mount-time snapshot. Without this, a
-  // user who types an address or drags the pin while the tab is in the
-  // background, then switches back right as the delayed fix finally
-  // resolves, would have their own input silently overwritten by the
-  // now-arriving "current location" result.
-  const hasLocationInputRef = useRef(false)
-  hasLocationInputRef.current = addr.status !== 'empty'
+  // Auto-locate's own "done" flag for this open of the form. STICKY: once
+  // true it never goes back to false, from any of two triggers, whichever
+  // comes first:
+  //  - auto-locate itself successfully applies a location (set directly
+  //    in the geolocation callbacks below), or
+  //  - the user provides their own input — a pin, a confirmed address, or
+  //    any typed address text, reflected live by addr.status leaving
+  //    'empty' (checked every render, not just once at mount, since the
+  //    geolocation callbacks below can resolve long after the render that
+  //    started them: a backgrounded tab throttles pending permission
+  //    queries and position fetches until it regains visibility again).
+  // The sticky "only ever moves true" direction matters because the user
+  // can later CLEAR their typed address (addr.status returns to 'empty')
+  // without that reopening the window for a late-arriving auto-locate
+  // result to overwrite their now-deliberately-empty field. The default
+  // map center is never consulted here — it is not a pin and is never
+  // treated as user input.
+  const autoLocateDoneRef = useRef(false)
+  if (addr.status !== 'empty') autoLocateDoneRef.current = true
 
   // Restore draft on mount
   useEffect(() => {
@@ -93,15 +99,27 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-locate on mount — runs at most once per open of this form, and
-  // only applies its result while the form still has no pin or address at
-  // the moment it resolves (see hasLocationInputRef above). Opening this
-  // screen is itself the deliberate user action that needs location
-  // (picking where to drop a pin), so it's fine to request immediately
-  // here rather than waiting for a further explicit control — but only
-  // when permission isn't already known to be denied, and only after
-  // checking because repeating a known-denied request is pointless and
-  // can't prompt again anyway.
+  // Auto-locate on mount — waits for the first available user location
+  // after this open of the form, and applies it (sets the pin, reverse
+  // geocodes the address) only if autoLocateDoneRef is still false at the
+  // moment that location arrives — i.e. the user hasn't placed a pin,
+  // confirmed an address, or typed any address text in the meantime. Runs
+  // at most once per open: the effect's own deps are permanently empty, so
+  // it can't re-fire without the form itself reopening, and applying a
+  // location marks autoLocateDoneRef true immediately, so even a
+  // (currently impossible, but defensive) second resolution would no-op.
+  // If permission is denied, unknown-but-not-grantable, or the position
+  // fetch errors for any other reason, this silently leaves the form
+  // empty — no error state here beyond the existing "location is
+  // blocked" hint tied to geoPermissionDenied, which only ever reflects a
+  // genuine OS/browser permission denial, not a plain fetch failure.
+  //
+  // Opening this screen is itself the deliberate user action that needs
+  // location (picking where to drop a pin), so it's fine to request
+  // immediately here rather than waiting for a further explicit control —
+  // but only when permission isn't already known to be denied, and only
+  // after checking because repeating a known-denied request is pointless
+  // and can't prompt again anyway.
   //
   // Native: uses @capacitor/geolocation for a real OS-backed check/fetch
   // instead of the WebView's navigator.geolocation. Never calls
@@ -117,7 +135,8 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
         if (result.location === 'denied') { setGeoPermissionDenied(true); return }
         if (result.location !== 'granted') return // 'prompt' / 'prompt-with-rationale' — skip, don't prompt bare
         return Geolocation.getCurrentPosition({ enableHighAccuracy: true }).then(pos => {
-          if (cancelled || hasLocationInputRef.current) return
+          if (cancelled || autoLocateDoneRef.current) return
+          autoLocateDoneRef.current = true
           const { latitude: lat, longitude: lng } = pos.coords
           setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
           addr.handlePinMove(lat, lng)
@@ -131,7 +150,8 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     if (!navigator.geolocation) return
     const doLocate = () => {
       navigator.geolocation.getCurrentPosition((pos) => {
-        if (hasLocationInputRef.current) return
+        if (autoLocateDoneRef.current) return
+        autoLocateDoneRef.current = true
         const { latitude: lat, longitude: lng } = pos.coords
         setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
         addr.handlePinMove(lat, lng)
