@@ -510,12 +510,27 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true
+    // Supabase re-validates the session (and fires this same SIGNED_IN
+    // event, with a freshly-deserialized session/user object) every time
+    // the tab regains visibility, not just on an actual token refresh —
+    // see GoTrueClient's _onVisibilityChanged -> _recoverAndRefresh. Setting
+    // state with a brand-new object every time, even though the user's id
+    // is unchanged, gave every downstream consumer of `user` a new prop
+    // reference on every tab return — harmless by itself, but exactly the
+    // kind of change effects/memos keyed on the raw `user` object (instead
+    // of user.id) can mistake for an actual identity change. Keeping the
+    // existing object when the id matches makes setUser a true no-op
+    // (React bails out via Object.is) so nothing downstream re-renders or
+    // reruns just because the tab was switched away and back.
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return
       const u = session?.user ?? null
-      _cachedUser = u
+      setUser(prev => {
+        const next = prev?.id === u?.id ? prev : u
+        _cachedUser = next
+        return next
+      })
       _authReady = true
-      setUser(u)
       setAuthLoaded(true)
       if (u) loadProfile(u)
       else clearProfile()
@@ -527,9 +542,12 @@ export default function App() {
         return
       }
       const u = session?.user ?? null
-      _cachedUser = u
+      setUser(prev => {
+        const next = prev?.id === u?.id ? prev : u
+        _cachedUser = next
+        return next
+      })
       _authReady = true
-      setUser(u)
       setAuthLoaded(true)
       if (event === 'SIGNED_IN' && session?.user) {
         const u = session.user

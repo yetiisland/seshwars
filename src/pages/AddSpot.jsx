@@ -59,7 +59,19 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const [geoPermissionDenied, setGeoPermissionDenied] = useState(false)
   const fileRef = useRef()
   const draftTimer = useRef(null)
-  const draftRestoredRef = useRef(false)
+  // Mirrors "does the form already have a pin or address" on every render
+  // (a plain assignment in the render body, not inside an effect) so the
+  // geolocation callbacks below — which can resolve much later than the
+  // render that started them, since a backgrounded browser tab throttles
+  // pending permission queries and position fetches until it regains
+  // visibility — always check the form's LIVE state at the moment they
+  // actually fire, never a stale mount-time snapshot. Without this, a
+  // user who types an address or drags the pin while the tab is in the
+  // background, then switches back right as the delayed fix finally
+  // resolves, would have their own input silently overwritten by the
+  // now-arriving "current location" result.
+  const hasLocationInputRef = useRef(false)
+  hasLocationInputRef.current = addr.status !== 'empty'
 
   // Restore draft on mount
   useEffect(() => {
@@ -72,7 +84,6 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
         if (mc) setMapCenter(mc)
         if (address || latitude != null) {
           addr.hydrate({ address, latitude, longitude, confirmed })
-          if (confirmed && latitude != null) draftRestoredRef.current = true
         }
       }
     } catch {}
@@ -82,13 +93,15 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-locate on mount — skipped if draft already had a confirmed pin.
-  // Opening this screen is itself the deliberate user action that needs
-  // location (picking where to drop a pin), so it's fine to request
-  // immediately here rather than waiting for a further explicit control —
-  // but only when permission isn't already known to be denied, and only
-  // after checking because repeating a known-denied request is pointless
-  // and can't prompt again anyway.
+  // Auto-locate on mount — runs at most once per open of this form, and
+  // only applies its result while the form still has no pin or address at
+  // the moment it resolves (see hasLocationInputRef above). Opening this
+  // screen is itself the deliberate user action that needs location
+  // (picking where to drop a pin), so it's fine to request immediately
+  // here rather than waiting for a further explicit control — but only
+  // when permission isn't already known to be denied, and only after
+  // checking because repeating a known-denied request is pointless and
+  // can't prompt again anyway.
   //
   // Native: uses @capacitor/geolocation for a real OS-backed check/fetch
   // instead of the WebView's navigator.geolocation. Never calls
@@ -104,7 +117,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
         if (result.location === 'denied') { setGeoPermissionDenied(true); return }
         if (result.location !== 'granted') return // 'prompt' / 'prompt-with-rationale' — skip, don't prompt bare
         return Geolocation.getCurrentPosition({ enableHighAccuracy: true }).then(pos => {
-          if (cancelled || draftRestoredRef.current) return
+          if (cancelled || hasLocationInputRef.current) return
           const { latitude: lat, longitude: lng } = pos.coords
           setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
           addr.handlePinMove(lat, lng)
@@ -118,7 +131,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     if (!navigator.geolocation) return
     const doLocate = () => {
       navigator.geolocation.getCurrentPosition((pos) => {
-        if (draftRestoredRef.current) return
+        if (hasLocationInputRef.current) return
         const { latitude: lat, longitude: lng } = pos.coords
         setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
         addr.handlePinMove(lat, lng)
