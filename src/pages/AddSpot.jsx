@@ -1,7 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
-import { Capacitor } from '@capacitor/core'
-import { Geolocation } from '@capacitor/geolocation'
 import { supabase } from '../lib/supabase'
 import { CloseIcon } from '../components/Icons'
 import { slugify } from '../utils/slugify'
@@ -28,7 +26,7 @@ const VISIBILITY_OPTIONS = [
   { value: 'private', label: 'Private', desc: 'Only you can see it' },
 ]
 
-export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
+export default function AddSpot({ onClose, onSuccess, user, onGoProfile, userLocation, locationPermission }) {
   const [form, setForm] = useState({
     title: '', type: '', features: [], bust_rating: '', lighting: '', is_multi_spot: 'No', description: '', visibility: 'public',
   })
@@ -56,7 +54,10 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
   const addr = useAddressConfirmation((lat, lng, source) => {
     if (source === 'coordinates') setMapCenter({ longitude: lng, latitude: lat, zoom: 16 })
   })
-  const [geoPermissionDenied, setGeoPermissionDenied] = useState(false)
+  // Reflects the app's one shared permission state (App.jsx's own
+  // useGeolocation() instance) — this is a read of existing state, not a
+  // permission check AddSpot performs itself.
+  const locationBlocked = locationPermission === 'denied'
   const fileRef = useRef()
   const draftTimer = useRef(null)
   // Auto-locate's own "done" flag for this open of the form. STICKY: once
@@ -99,77 +100,40 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-locate on mount — waits for the first available user location
-  // after this open of the form, and applies it (sets the pin, reverse
-  // geocodes the address) only if autoLocateDoneRef is still false at the
-  // moment that location arrives — i.e. the user hasn't placed a pin,
-  // confirmed an address, or typed any address text in the meantime. Runs
-  // at most once per open: the effect's own deps are permanently empty, so
-  // it can't re-fire without the form itself reopening, and applying a
-  // location marks autoLocateDoneRef true immediately, so even a
-  // (currently impossible, but defensive) second resolution would no-op.
-  // If permission is denied, unknown-but-not-grantable, or the position
-  // fetch errors for any other reason, this silently leaves the form
-  // empty — no error state here beyond the existing "location is
-  // blocked" hint tied to geoPermissionDenied, which only ever reflects a
-  // genuine OS/browser permission denial, not a plain fetch failure.
+  // Auto-locate — the shared userLocation prop (App.jsx's one
+  // useGeolocation() instance, already running for the whole app; it's
+  // what spot cards use for distances) is this form's only location
+  // source. No geolocation call, permission check, or request of its own:
+  // AddSpot only ever reads userLocation/locationPermission, never
+  // queries or requests anything itself, so native and web behave
+  // identically here — whatever the shared hook has already resolved (or
+  // resolves later) is exactly what this form sees.
   //
-  // Opening this screen is itself the deliberate user action that needs
-  // location (picking where to drop a pin), so it's fine to request
-  // immediately here rather than waiting for a further explicit control —
-  // but only when permission isn't already known to be denied, and only
-  // after checking because repeating a known-denied request is pointless
-  // and can't prompt again anyway.
+  // Applies immediately if userLocation is already available when this
+  // effect first runs (on open), or the first time it becomes available
+  // afterward — either way, only while autoLocateDoneRef is still false,
+  // i.e. the user hasn't placed a pin, confirmed an address, or typed any
+  // address text in the meantime. Re-runs on every userLocation update
+  // (watchPosition delivers a new fix continuously), but applies at most
+  // once per open: the first successful application marks autoLocateDoneRef
+  // true, so every later run (including every later userLocation update)
+  // no-ops immediately.
   //
-  // Native: uses @capacitor/geolocation for a real OS-backed check/fetch
-  // instead of the WebView's navigator.geolocation. Never calls
-  // requestPermissions itself — if permission is still 'prompt', this
-  // silently skips the auto-locate rather than popping a bare OS prompt
-  // with no context; the app's branded pre-prompt (App.jsx, driven by the
-  // same underlying OS permission) is what asks for it with context.
+  // If the shared location is denied or simply never arrives, this leaves
+  // the form empty with no error — the "Location is blocked" hint below
+  // reflects the shared locationPermission as-is, not a check this form
+  // performs.
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      let cancelled = false
-      Geolocation.checkPermissions().then(result => {
-        if (cancelled) return
-        if (result.location === 'denied') { setGeoPermissionDenied(true); return }
-        if (result.location !== 'granted') return // 'prompt' / 'prompt-with-rationale' — skip, don't prompt bare
-        return Geolocation.getCurrentPosition({ enableHighAccuracy: true }).then(pos => {
-          if (cancelled || autoLocateDoneRef.current) return
-          autoLocateDoneRef.current = true
-          const { latitude: lat, longitude: lng } = pos.coords
-          setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
-          addr.handlePinMove(lat, lng)
-        })
-      }).catch(err => {
-        console.error('[AddSpot] native getCurrentPosition error:', err)
-      })
-      return () => { cancelled = true }
-    }
-
-    if (!navigator.geolocation) return
-    const doLocate = () => {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        if (autoLocateDoneRef.current) return
-        autoLocateDoneRef.current = true
-        const { latitude: lat, longitude: lng } = pos.coords
-        setMapCenter({ longitude: lng, latitude: lat, zoom: 15 })
-        addr.handlePinMove(lat, lng)
-      }, err => {
-        console.error('[AddSpot] getCurrentPosition error:', err.code, err.message)
-        if (err.code === err.PERMISSION_DENIED) setGeoPermissionDenied(true)
-      }, { enableHighAccuracy: true })
-    }
-    if (!navigator.permissions?.query) { doLocate(); return }
-    let cancelled = false
-    navigator.permissions.query({ name: 'geolocation' }).then(status => {
-      if (cancelled) return
-      if (status.state === 'denied') { setGeoPermissionDenied(true); return }
-      doLocate()
-    }).catch(doLocate)
-    return () => { cancelled = true }
+    if (!userLocation || autoLocateDoneRef.current) return
+    autoLocateDoneRef.current = true
+    setMapCenter({ longitude: userLocation.longitude, latitude: userLocation.latitude, zoom: 15 })
+    addr.handlePinMove(userLocation.latitude, userLocation.longitude)
+    // addr is stable across renders (its own methods are memoized) —
+    // intentionally omitted so eslint doesn't demand it be re-added, which
+    // would change nothing since it never changes identity in a way that
+    // should re-trigger this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [userLocation])
 
   // Persist draft to sessionStorage, debounced 300 ms; photos are already-uploaded URLs so safe to store
   useEffect(() => {
@@ -400,7 +364,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile }) {
         <div ref={locationSectionRef} style={{ marginBottom: 14 }}>
           <div className="section-label">Location</div>
           {fieldErrors.location && <div style={{ fontSize: 11, color: '#e07070', fontWeight: 700, marginBottom: 8 }}>{fieldErrors.location}</div>}
-          {geoPermissionDenied && (
+          {locationBlocked && (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, lineHeight: 1.5, marginBottom: 8 }}>
               Location is blocked, so this can't be auto-filled. Search for the address below, or re-enable location for this app in your browser or device settings.
             </div>

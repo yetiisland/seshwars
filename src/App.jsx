@@ -1171,7 +1171,7 @@ export default function App() {
             }
             onClick={isDesktop ? e => e.stopPropagation() : undefined}
           >
-            <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} onGoProfile={goToProfile} />
+            <AddSpot onClose={() => setShowAdd(false)} onSuccess={handleAddSuccess} user={user} onGoProfile={goToProfile} userLocation={userLocation} locationPermission={locationPermission} />
           </div>
         </div>,
         document.body
