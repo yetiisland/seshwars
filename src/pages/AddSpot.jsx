@@ -24,7 +24,7 @@ const MAX_PHOTO_BYTES = 25 * 1024 * 1024
 
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
-  { value: 'unlisted', label: 'Unlisted & Friends', desc: 'Hidden from the map. Your friends and anyone with the link can see it.' },
+  { value: 'unlisted', label: 'Friends Only (Unlisted)', desc: 'Hidden from the map. Your friends and anyone with the link can see it.' },
   { value: 'private', label: 'Private', desc: 'Only you can see it' },
 ]
 

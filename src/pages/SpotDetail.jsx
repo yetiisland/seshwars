@@ -40,7 +40,7 @@ const MAX_PHOTO_BYTES = 25 * 1024 * 1024
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
-  { value: 'unlisted', label: 'Unlisted & Friends', desc: 'Hidden from the map. Your friends and anyone with the link can see it.' },
+  { value: 'unlisted', label: 'Friends Only (Unlisted)', desc: 'Hidden from the map. Your friends and anyone with the link can see it.' },
   { value: 'private', label: 'Private', desc: 'Only you can see it' },
 ]
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
@@ -882,7 +882,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                       <rect x="1" y="4.5" width="6" height="5" rx="1" stroke="#fff" strokeWidth="1.1" />
                       <path d="M2 4.5V3a2 2 0 014 0v1.5" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
                     </svg>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility === 'unlisted' ? 'Unlisted & Friends' : spot.visibility}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility === 'unlisted' ? 'Friends Only (Unlisted)' : spot.visibility}</span>
                   </div>
                 )}
                 {hasReport && (

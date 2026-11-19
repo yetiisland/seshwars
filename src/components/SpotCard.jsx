@@ -85,7 +85,7 @@ function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress,
                   <rect x="1" y="4.5" width="6" height="5" rx="1" stroke="#fff" strokeWidth="1.1" />
                   <path d="M2 4.5V3a2 2 0 014 0v1.5" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
                 </svg>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility === 'unlisted' ? 'Unlisted & Friends' : spot.visibility}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility === 'unlisted' ? 'Friends Only (Unlisted)' : spot.visibility}</span>
               </div>
             )}
             {spot.most_recent_report && spot.most_recent_report !== 'Skateable Again' && (
