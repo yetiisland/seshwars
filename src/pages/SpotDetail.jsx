@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
 import { siteOrigin } from '../lib/siteUrl'
-import { ShareIcon, BookmarkIcon, PencilIcon, FriendsIcon, TrickListIcon, MultiSpotIcon, SunIcon } from '../components/Icons'
+import { ShareIcon, BookmarkIcon, PencilIcon, FriendsIcon, TrickListIcon, MultiSpotIcon, SunIcon, IconBox } from '../components/Icons'
 import DraggablePhotos from '../components/DraggablePhotos'
 import SpotFormFields from '../components/SpotFormFields'
 import ClipsSection from '../components/ClipsSection'
@@ -20,6 +20,8 @@ import TermsOfService from './TermsOfService'
 import { isAdminUser } from '../lib/admin'
 import { haversineDistance } from '../hooks/useGeolocation'
 import AddedByCard from '../components/AddedByCard'
+import SpotCreditSheet from '../components/SpotCreditSheet'
+import { deriveCreditLabel, normalizeCreditUrl } from '../lib/spotCredit'
 import { SPOT_FIELDS } from '../lib/spotFields'
 import { mergeSpotIntoCache, removeSpotFromCache } from '../hooks/useSpots'
 import { useAddressConfirmation } from '../hooks/useAddressConfirmation'
@@ -60,6 +62,8 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
   const [showTrickSheet, setShowTrickSheet] = useState(false)
   const [shareSheetMode, setShareSheetMode] = useState('choice') // 'choice' | 'friends'
   const [sendToast, setSendToast] = useState('')
+  const [showCreditSheet, setShowCreditSheet] = useState(false)
+  const [creditError, setCreditError] = useState('')
   const touchStartX = useRef(null)
   const touchStartY = useRef(null)
   const dragging = useRef(false)
@@ -456,6 +460,8 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       is_multi_spot: spot.is_multi_spot ? 'Yes' : 'No',
       description: spot.description || '',
       visibility: spot.visibility || 'public',
+      credit_name: spot.credit_name || '',
+      credit_url: spot.credit_url || '',
     })
     setEditPhotos([...(spot.photos || [])])
     // An existing spot's own saved address/coordinates are the current
@@ -592,6 +598,14 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
       }
     })
     if (photosChanged) payload.moderation_status = newModerationStatus
+    // Only ever included for an admin's own save — a non-admin's payload
+    // never mentions credit_name/credit_url at all (a database trigger
+    // also enforces this server-side).
+    if (isAdmin) {
+      const trimmedCreditUrl = (editForm.credit_url || '').trim()
+      payload.credit_name = (editForm.credit_name || '').trim() || null
+      payload.credit_url = trimmedCreditUrl ? normalizeCreditUrl(trimmedCreditUrl) : null
+    }
     const { data, error } = await supabase.from('spots').update(payload).eq('id', spot.id).select()
     setEditSaving(false)
     if (error) { setEditSaveProblems([friendlySaveErrorMessage(error)]); return }
@@ -977,6 +991,38 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 1.3, marginTop: 4 }}>Rating</div>
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Spot Credit — directly under the publisher card. Non-admin
+              sees nothing at all when the spot has no credit (no empty
+              row, no spacing); admin always sees this row so there's a
+              way in to add one. */}
+          {(spot.credit_url || isAdmin) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              {spot.credit_url ? (
+                <>
+                  <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Spot Credit:</span>
+                  <span
+                    onClick={() => window.open(spot.credit_url, '_blank')}
+                    style={{ fontSize: 11, color: '#d4785a', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {deriveCreditLabel(spot.credit_name, spot.credit_url)}
+                  </span>
+                  {isAdmin && (
+                    <IconBox size={30} onClick={() => setShowCreditSheet(true)}>
+                      <PencilIcon color="#d4785a" />
+                    </IconBox>
+                  )}
+                </>
+              ) : (
+                <span
+                  onClick={() => setShowCreditSheet(true)}
+                  style={{ fontSize: 11, fontWeight: 700, color: '#d4785a', cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase' }}
+                >
+                  Add Spot Credit
+                </span>
               )}
             </div>
           )}
@@ -1377,6 +1423,27 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               </div>
             </div>
 
+            {/* Spot Credit — admin only, optional. Same two fields/
+                normalization as the Spot Credit edit sheet and Drop a Spot. */}
+            {isAdmin && (
+              <div style={{ marginBottom: 14 }}>
+                <div className="section-label">Spot Credit</div>
+                <input
+                  className="form-input"
+                  placeholder="@handle or site name"
+                  value={editForm.credit_name || ''}
+                  onChange={e => setEditForm(p => ({ ...p, credit_name: e.target.value }))}
+                  style={{ marginBottom: 8 }}
+                />
+                <input
+                  className="form-input"
+                  placeholder="https://"
+                  value={editForm.credit_url || ''}
+                  onChange={e => setEditForm(p => ({ ...p, credit_url: e.target.value }))}
+                />
+              </div>
+            )}
+
             <button className="btn-salmon" onClick={handleEditSave} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save Changes'}</button>
 
             <div style={{ marginTop: 10, marginBottom: 4 }}>
@@ -1600,6 +1667,26 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
           onClose={() => setShowTrickSheet(false)}
           onGoProfile={onGoProfile}
         />
+      )}
+      {showCreditSheet && (
+        <SpotCreditSheet
+          spot={spot}
+          onClose={() => setShowCreditSheet(false)}
+          onSaved={(updatedSpot) => {
+            mergeSpotIntoCache(updatedSpot)
+            onEditSuccess?.(updatedSpot)
+          }}
+          onError={(message) => {
+            setCreditError(message)
+            setTimeout(() => setCreditError(''), 3000)
+          }}
+        />
+      )}
+      {creditError && createPortal(
+        <div style={{ position: 'fixed', bottom: 'calc(max(env(safe-area-inset-bottom), 24px) + 88px)', left: '50%', transform: 'translateX(-50%)', background: '#FFFFFF', border: '1px solid #EAD8C8', color: '#e07070', padding: '8px 18px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: LAYERS.TOAST, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          {creditError}
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -15,6 +15,8 @@ import { mergeSpotIntoCache } from '../hooks/useSpots'
 import { LAYERS } from '../lib/layers'
 import { validateSpotForm, friendlySaveErrorMessage } from '../lib/spotSaveValidation'
 import useBlurOnScroll from '../hooks/useBlurOnScroll'
+import { isAdminUser } from '../lib/admin'
+import { normalizeCreditUrl } from '../lib/spotCredit'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const DRAFT_KEY = 'seshwars_spot_draft'
@@ -29,7 +31,9 @@ const VISIBILITY_OPTIONS = [
 export default function AddSpot({ onClose, onSuccess, user, onGoProfile, userLocation, locationPermission }) {
   const [form, setForm] = useState({
     title: '', type: '', features: [], bust_rating: '', lighting: '', is_multi_spot: 'No', description: '', visibility: 'public',
+    credit_name: '', credit_url: '',
   })
+  const isAdmin = isAdminUser(user)
   const [photos, setPhotos] = useState([])
   const [uploading, setUploading] = useState(false)
   const [uploadingText, setUploadingText] = useState('Compressing...')
@@ -234,7 +238,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile, userLoc
     }
     const moderation_status = allSafe ? 'approved' : 'pending'
     setUploadingText('Saving...')
-    const { data, error } = await supabase.from('spots').insert({
+    const payload = {
       title: form.title,
       slug: slugify(form.title, Math.random().toString(36).slice(2, 6)),
       type: form.type,
@@ -250,7 +254,16 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile, userLoc
       added_by: user?.id || 'anon',
       moderation_status,
       visibility: form.visibility,
-    }).select().single()
+    }
+    // Only an admin's own session can even set these (a database trigger
+    // enforces it server-side too), and only ever included for an admin —
+    // a non-admin's payload never mentions credit_name/credit_url at all.
+    if (isAdmin) {
+      const trimmedUrl = form.credit_url.trim()
+      payload.credit_name = form.credit_name.trim() || null
+      payload.credit_url = trimmedUrl ? normalizeCreditUrl(trimmedUrl) : null
+    }
+    const { data, error } = await supabase.from('spots').insert(payload).select().single()
     setUploading(false)
     if (error || !data) {
       console.error('[AddSpot] handleSubmit insert failed:', error)
@@ -486,6 +499,27 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile, userLoc
             <span onClick={() => setShowTos(true)} style={{ color: '#d4785a', cursor: 'pointer', textDecoration: 'underline' }}>Terms of Service</span>
           </div>
         </div>
+
+        {/* Spot Credit — admin only, optional. Same two fields/normalization
+            as the Spot Credit edit sheet on the spot page. */}
+        {isAdmin && (
+          <div style={{ marginBottom: 14 }}>
+            <div className="section-label">Spot Credit</div>
+            <input
+              className="form-input"
+              placeholder="@handle or site name"
+              value={form.credit_name}
+              onChange={e => setForm(p => ({ ...p, credit_name: e.target.value }))}
+              style={{ marginBottom: 8 }}
+            />
+            <input
+              className="form-input"
+              placeholder="https://"
+              value={form.credit_url}
+              onChange={e => setForm(p => ({ ...p, credit_url: e.target.value }))}
+            />
+          </div>
+        )}
 
         <button className="btn-salmon" onClick={handleSubmit} disabled={uploading} style={{ marginTop: 4 }}>
           Drop This Spot
