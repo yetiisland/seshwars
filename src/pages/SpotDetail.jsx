@@ -40,8 +40,7 @@ const MAX_PHOTO_BYTES = 25 * 1024 * 1024
 const normalizeType = (t) => (t === 'Park' ? 'Skatepark' : t)
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
-  { value: 'friends', label: 'Friends Only', desc: 'Hidden from the map. Your friends and anyone with the link can see it.' },
-  { value: 'unlisted', label: 'Unlisted', desc: 'Only people with the link can see it' },
+  { value: 'unlisted', label: 'Unlisted & Friends', desc: 'Hidden from the map. Your friends and anyone with the link can see it.' },
   { value: 'private', label: 'Private', desc: 'Only you can see it' },
 ]
 const BOTTOM_PAD = 'calc(80px + env(safe-area-inset-bottom))'
@@ -879,15 +878,11 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
               <div style={{ position: 'absolute', bottom: 14, left: 12, zIndex: LAYERS.PAGE_CONTENT + 10, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', maxWidth: 'calc(100% - 24px)' }}>
                 {hasVisibility && (
                   <div style={{ background: '#3D4454', border: '1px solid #2e3344', borderRadius: 6, padding: '4px 10px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {spot.visibility === 'friends' ? (
-                      <FriendsIcon color="#fff" size={10} />
-                    ) : (
-                      <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
-                        <rect x="1" y="4.5" width="6" height="5" rx="1" stroke="#fff" strokeWidth="1.1" />
-                        <path d="M2 4.5V3a2 2 0 014 0v1.5" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
-                      </svg>
-                    )}
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility === 'friends' ? 'Friends Only' : spot.visibility}</span>
+                    <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
+                      <rect x="1" y="4.5" width="6" height="5" rx="1" stroke="#fff" strokeWidth="1.1" />
+                      <path d="M2 4.5V3a2 2 0 014 0v1.5" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
+                    </svg>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility === 'unlisted' ? 'Unlisted & Friends' : spot.visibility}</span>
                   </div>
                 )}
                 {hasReport && (
@@ -1063,13 +1058,11 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
             <div style={{ background: spot.visibility === 'private' ? '#f5ece8' : '#f0ede5', border: `1px solid ${spot.visibility === 'private' ? '#ddc0b0' : '#d8cdb8'}`, borderRadius: 8, padding: '8px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 7 }}>
               {spot.visibility === 'private' ? (
                 <svg width="11" height="13" viewBox="0 0 14 16" fill="none"><rect x="3" y="7" width="8" height="8" rx="1.5" stroke="#9a5838" strokeWidth="1.4"/><path d="M4.5 7V5a2.5 2.5 0 015 0v2" stroke="#9a5838" strokeWidth="1.4" strokeLinecap="round"/></svg>
-              ) : spot.visibility === 'friends' ? (
-                <FriendsIcon color="#8a7848" size={13} />
               ) : (
                 <svg width="13" height="10" viewBox="0 0 18 12" fill="none"><path d="M9 1C5 1 1.73 3.89 1 6c.73 2.11 4 5 8 5s7.27-2.89 8-5c-.73-2.11-4-5-8-5z" stroke="#8a7848" strokeWidth="1.4" fill="none"/><circle cx="9" cy="6" r="2.5" stroke="#8a7848" strokeWidth="1.4"/></svg>
               )}
               <span style={{ fontSize: 11, fontWeight: 700, color: spot.visibility === 'private' ? '#7a4028' : '#6a5828' }}>
-                {spot.visibility === 'private' ? 'Private: only you can see this spot' : spot.visibility === 'friends' ? 'Friends Only: hidden from the map, visible to friends and anyone with the link' : 'Unlisted: only visible via direct link'}
+                {spot.visibility === 'private' ? 'Private: only you can see this spot' : 'Only you, your friends and people with the link can see this spot.'}
               </span>
             </div>
           )}
@@ -1411,10 +1404,7 @@ const SpotDetail = forwardRef(function SpotDetail({ spot, saved, onSavePress, on
                         {isActive && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#d4785a' }} />}
                       </div>
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          {opt.value === 'friends' && <FriendsIcon color="#d4785a" size={16} />}
-                          <span style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#d4785a' : '#2a1e14' }}>{opt.label}</span>
-                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#d4785a' : '#2a1e14' }}>{opt.label}</div>
                         <div style={{ fontSize: 10, color: '#9a8878', marginTop: 1 }}>{opt.desc}</div>
                       </div>
                     </div>

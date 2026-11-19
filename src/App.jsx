@@ -497,9 +497,9 @@ export default function App() {
       const passesModeration = !status || status === 'approved' ||
         (status === 'pending' && user?.id && s.added_by === user.id)
       if (!passesModeration) return false
-      // Public spots, the owner's own spots, and (for Friends Only) the
-      // owner's accepted friends appear in list/map/search — private and
-      // unlisted stay link-only. isAdmin is already handled above, but
+      // Public spots, the owner's own spots, and (for Unlisted & Friends)
+      // the owner's accepted friends appear in list/map/search — private
+      // stays link-only. isAdmin is already handled above, but
       // canSeeInFeeds takes it too so this stays the one shared check
       // every surface uses, not a duplicated inline rule.
       return canSeeInFeeds(s, user?.id, friendIds, isAdmin)

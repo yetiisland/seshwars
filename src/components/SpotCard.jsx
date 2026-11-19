@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { BookmarkIcon, ArrowIcon, MultiSpotIcon, SunIcon, FriendsIcon } from './Icons'
+import { BookmarkIcon, ArrowIcon, MultiSpotIcon, SunIcon } from './Icons'
 import TagsRow from './TagsRow'
 import { transformImageUrl } from '../utils/imageUrl'
 import { SHOP_STYLE } from '../lib/spotFields'
@@ -81,15 +81,11 @@ function SpotCard({ spot, saved, onSavePress, onClick, highlighted, onHidePress,
           <div style={{ position: 'absolute', bottom: 8, left: 8, zIndex: LAYERS.PAGE_CONTENT + 3, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', maxWidth: 'calc(100% - 16px)' }}>
             {spot.visibility && spot.visibility !== 'public' && (
               <div style={{ background: '#3D4454', border: '1px solid #2e3344', borderRadius: 6, padding: '4px 10px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-                {spot.visibility === 'friends' ? (
-                  <FriendsIcon color="#fff" size={10} />
-                ) : (
-                  <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
-                    <rect x="1" y="4.5" width="6" height="5" rx="1" stroke="#fff" strokeWidth="1.1" />
-                    <path d="M2 4.5V3a2 2 0 014 0v1.5" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
-                  </svg>
-                )}
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility === 'friends' ? 'Friends Only' : spot.visibility}</span>
+                <svg width="8" height="10" viewBox="0 0 8 10" fill="none" style={{ flexShrink: 0 }}>
+                  <rect x="1" y="4.5" width="6" height="5" rx="1" stroke="#fff" strokeWidth="1.1" />
+                  <path d="M2 4.5V3a2 2 0 014 0v1.5" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
+                </svg>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.8, textTransform: 'uppercase' }}>{spot.visibility === 'unlisted' ? 'Unlisted & Friends' : spot.visibility}</span>
               </div>
             )}
             {spot.most_recent_report && spot.most_recent_report !== 'Skateable Again' && (

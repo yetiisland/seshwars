@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Map, { Marker, NavigationControl } from 'react-map-gl'
 import { supabase } from '../lib/supabase'
-import { CloseIcon, FriendsIcon } from '../components/Icons'
+import { CloseIcon } from '../components/Icons'
 import { slugify } from '../utils/slugify'
 import DraggablePhotos from '../components/DraggablePhotos'
 import LoadingOverlay from '../components/LoadingOverlay'
@@ -24,8 +24,7 @@ const MAX_PHOTO_BYTES = 25 * 1024 * 1024
 
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public', desc: 'Visible to everyone on the map and list' },
-  { value: 'friends', label: 'Friends Only', desc: 'Hidden from the map. Your friends and anyone with the link can see it.' },
-  { value: 'unlisted', label: 'Unlisted', desc: 'Only people with the link can see it' },
+  { value: 'unlisted', label: 'Unlisted & Friends', desc: 'Hidden from the map. Your friends and anyone with the link can see it.' },
   { value: 'private', label: 'Private', desc: 'Only you can see it' },
 ]
 
@@ -481,10 +480,7 @@ export default function AddSpot({ onClose, onSuccess, user, onGoProfile, userLoc
                     {isActive && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#d4785a' }} />}
                   </div>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      {opt.value === 'friends' && <FriendsIcon color="#d4785a" size={16} />}
-                      <span style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#d4785a' : '#2a1e14' }}>{opt.label}</span>
-                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#d4785a' : '#2a1e14' }}>{opt.label}</div>
                     <div style={{ fontSize: 10, color: '#9a8878', marginTop: 1 }}>{opt.desc}</div>
                   </div>
                 </div>
