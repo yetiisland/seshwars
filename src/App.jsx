@@ -8,6 +8,8 @@ import AuthScreen from './pages/AuthScreen'
 import { useSpots, useSavedSpots, useHiddenSpots } from './hooks/useSpots'
 import { useGeolocation, haversineDistance } from './hooks/useGeolocation'
 import { useNotifications } from './hooks/useNotifications'
+import { useFriendIds } from './hooks/useFriendIds'
+import { canSeeInFeeds } from './lib/spotVisibility'
 import useKeyboardOpen from './hooks/useKeyboardOpen'
 import TabBar from './components/TabBar'
 import Logo from './components/Logo'
@@ -388,6 +390,7 @@ export default function App() {
   const { spots, loading, refetch } = useSpots()
   const { saved } = useSavedSpots(user?.id)
   const { hiddenIds, hideSpot, unhideSpot } = useHiddenSpots(user?.id)
+  const { friendIds } = useFriendIds(user?.id)
   const [hideTarget, setHideTarget] = useState(null)
   const [showHideConfirm, setShowHideConfirm] = useState(false)
   const [hideConfirmClosing, setHideConfirmClosing] = useState(false)
@@ -494,11 +497,14 @@ export default function App() {
       const passesModeration = !status || status === 'approved' ||
         (status === 'pending' && user?.id && s.added_by === user.id)
       if (!passesModeration) return false
-      // Only public spots appear in list/map/search — private and unlisted are link-only
-      const vis = s.visibility || 'public'
-      return vis === 'public'
+      // Public spots, the owner's own spots, and (for Friends Only) the
+      // owner's accepted friends appear in list/map/search — private and
+      // unlisted stay link-only. isAdmin is already handled above, but
+      // canSeeInFeeds takes it too so this stays the one shared check
+      // every surface uses, not a duplicated inline rule.
+      return canSeeInFeeds(s, user?.id, friendIds, isAdmin)
     })
-  }, [spotsWithDistance, isAdmin, user, hiddenIds])
+  }, [spotsWithDistance, isAdmin, user, hiddenIds, friendIds])
 
   const filteredByDistance = useMemo(() => {
     if (!distanceRadius || (!userLocation && !searchLocation)) return visibleSpots
