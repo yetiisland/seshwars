@@ -5,6 +5,7 @@
  * Usage:
  *   node scripts/import-speakeasy.mjs --url <park page url> [--dry-run]
  *   node scripts/import-speakeasy.mjs --url <park page url> --update <spot id>
+ *   node scripts/import-speakeasy.mjs --page <listing page url> [--dry-run]
  *
  * Reads credentials from:
  *   .env               → VITE_SUPABASE_URL, VITE_MAPBOX_TOKEN
@@ -12,7 +13,8 @@
  *
  * Photos: bucket=spot-photos, path=spots/${ts}-${rand}.jpg, JPEG q=0.75, max 1200px
  * Titles: no hyphens/dashes, Title Case
- * Lighting: extracted from page LIGHTS field → lighting column (not features array)
+ * Lighting: extracted from page LIGHTS field → lighting column
+ * Default visibility: public
  */
 
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -49,14 +51,17 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !MAPBOX_TOKEN) {
 const args = process.argv.slice(2)
 const urlIndex = args.indexOf('--url')
 const parkUrl = urlIndex !== -1 ? args[urlIndex + 1] : null
+const pageIndex = args.indexOf('--page')
+const pageUrl = pageIndex !== -1 ? args[pageIndex + 1] : null
 const dryRun = args.includes('--dry-run')
 const updateIndex = args.indexOf('--update')
 const updateId = updateIndex !== -1 ? args[updateIndex + 1] : null
 
-if (!parkUrl) {
+if (!parkUrl && !pageUrl) {
   console.error('Usage:')
   console.error('  node scripts/import-speakeasy.mjs --url <url> [--dry-run]')
   console.error('  node scripts/import-speakeasy.mjs --url <url> --update <spot-id>')
+  console.error('  node scripts/import-speakeasy.mjs --page <listing-url> [--dry-run]')
   process.exit(1)
 }
 
@@ -85,12 +90,10 @@ function normalizeTitle(raw) {
     .replace(/&gt;/gi, '>')
     .replace(/&nbsp;/gi, ' ')
     .trim()
-  // Strip en/em dashes and plain hyphens; collapse surrounding spaces
   const stripped = decoded
     .replace(/\s*[-–—]\s*/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
-  // Title case: first char of each space-delimited word uppercased, rest lower
   return stripped
     .split(' ')
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
@@ -114,11 +117,30 @@ async function fetchBinary(url) {
   return Buffer.from(await res.arrayBuffer())
 }
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
 // ---------------------------------------------------------------------------
-// Page parsing
+// Listing page: extract all park links
+// ---------------------------------------------------------------------------
+function extractParkLinks(html) {
+  const links = []
+  const re = /href='(https:\/\/speakeasyskate\.com\/[^/']+\/)'/g
+  let m
+  const seen = new Set()
+  while ((m = re.exec(html)) !== null) {
+    const url = m[1]
+    // Skip obvious non-park pages
+    if (url.match(/\/(skateparks|skateparks-directory|closed|construction|category|tag|author|page|wp-|feed|xmlrpc)\//i)) continue
+    if (!seen.has(url)) { seen.add(url); links.push(url) }
+  }
+  return links
+}
+
+// ---------------------------------------------------------------------------
+// Park page parsing
 // ---------------------------------------------------------------------------
 function parsePage(html) {
-  // --- Coordinates from Google Maps embed ---
+  // --- Coordinates ---
   const coordMatch =
     html.match(/maps\.google\.com\/[^"'<>]*[?&]q=([\d.-]+)[,\s]+([\d.-]+)/i) ||
     html.match(/google\.com\/maps[^"'<>]*[?&]q=([\d.-]+)[,\s]+([\d.-]+)/i)
@@ -138,20 +160,39 @@ function parsePage(html) {
   let coverUrl = ogMatch ? ogMatch[1].split('?')[0] : null
   if (coverUrl && coverUrl.includes('i0.wp.com')) coverUrl += '?w=2560&ssl=1'
 
-  // --- Gallery: lh3.googleusercontent.com images ---
+  // --- Gallery images ---
   const gallerySet = new Set()
   const galleryRe = /(https?:\/\/lh3\.googleusercontent\.com\/pw\/[A-Za-z0-9_-]+)/g
   let m
   while ((m = galleryRe.exec(html)) !== null) gallerySet.add(m[1] + '=w2560')
 
-  // --- Lights from meta description: "LIGHTS: Yes" / "LIGHTS: No" ---
-  // Also look for a time like "LIGHTS: Yes (till 10pm)" or "10:30pm"
-  const lightsMatch = html.match(/LIGHTS:\s*(Yes|No)(?:[^<"]{0,60}?([\d]{1,2}(?::\d{2})?(?:am|pm)))?/i)
+  // --- Lights from meta description ---
+  const lightsMatch = html.match(/LIGHTS:\s*(Yes|No)(?:[^<"]{0,80}?([\d]{1,2}(?::\d{2})?(?:am|pm)))?/i)
   let lighting = null
   let lightsTime = null
   if (lightsMatch) {
     lighting = lightsMatch[1].toLowerCase() === 'yes' ? 'Lights' : 'No Lights'
     if (lightsMatch[2]) lightsTime = lightsMatch[2].toLowerCase()
+  }
+
+  // --- Status: closed or under construction ---
+  // Check category tags and body text
+  let status = 'active'
+  const lowerHtml = html.toLowerCase()
+  // Category-based detection (class="cat-X" text)
+  if (/category-closed|cat-closed|"closed"/i.test(html)) status = 'closed'
+  else if (/category-under-construction|cat-construction|"under.construction"/i.test(html)) status = 'construction'
+  // Body text indicators (look in content area only, avoid sidebar matches)
+  if (status === 'active') {
+    const entryContent = html.match(/class="entry-content"[^>]*>([\s\S]*?)<\/div>/i)?.[1] || ''
+    if (/\bthis park is (permanently )?closed\b/i.test(entryContent)) status = 'closed'
+    else if (/\bthis park is under construction\b/i.test(entryContent)) status = 'construction'
+    else if (/\bpermanently closed\b/i.test(entryContent)) status = 'closed'
+  }
+  // STATUS field in meta description
+  if (status === 'active') {
+    if (/STATUS:\s*closed/i.test(html)) status = 'closed'
+    else if (/STATUS:\s*under construction/i.test(html)) status = 'construction'
   }
 
   // --- YouTube ---
@@ -160,7 +201,7 @@ function parsePage(html) {
     html.match(/youtu\.be\/([A-Za-z0-9_-]{11})/i)
   const youtubeUrl = ytMatch ? `https://www.youtube.com/watch?v=${ytMatch[1]}` : null
 
-  return { lat, lng, rawTitle, coverUrl, galleryUrls: [...gallerySet], lighting, lightsTime, youtubeUrl }
+  return { lat, lng, rawTitle, coverUrl, galleryUrls: [...gallerySet], lighting, lightsTime, youtubeUrl, status }
 }
 
 // ---------------------------------------------------------------------------
@@ -179,108 +220,115 @@ async function reverseGeocode(lat, lng) {
 }
 
 // ---------------------------------------------------------------------------
-// Perceptual hash: 8×8 grayscale dHash
-// Returns a 64-element boolean array (each pixel > mean)
+// Haversine distance in metres
+// ---------------------------------------------------------------------------
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+// ---------------------------------------------------------------------------
+// Name similarity: check for shared distinctive words
+// ---------------------------------------------------------------------------
+const STOPWORDS = new Set(['the', 'a', 'an', 'of', 'at', 'in', 'and', 'or', 'for',
+  'skatepark', 'park', 'skate', 'skateparks', 'sports', 'complex', 'center',
+  'colorado', 'state', 'street', 'avenue', 'drive', 'road', 'way', 'st',
+  'ave', 'dr', 'blvd', 'rec', 'recreation', 'community', 'north', 'south', 'east', 'west'])
+
+function distinctiveWords(title) {
+  return title.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOPWORDS.has(w))
+}
+
+function namesShareDistinctiveWord(a, b) {
+  const wa = new Set(distinctiveWords(a))
+  return distinctiveWords(b).some(w => wa.has(w))
+}
+
+// ---------------------------------------------------------------------------
+// Perceptual hash (dHash 8×8)
 // ---------------------------------------------------------------------------
 async function pHash(buf) {
   const { data } = await sharp(buf)
-    .resize(9, 8, { fit: 'fill' })  // 9 wide so we can diff 8 columns
+    .resize(9, 8, { fit: 'fill' })
     .greyscale()
     .raw()
     .toBuffer({ resolveWithObject: true })
-  // dHash: each bit = left pixel > right pixel across the row
   const bits = []
-  for (let y = 0; y < 8; y++) {
-    for (let x = 0; x < 8; x++) {
+  for (let y = 0; y < 8; y++)
+    for (let x = 0; x < 8; x++)
       bits.push(data[y * 9 + x] > data[y * 9 + x + 1])
-    }
-  }
   return bits
 }
 
 function hammingDistance(a, b) {
-  let dist = 0
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) dist++
-  return dist
+  let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++; return d
 }
 
-// ---------------------------------------------------------------------------
-// Deduplicate: given an array of Buffers, return indices of unique ones
-// Two images are considered duplicates if hamming distance < 10
-// ---------------------------------------------------------------------------
 async function deduplicateBuffers(buffers) {
   const hashes = await Promise.all(buffers.map(b => pHash(b)))
   const kept = []
   for (let i = 0; i < hashes.length; i++) {
-    const isDup = kept.some(j => hammingDistance(hashes[i], hashes[j]) < 10)
-    if (!isDup) kept.push(i)
+    if (!kept.some(j => hammingDistance(hashes[i], hashes[j]) < 10)) kept.push(i)
   }
   return kept
 }
 
 // ---------------------------------------------------------------------------
-// Black bar detection and crop with safety margin + re-check
+// Black bar detection + improved crop with safety margin and re-check
 // ---------------------------------------------------------------------------
 async function detectAndCropBar(buf) {
   const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const { width, height, channels } = info
 
-  // Scan from top; a row is "bar" if >80% pixels are near-black or near-white
-  let barEndRow = -1
-  let consecutiveBarRows = 0
-
+  let barEndRow = -1, consecutiveBarRows = 0
   for (let y = 0; y < Math.min(height, 300); y++) {
-    let darkCount = 0
-    let lightCount = 0
+    let dark = 0, light = 0
     for (let x = 0; x < width; x++) {
       const o = (y * width + x) * channels
       const r = data[o], g = data[o + 1], b = data[o + 2]
-      if (r < 60 && g < 60 && b < 60) darkCount++
-      else if (r > 200 && g > 200 && b > 200) lightCount++
+      if (r < 60 && g < 60 && b < 60) dark++
+      else if (r > 200 && g > 200 && b > 200) light++
     }
-    if ((darkCount + lightCount) / width >= 0.80) {
-      consecutiveBarRows++
-      barEndRow = y
+    if ((dark + light) / width >= 0.80) {
+      consecutiveBarRows++; barEndRow = y
     } else {
       if (consecutiveBarRows >= 10) break
-      barEndRow = -1
-      consecutiveBarRows = 0
+      barEndRow = -1; consecutiveBarRows = 0
     }
   }
-
   if (barEndRow < 9) return { cropped: false, buf, rowsRemoved: 0 }
 
-  // Safety margin: 2% of image height, minimum 1 row
   const margin = Math.max(1, Math.round(height * 0.02))
   let cropTop = barEndRow + 1 + margin
 
-  // Re-check: if top 10 rows of cropped image are still dark, keep nudging
   for (let attempt = 0; attempt < 10; attempt++) {
-    if (cropTop + 10 >= height) {
-      // Can't crop any further — give up and skip this image
-      return { cropped: false, buf, rowsRemoved: 0, skipped: true }
-    }
-    const { data: checkData, info: checkInfo } = await sharp(buf)
+    if (cropTop + 10 >= height) return { cropped: false, buf, rowsRemoved: 0, skipped: true }
+    const { data: cd, info: ci } = await sharp(buf)
       .extract({ left: 0, top: cropTop, width, height: Math.min(10, height - cropTop) })
       .ensureAlpha().raw().toBuffer({ resolveWithObject: true })
     let darkRows = 0
-    for (let y = 0; y < checkInfo.height; y++) {
-      let dark = 0
+    for (let y = 0; y < ci.height; y++) {
+      let d = 0
       for (let x = 0; x < width; x++) {
-        const o = (y * width + x) * checkInfo.channels
-        const r = checkData[o], g = checkData[o + 1], b = checkData[o + 2]
-        if (r < 60 && g < 60 && b < 60) dark++
+        const o = (y * width + x) * ci.channels
+        if (cd[o] < 60 && cd[o + 1] < 60 && cd[o + 2] < 60) d++
       }
-      if (dark / width >= 0.5) darkRows++
+      if (d / width >= 0.5) darkRows++
     }
-    if (darkRows <= 2) break  // top looks clean
+    if (darkRows <= 2) break
     cropTop += 5
   }
 
   const croppedBuf = await sharp(buf)
     .extract({ left: 0, top: cropTop, width, height: height - cropTop })
     .toBuffer()
-
   return { cropped: true, buf: croppedBuf, cropTop, rowsRemoved: cropTop }
 }
 
@@ -295,14 +343,118 @@ async function compressImage(buf) {
 }
 
 // ---------------------------------------------------------------------------
-// Extract storage path from public URL
-// e.g. https://.../object/public/spot-photos/spots/xxx.jpg → spots/xxx.jpg
+// Storage path from public URL
 // ---------------------------------------------------------------------------
 function storagePathFromUrl(url) {
-  const marker = '/spot-photos/'
-  const idx = url.indexOf(marker)
-  if (idx === -1) return null
-  return url.slice(idx + marker.length)
+  const idx = url.indexOf('/spot-photos/')
+  return idx === -1 ? null : url.slice(idx + '/spot-photos/'.length)
+}
+
+// ---------------------------------------------------------------------------
+// Download, crop, dedupe, compress photos
+// ---------------------------------------------------------------------------
+async function processPhotos(coverUrl, galleryUrls, slug, maxPhotos = 8) {
+  mkdirSync('scripts/import-output', { recursive: true })
+
+  const sources = []
+  if (coverUrl) sources.push({ url: coverUrl, isCover: true })
+  for (const u of galleryUrls) {
+    if (sources.length >= maxPhotos + 4) break
+    sources.push({ url: u, isCover: false })
+  }
+
+  const downloaded = []
+  for (let i = 0; i < sources.length; i++) {
+    const { url, isCover } = sources[i]
+    try {
+      const buf = await fetchBinary(url)
+      downloaded.push({ buf, url, isCover })
+    } catch (err) {
+      console.log(`    photo [${i + 1}] SKIPPED (${err.message})`)
+    }
+  }
+
+  const rawBufs = downloaded.map(d => d.buf)
+  const uniqueIndices = await deduplicateBuffers(rawBufs)
+  const duplicatesRemoved = downloaded.length - uniqueIndices.length
+  if (duplicatesRemoved > 0) console.log(`    deduped: removed ${duplicatesRemoved} duplicate(s)`)
+  const unique = uniqueIndices.map(i => downloaded[i])
+
+  let coverCropRows = 0
+  const processed = []
+  for (let i = 0; i < unique.length && processed.length < maxPhotos; i++) {
+    const { buf, url, isCover } = unique[i]
+    const { cropped, buf: croppedBuf, rowsRemoved, skipped } = await detectAndCropBar(buf)
+    if (skipped) { console.log(`    photo [${i + 1}] bar unremovable — SKIPPED`); continue }
+    const finalBuf = cropped ? croppedBuf : buf
+    if (cropped && isCover) coverCropRows = rowsRemoved
+    if (isCover) {
+      const previewBuf = await sharp(finalBuf).jpeg({ quality: 85 }).toBuffer()
+      writeFileSync(`scripts/import-output/${slug}-cover.jpg`, previewBuf)
+    }
+    const compressed = await compressImage(finalBuf)
+    processed.push({ compressed, url, isCover, rowsRemoved: cropped ? rowsRemoved : 0 })
+  }
+  return { processed, coverCropRows, duplicatesRemoved }
+}
+
+// ---------------------------------------------------------------------------
+// Upload photos, return public URLs; on failure delete already-uploaded paths
+// ---------------------------------------------------------------------------
+async function uploadPhotos(admin, processed) {
+  const photoUrls = []
+  const uploadedPaths = []
+  for (let i = 0; i < processed.length; i++) {
+    const path = `spots/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
+    const { error: upErr } = await admin.storage
+      .from('spot-photos').upload(path, processed[i].compressed, { contentType: 'image/jpeg' })
+    if (upErr) {
+      // Clean up already uploaded files before propagating
+      if (uploadedPaths.length > 0)
+        await admin.storage.from('spot-photos').remove(uploadedPaths).catch(() => {})
+      throw new Error(`Photo [${i + 1}] upload failed: ${upErr.message}`)
+    }
+    uploadedPaths.push(path)
+    const { data: { publicUrl } } = admin.storage.from('spot-photos').getPublicUrl(path)
+    photoUrls.push(publicUrl)
+  }
+  return photoUrls
+}
+
+// ---------------------------------------------------------------------------
+// File a spot report (mirrors ReportSection.jsx insert)
+// Table: spot_reports; columns: spot_id, user_id, report_type, custom_text
+// CONTENT_REPORT_TYPES is empty set → no edge function call needed
+// ---------------------------------------------------------------------------
+async function fileReport(admin, spotId, userId, reportType, customText = null) {
+  const payload = {
+    spot_id: spotId,
+    user_id: userId,
+    report_type: reportType,
+    custom_text: reportType === 'Other' ? customText : null,
+  }
+  const { data, error } = await admin.from('spot_reports').insert(payload).select().single()
+  if (error || !data) throw new Error(`Report insert failed: ${error?.message}`)
+  return data
+}
+
+// ---------------------------------------------------------------------------
+// Verify photo URLs (HEAD requests)
+// ---------------------------------------------------------------------------
+async function verifyPhotos(urls) {
+  const results = []
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      const r = await fetch(urls[i], { method: 'HEAD' })
+      results.push({ ok: r.ok, status: r.status })
+      process.stdout.write(r.ok ? '✓' : `✗(${r.status})`)
+    } catch {
+      results.push({ ok: false, status: 0 })
+      process.stdout.write('✗(err)')
+    }
+  }
+  console.log()
+  return results
 }
 
 // ---------------------------------------------------------------------------
@@ -310,293 +462,307 @@ function storagePathFromUrl(url) {
 // ---------------------------------------------------------------------------
 function printSpot(spot) {
   const fields = [
-    ['id',                spot.id],
-    ['slug',              spot.slug],
-    ['title',             spot.title],
-    ['type',              spot.type],
-    ['features',          JSON.stringify(spot.features)],
-    ['lighting',          spot.lighting],
-    ['bust_rating',       spot.bust_rating],
-    ['is_multi_spot',     spot.is_multi_spot],
-    ['description',       JSON.stringify(spot.description)],
-    ['address',           spot.address],
-    ['latitude',          spot.latitude],
-    ['longitude',         spot.longitude],
-    ['visibility',        spot.visibility],
-    ['moderation_status', spot.moderation_status],
-    ['added_by',          spot.added_by],
-    ['credit_name',       spot.credit_name],
-    ['credit_url',        spot.credit_url],
-    ['photos count',      spot.photos?.length],
+    ['id', spot.id], ['slug', spot.slug], ['title', spot.title], ['type', spot.type],
+    ['features', JSON.stringify(spot.features)], ['lighting', spot.lighting],
+    ['description', JSON.stringify(spot.description)], ['address', spot.address],
+    ['lat/lng', `${spot.latitude}, ${spot.longitude}`],
+    ['visibility', spot.visibility], ['moderation_status', spot.moderation_status],
+    ['added_by', spot.added_by], ['credit_name', spot.credit_name],
+    ['credit_url', spot.credit_url], ['photos', spot.photos?.length],
   ]
-  for (const [k, v] of fields) console.log(`  ${k.padEnd(20)}: ${v}`)
+  for (const [k, v] of fields) console.log(`    ${k.padEnd(18)}: ${v}`)
 }
 
 // ---------------------------------------------------------------------------
-// Verify photo URLs
+// Import one park — shared by --url and --page modes
+// Returns result object for the final report
 // ---------------------------------------------------------------------------
-async function verifyPhotos(urls) {
-  console.log('\nVerifying photo URLs ...')
-  for (let i = 0; i < urls.length; i++) {
-    const url = urls[i]
-    try {
-      const r = await fetch(url, { method: 'HEAD' })
-      console.log(`  [${i + 1}] ${r.ok ? '✓' : '✗'} HTTP ${r.status}  ${url.slice(0, 90)}`)
-    } catch {
-      console.log(`  [${i + 1}] ✗ network error  ${url.slice(0, 90)}`)
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Download, crop, deduplicate, compress photos
-// Returns array of { compressed, url, isCover, rowsRemoved }
-// Also returns { coverCropRows, duplicatesRemoved }
-// ---------------------------------------------------------------------------
-async function processPhotos(coverUrl, galleryUrls, maxPhotos = 8) {
-  mkdirSync('scripts/import-output', { recursive: true })
-
-  // Build source list: cover first, then gallery up to maxPhotos total
-  // We fetch more than maxPhotos to allow for deduplication
-  const sources = []
-  if (coverUrl) sources.push({ url: coverUrl, isCover: true })
-  for (const u of galleryUrls) {
-    if (sources.length >= maxPhotos + 4) break  // fetch a few extra for dedup buffer
-    sources.push({ url: u, isCover: false })
+async function importOnePark({ parkUrl, admin, userId, existingSpots, skipUrls, visibility = 'public' }) {
+  const result = {
+    url: parkUrl, title: null, spotId: null, status: 'unknown',
+    action: null, lighting: null, description: '', photoCount: 0,
+    reportFiled: null, youtubeUrl: null, nearbyFlag: null, error: null,
+    duplicateOf: null, slug: null,
   }
 
-  // Download all
-  const downloaded = []
-  console.log(`  Downloading ${sources.length} source images ...`)
-  for (let i = 0; i < sources.length; i++) {
-    const { url, isCover } = sources[i]
-    process.stdout.write(`  [${i + 1}/${sources.length}]${isCover ? ' (cover)' : ''} ...`)
-    try {
-      const buf = await fetchBinary(url)
-      downloaded.push({ buf, url, isCover })
-      console.log(' ok')
-    } catch (err) {
-      console.log(` SKIPPED (${err.message})`)
+  try {
+    const html = await fetchText(parkUrl)
+    const { lat, lng, rawTitle, coverUrl, galleryUrls, lighting: pageLighting, lightsTime, youtubeUrl, status } = parsePage(html)
+
+    if (!rawTitle) throw new Error('Could not extract title from H1')
+    if (!lat || !lng) throw new Error('Could not extract coordinates — no Google Maps embed found')
+
+    const title = normalizeTitle(rawTitle)
+    result.title = title
+    result.youtubeUrl = youtubeUrl
+    result.status = status
+
+    console.log(`  Title   : ${title}`)
+    console.log(`  Coords  : ${lat}, ${lng}`)
+    console.log(`  Status  : ${status}`)
+    console.log(`  Lights  : ${pageLighting ?? 'not detected'}${lightsTime ? ` till ${lightsTime}` : ''}`)
+
+    const lighting = pageLighting
+    const description = (lighting === 'Lights' && lightsTime) ? `Lights on till ${lightsTime}.` : ''
+    result.lighting = lighting
+    result.description = description
+
+    // --- Duplicate / proximity check against existing spots ---
+    if (existingSpots && lat && lng) {
+      for (const ex of existingSpots) {
+        if (!ex.latitude || !ex.longitude) continue
+        const dist = haversineMeters(lat, lng, ex.latitude, ex.longitude)
+        if (dist <= 150) {
+          const sameName = namesShareDistinctiveWord(title, ex.title || '')
+          if (sameName) {
+            console.log(`  SKIP: duplicate of "${ex.title}" (${Math.round(dist)}m, id: ${ex.id})`)
+            result.action = 'skipped-duplicate'
+            result.duplicateOf = { id: ex.id, title: ex.title, dist: Math.round(dist) }
+            return result
+          } else {
+            console.log(`  FLAG: nearby spot "${ex.title}" (${Math.round(dist)}m) — different name, proceeding`)
+            result.nearbyFlag = { id: ex.id, title: ex.title, dist: Math.round(dist) }
+          }
+        }
+      }
     }
+
+    // --- Address ---
+    const { address: mapboxAddr } = await reverseGeocode(lat, lng)
+    const address = mapboxAddr || `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+
+    // --- Photos ---
+    const slug = slugify(title, Math.random().toString(36).slice(2, 6))
+    result.slug = slug
+    console.log(`  Slug    : ${slug}`)
+    console.log(`  Address : ${address}`)
+    console.log(`  Photos  : downloading ${coverUrl ? 1 : 0} cover + ${galleryUrls.length} gallery...`)
+
+    const { processed, coverCropRows, duplicatesRemoved } = await processPhotos(coverUrl, galleryUrls, slug)
+    console.log(`  Photos  : ${processed.length} unique (${duplicatesRemoved} dupes removed, cover crop ${coverCropRows}r)`)
+    result.photoCount = processed.length
+
+    if (dryRun) {
+      console.log(`  DRY RUN: would insert with ${processed.length} photos`)
+      result.action = 'dry-run'
+      return result
+    }
+
+    if (processed.length === 0) throw new Error('No photos processed')
+
+    // --- Upload ---
+    const photoUrls = await uploadPhotos(admin, processed)
+
+    // --- Insert ---
+    const payload = {
+      title, slug, type: 'Skatepark', features: [], bust_rating: null,
+      lighting, is_multi_spot: false, description,
+      address, latitude: lat, longitude: lng, photos: photoUrls,
+      added_by: userId, moderation_status: 'approved', visibility,
+      credit_name: 'Speak Easy Skate', credit_url: 'https://speakeasyskate.com/',
+    }
+    const { data: spot, error: insertErr } = await admin.from('spots').insert(payload).select().single()
+    if (insertErr || !spot) {
+      // Clean up uploaded photos
+      await admin.storage.from('spot-photos').remove(photoUrls.map(storagePathFromUrl).filter(Boolean)).catch(() => {})
+      throw new Error(`Insert failed: ${insertErr?.message}`)
+    }
+
+    result.spotId = spot.id
+    result.action = 'added'
+    printSpot(spot)
+
+    // --- Verify photos ---
+    process.stdout.write(`  Verify  : `)
+    await verifyPhotos(spot.photos)
+
+    // --- Report if closed or under construction ---
+    if (status === 'closed') {
+      const rpt = await fileReport(admin, spot.id, userId, "Spot Doesn't Exist")
+      result.reportFiled = { type: "Spot Doesn't Exist", id: rpt.id }
+      console.log(`  Report  : filed "Spot Doesn't Exist" (id: ${rpt.id})`)
+    } else if (status === 'construction') {
+      const rpt = await fileReport(admin, spot.id, userId, 'Other', 'Under Construction')
+      result.reportFiled = { type: 'Other', customText: 'Under Construction', id: rpt.id }
+      console.log(`  Report  : filed "Other / Under Construction" (id: ${rpt.id})`)
+    }
+
+    console.log(`  ✓ Done`)
+  } catch (err) {
+    result.action = 'failed'
+    result.error = err.message
+    console.error(`  ✗ FAILED: ${err.message}`)
   }
 
-  // Deduplicate raw downloads by perceptual hash (before crop, so cover+gallery
-  // duplicate is caught even if cropped slightly differently)
-  console.log(`  Deduplicating ${downloaded.length} images ...`)
-  const rawBufs = downloaded.map(d => d.buf)
-  const uniqueIndices = await deduplicateBuffers(rawBufs)
-  const duplicatesRemoved = downloaded.length - uniqueIndices.length
-  if (duplicatesRemoved > 0) console.log(`  Removed ${duplicatesRemoved} duplicate(s)`)
-  const unique = uniqueIndices.map(i => downloaded[i])
-
-  // Crop and compress, up to maxPhotos
-  let coverCropRows = 0
-  const processed = []
-  for (let i = 0; i < unique.length && processed.length < maxPhotos; i++) {
-    const { buf, url, isCover } = unique[i]
-    const { cropped, buf: croppedBuf, rowsRemoved, skipped } = await detectAndCropBar(buf)
-    if (skipped) {
-      console.log(`  [${i + 1}] bar could not be removed cleanly — SKIPPED`)
-      continue
-    }
-    const finalBuf = cropped ? croppedBuf : buf
-    if (cropped) {
-      console.log(`  [${i + 1}]${isCover ? ' (cover)' : ''} cropped ${rowsRemoved} rows`)
-      if (isCover) coverCropRows = rowsRemoved
-    } else {
-      console.log(`  [${i + 1}]${isCover ? ' (cover)' : ''} no bar`)
-    }
-    if (isCover) {
-      const previewBuf = await sharp(finalBuf).jpeg({ quality: 85 }).toBuffer()
-      writeFileSync('scripts/import-output/cover-preview.jpg', previewBuf)
-      console.log(`         → scripts/import-output/cover-preview.jpg saved`)
-    }
-    const compressed = await compressImage(finalBuf)
-    processed.push({ compressed, url, isCover, rowsRemoved: cropped ? rowsRemoved : 0 })
-  }
-
-  return { processed, coverCropRows, duplicatesRemoved }
+  return result
 }
 
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
-  const mode = updateId ? `UPDATE ${updateId}` : dryRun ? 'DRY RUN' : 'INSERT'
-  console.log('\nSesh Wars — Speak Easy Skate Importer')
-  console.log(`Park URL : ${parkUrl}`)
-  console.log(`Mode     : ${mode}`)
-  console.log('─'.repeat(70))
-
-  // Admin client
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
   // User lookup
-  console.log('\n[1] Looking up user taylorselgas@gmail.com ...')
   const { data: { users }, error: userErr } = await admin.auth.admin.listUsers({ perPage: 1000 })
   if (userErr) throw new Error(`listUsers: ${userErr.message}`)
   const targetUser = users.find(u => u.email === 'taylorselgas@gmail.com')
   if (!targetUser) throw new Error('taylorselgas@gmail.com not found in auth.users')
-  console.log(`  user_id: ${targetUser.id}`)
+  const userId = targetUser.id
 
-  // Fetch existing spot for --update
-  let existingSpot = null
-  if (updateId) {
-    console.log(`\n[2] Fetching existing spot ${updateId} ...`)
-    const { data, error } = await admin.from('spots').select('*').eq('id', updateId).single()
-    if (error || !data) throw new Error(`Could not fetch spot ${updateId}: ${error?.message}`)
-    existingSpot = data
-    console.log(`  Found: "${existingSpot.title}" (slug: ${existingSpot.slug})`)
-    console.log(`  Current photos: ${existingSpot.photos?.length ?? 0}`)
-  }
+  // ── BATCH MODE: --page ──
+  if (pageUrl) {
+    console.log(`\nSesh Wars — Speak Easy Batch Import`)
+    console.log(`Listing : ${pageUrl}`)
+    console.log(`Mode    : ${dryRun ? 'DRY RUN' : 'LIVE'}`)
+    console.log('─'.repeat(70))
 
-  // Fetch and parse park page
-  console.log(`\n[${updateId ? 3 : 2}] Fetching park page ...`)
-  const html = await fetchText(parkUrl)
-  const { lat, lng, rawTitle, coverUrl, galleryUrls, lighting: pageLighting, lightsTime, youtubeUrl } = parsePage(html)
+    // Explicit skip list (already-imported parks by URL)
+    const SKIP_URLS = new Set([
+      'https://speakeasyskate.com/3rdst/',
+    ])
 
-  if (!lat || !lng) throw new Error('Could not extract coordinates — no Google Maps embed found.')
-  const title = rawTitle ? normalizeTitle(rawTitle) : null
-  if (!title) throw new Error('Could not extract park title from H1.')
+    // Fetch listing page
+    console.log('\nFetching listing page ...')
+    const listHtml = await fetchText(pageUrl)
+    const parkLinks = extractParkLinks(listHtml)
+    console.log(`Found ${parkLinks.length} park link(s)`)
 
-  console.log(`  Page title (raw)  : ${rawTitle}`)
-  console.log(`  Title (normalised): ${title}`)
-  console.log(`  Coordinates       : ${lat}, ${lng}`)
-  console.log(`  Cover URL         : ${coverUrl || 'not found'}`)
-  console.log(`  Gallery images    : ${galleryUrls.length}`)
-  console.log(`  Lighting          : ${pageLighting ?? 'not detected'}${lightsTime ? ` (till ${lightsTime})` : ''}`)
-  console.log(`  YouTube           : ${youtubeUrl || 'none'}`)
+    // Load all existing spots for duplicate checking
+    console.log('Loading existing spots for duplicate check ...')
+    const { data: existingSpots, error: spotsErr } = await admin
+      .from('spots').select('id, title, latitude, longitude, slug')
+    if (spotsErr) throw new Error(`Could not load existing spots: ${spotsErr.message}`)
+    console.log(`Loaded ${existingSpots.length} existing spot(s)`)
 
-  const lighting = pageLighting
-  const description = (lighting === 'Lights' && lightsTime) ? `Lights on till ${lightsTime}.` : ''
-  if (description) console.log(`  Description       : "${description}"`)
+    const results = []
+    let idx = 0
+    for (const link of parkLinks) {
+      idx++
+      console.log(`\n[${ idx}/${parkLinks.length}] ${link}`)
 
-  // Reverse geocode (only for new inserts; updates keep existing address)
-  let address, finalAddrSource
-  if (!updateId) {
-    console.log(`\n[3] Reverse geocoding ...`)
-    const { address: mapboxAddr } = await reverseGeocode(lat, lng)
-    address = mapboxAddr || `${lat.toFixed(4)}, ${lng.toFixed(4)}`
-    finalAddrSource = mapboxAddr ? 'mapbox' : 'coordinates-fallback'
-    console.log(`  Address (${finalAddrSource}): ${address}`)
-  }
+      if (SKIP_URLS.has(link)) {
+        console.log('  SKIP: in explicit skip list (already imported)')
+        results.push({ url: link, action: 'skipped-explicit', title: '(3rd St — already imported)' })
+        continue
+      }
 
-  // Photos
-  console.log(`\n[${updateId ? 4 : 4}] Processing photos ...`)
-  const { processed, coverCropRows, duplicatesRemoved } = await processPhotos(coverUrl, galleryUrls)
-  console.log(`  ${processed.length} unique photo(s) ready (${duplicatesRemoved} duplicate(s) removed)`)
+      await sleep(1000)
+      const result = await importOnePark({ parkUrl: link, admin, userId, existingSpots, skipUrls: SKIP_URLS })
+      results.push(result)
 
-  // Dry run
-  if (dryRun) {
-    console.log('\n' + '─'.repeat(70))
-    console.log('DRY RUN — payload preview:')
-    const slug = slugify(title, Math.random().toString(36).slice(2, 6))
-    console.log(JSON.stringify({
-      title, slug, type: 'Skatepark', features: [], bust_rating: null,
-      lighting, is_multi_spot: false, description,
-      address: address || existingSpot?.address, latitude: lat, longitude: lng,
-      photos: [`[${processed.length} photos would be uploaded]`],
-      added_by: targetUser.id, moderation_status: 'approved',
-      visibility: 'private', credit_name: 'Speak Easy Skate', credit_url: 'https://speakeasyskate.com/',
-    }, null, 2))
-    if (youtubeUrl) console.log(`\nYouTube (not imported): ${youtubeUrl}`)
-    console.log('\nRe-run without --dry-run to insert.')
+      // Add successfully-inserted spot to existingSpots for subsequent proximity checks
+      if (result.action === 'added' && result.spotId) {
+        // Fetch the new spot's coords to add to the in-memory list
+        const { data: newSpot } = await admin.from('spots')
+          .select('id, title, latitude, longitude, slug').eq('id', result.spotId).single()
+        if (newSpot) existingSpots.push(newSpot)
+      }
+    }
+
+    // Final report table
+    console.log('\n' + '═'.repeat(80))
+    console.log('BATCH RESULTS\n')
+    console.log('URL slug'.padEnd(26) + ' Title'.padEnd(36) + ' Action'.padEnd(20) + ' Lights'.padEnd(14) + ' Photos  Report')
+    console.log('─'.repeat(118))
+    for (const r of results) {
+      const slug = r.url?.split('/').filter(Boolean).pop() || ''
+      const title = (r.title || '').slice(0, 34).padEnd(34)
+      const action = (r.action || '').padEnd(18)
+      const lights = (r.lighting || '').padEnd(12)
+      const photos = String(r.photoCount || 0).padEnd(7)
+      const rpt = r.reportFiled ? r.reportFiled.type.slice(0, 20) : (r.error ? `ERR: ${r.error.slice(0, 20)}` : 'none')
+      console.log(`${slug.padEnd(25)} ${title} ${action} ${lights} ${photos} ${rpt}`)
+    }
+
+    const added = results.filter(r => r.action === 'added')
+    const skipped = results.filter(r => r.action?.startsWith('skipped'))
+    const failed = results.filter(r => r.action === 'failed')
+    const reported = results.filter(r => r.reportFiled)
+    const youtubeFound = results.filter(r => r.youtubeUrl)
+    const nearbyFlagged = results.filter(r => r.nearbyFlag)
+
+    console.log(`\n  Added:   ${added.length}`)
+    console.log(`  Skipped: ${skipped.length}`)
+    console.log(`  Failed:  ${failed.length}`)
+    console.log(`  Reports: ${reported.length}`)
+
+    if (skipped.length > 0) {
+      console.log('\nSkipped:')
+      for (const r of skipped) {
+        const dup = r.duplicateOf
+        console.log(`  ${r.url} → ${r.action}${dup ? ` (matches "${dup.title}", ${dup.dist}m, id: ${dup.id})` : ''}`)
+      }
+    }
+    if (nearbyFlagged.length > 0) {
+      console.log('\nNearby flags (added despite proximity):')
+      for (const r of nearbyFlagged) {
+        console.log(`  ${r.title} near "${r.nearbyFlag.title}" (${r.nearbyFlag.dist}m)`)
+      }
+    }
+    if (youtubeFound.length > 0) {
+      console.log('\nYouTube URLs found (not imported):')
+      for (const r of youtubeFound) console.log(`  ${r.title}: ${r.youtubeUrl}`)
+    }
+    if (failed.length > 0) {
+      console.log('\nFailed parks:')
+      for (const r of failed) console.log(`  ${r.url}: ${r.error}`)
+    }
     return
   }
 
-  if (processed.length === 0) throw new Error('No photos processed — aborting')
+  // ── SINGLE URL MODE: --url ──
+  const mode = updateId ? `UPDATE ${updateId}` : dryRun ? 'DRY RUN' : 'INSERT'
+  console.log(`\nSesh Wars — Speak Easy Skate Importer`)
+  console.log(`Park URL : ${parkUrl}`)
+  console.log(`Mode     : ${mode}`)
+  console.log('─'.repeat(70))
 
-  // Upload photos
-  console.log(`\n[5] Uploading ${processed.length} photo(s) ...`)
-  const photoUrls = []
-  for (let i = 0; i < processed.length; i++) {
-    const path = `spots/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
-    const { error: upErr } = await admin.storage.from('spot-photos').upload(path, processed[i].compressed, { contentType: 'image/jpeg' })
-    if (upErr) { console.warn(`  [${i + 1}] UPLOAD FAILED: ${upErr.message}`); continue }
-    const { data: { publicUrl } } = admin.storage.from('spot-photos').getPublicUrl(path)
-    photoUrls.push(publicUrl)
-    console.log(`  [${i + 1}] → ${publicUrl}`)
-  }
-  if (photoUrls.length === 0) throw new Error('All uploads failed — aborting')
-
-  // ── UPDATE mode ──
   if (updateId) {
-    // Delete old storage files
+    // ── UPDATE ──
+    console.log(`\nFetching existing spot ${updateId} ...`)
+    const { data: existingSpot, error: fetchErr } = await admin.from('spots').select('*').eq('id', updateId).single()
+    if (fetchErr || !existingSpot) throw new Error(`Could not fetch spot: ${fetchErr?.message}`)
+    console.log(`  Found: "${existingSpot.title}" (${existingSpot.photos?.length} photos)`)
+
+    const html = await fetchText(parkUrl)
+    const { lat, lng, rawTitle, coverUrl, galleryUrls, lighting, lightsTime, youtubeUrl } = parsePage(html)
+    if (!rawTitle || !lat || !lng) throw new Error('Missing title or coordinates')
+
+    const title = normalizeTitle(rawTitle)
+    const description = (lighting === 'Lights' && lightsTime) ? `Lights on till ${lightsTime}.` : ''
+    const slug = existingSpot.slug
+
+    console.log(`  New title: ${title}  Lighting: ${lighting}  Description: "${description}"`)
+
+    const { processed, coverCropRows, duplicatesRemoved } = await processPhotos(coverUrl, galleryUrls, slug)
+    console.log(`  Photos: ${processed.length} (${duplicatesRemoved} dupes removed, cover crop ${coverCropRows}r)`)
+
+    const photoUrls = await uploadPhotos(admin, processed)
+
     const oldPaths = (existingSpot.photos || []).map(storagePathFromUrl).filter(Boolean)
-    console.log(`\n[6] Deleting ${oldPaths.length} old storage file(s) ...`)
     if (oldPaths.length > 0) {
-      const { error: delErr } = await admin.storage.from('spot-photos').remove(oldPaths)
-      if (delErr) console.warn(`  Storage delete warning: ${delErr.message}`)
-      else console.log(`  Deleted: ${oldPaths.join(', ')}`)
+      await admin.storage.from('spot-photos').remove(oldPaths)
+      console.log(`  Deleted ${oldPaths.length} old storage file(s)`)
     }
 
-    // Update spot — keep slug, address, coords, category, credit, visibility, added_by, moderation_status
-    console.log(`\n[7] Updating spot ${updateId} ...`)
-    const updatePayload = {
-      title,
-      // slug: kept as-is (app keeps existing slug on edit per SpotDetail.jsx line 580)
-      description,
-      lighting,
-      photos: photoUrls,
-    }
-    const { data: spot, error: updateErr } = await admin
-      .from('spots').update(updatePayload).eq('id', updateId).select().single()
-    if (updateErr || !spot) throw new Error(`Update failed: ${updateErr?.message}`)
+    const { data: spot, error: upErr } = await admin
+      .from('spots').update({ title, description, lighting, photos: photoUrls }).eq('id', updateId).select().single()
+    if (upErr || !spot) throw new Error(`Update failed: ${upErr?.message}`)
 
-    console.log('\n' + '─'.repeat(70))
-    console.log('UPDATE SUCCESSFUL\n')
+    console.log('\nUPDATE SUCCESSFUL')
     printSpot(spot)
+    process.stdout.write('Verifying photos: ')
     await verifyPhotos(spot.photos)
-
-    console.log('\n' + '─'.repeat(70))
-    console.log('SUMMARY')
-    console.log(`  Spot id          : ${spot.id}`)
-    console.log(`  Slug (unchanged) : ${spot.slug}`)
-    console.log(`  New title        : ${spot.title}`)
-    console.log(`  Lighting         : ${spot.lighting}`)
-    console.log(`  Description      : ${JSON.stringify(spot.description)}`)
-    console.log(`  Photos           : ${spot.photos.length} uploaded`)
-    console.log(`  Duplicates rmvd  : ${duplicatesRemoved}`)
-    console.log(`  Cover crop rows  : ${coverCropRows}`)
-    console.log(`  Old files deleted: ${oldPaths.length}`)
-    if (youtubeUrl) console.log(`  YouTube          : ${youtubeUrl}  (not imported)`)
+    if (youtubeUrl) console.log(`YouTube (not imported): ${youtubeUrl}`)
     return
   }
 
-  // ── INSERT mode ──
-  console.log('\n[6] Inserting spot ...')
-  const slug = slugify(title, Math.random().toString(36).slice(2, 6))
-  const payload = {
-    title, slug, type: 'Skatepark', features: [], bust_rating: null,
-    lighting, is_multi_spot: false, description,
-    address, latitude: lat, longitude: lng, photos: photoUrls,
-    added_by: targetUser.id, moderation_status: 'approved',
-    visibility: 'private', credit_name: 'Speak Easy Skate', credit_url: 'https://speakeasyskate.com/',
-  }
-  const { data: spot, error: insertErr } = await admin.from('spots').insert(payload).select().single()
-  if (insertErr || !spot) throw new Error(`Insert failed: ${insertErr?.message}`)
-
-  console.log('\n' + '─'.repeat(70))
-  console.log('INSERT SUCCESSFUL\n')
-  printSpot(spot)
-  await verifyPhotos(spot.photos)
-
-  console.log('\n' + '─'.repeat(70))
-  console.log('SUMMARY')
-  console.log(`  Spot id    : ${spot.id}`)
-  console.log(`  Slug       : ${spot.slug}`)
-  console.log(`  Title      : ${spot.title}`)
-  console.log(`  Address    : ${spot.address}  (source: ${finalAddrSource})`)
-  console.log(`  Coords     : ${spot.latitude}, ${spot.longitude}`)
-  console.log(`  Lighting   : ${spot.lighting}`)
-  console.log(`  Description: ${JSON.stringify(spot.description)}`)
-  console.log(`  Photos     : ${spot.photos.length} uploaded`)
-  console.log(`  Duplicates : ${duplicatesRemoved} removed`)
-  console.log(`  Cover crop : ${coverCropRows} rows removed`)
-  if (youtubeUrl) console.log(`  YouTube    : ${youtubeUrl}  (not imported)`)
-  console.log()
+  // ── SINGLE INSERT ──
+  const result = await importOnePark({ parkUrl, admin, userId, existingSpots: null, skipUrls: new Set(), visibility: 'public' })
+  if (result.action === 'failed') process.exit(1)
 }
 
 main().catch(err => {
