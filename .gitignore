@@ -30,3 +30,4 @@ dist-ssr
 .env*
 supabase/.temp/
 scripts/import-output/
+scripts/.ig-profile/
