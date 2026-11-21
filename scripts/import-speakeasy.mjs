@@ -56,12 +56,14 @@ const pageUrl = pageIndex !== -1 ? args[pageIndex + 1] : null
 const dryRun = args.includes('--dry-run')
 const updateIndex = args.indexOf('--update')
 const updateId = updateIndex !== -1 ? args[updateIndex + 1] : null
+const doBackfill = args.includes('--backfill')
 
-if (!parkUrl && !pageUrl) {
+if (!parkUrl && !pageUrl && !doBackfill) {
   console.error('Usage:')
   console.error('  node scripts/import-speakeasy.mjs --url <url> [--dry-run]')
   console.error('  node scripts/import-speakeasy.mjs --url <url> --update <spot-id>')
   console.error('  node scripts/import-speakeasy.mjs --page <listing-url> [--dry-run]')
+  console.error('  node scripts/import-speakeasy.mjs --backfill')
   process.exit(1)
 }
 
@@ -167,12 +169,22 @@ function parsePage(html) {
   while ((m = galleryRe.exec(html)) !== null) gallerySet.add(m[1] + '=w2560')
 
   // --- Lights from meta description ---
-  const lightsMatch = html.match(/LIGHTS:\s*(Yes|No)(?:[^<"]{0,80}?([\d]{1,2}(?::\d{2})?(?:am|pm)))?/i)
+  // Formats: "LIGHTS: Yes | 10:00 PM", "LIGHTS: Yes till 10pm", "LIGHTS: No"
+  const lightsFieldMatch = html.match(/LIGHTS:\s*(Yes|No)([^<"]*)/i)
   let lighting = null
   let lightsTime = null
-  if (lightsMatch) {
-    lighting = lightsMatch[1].toLowerCase() === 'yes' ? 'Lights' : 'No Lights'
-    if (lightsMatch[2]) lightsTime = lightsMatch[2].toLowerCase()
+  if (lightsFieldMatch) {
+    lighting = lightsFieldMatch[1].toLowerCase() === 'yes' ? 'Lights' : 'No Lights'
+    if (lighting === 'Lights') {
+      const after = lightsFieldMatch[2]
+      const timeMatch = after.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i)
+      if (timeMatch) {
+        const h = timeMatch[1]
+        const min = timeMatch[2]
+        const period = timeMatch[3].toLowerCase()
+        lightsTime = (min && min !== '00') ? `${h}:${min}${period}` : `${h}${period}`
+      }
+    }
   }
 
   // --- Status: closed or under construction ---
@@ -229,26 +241,6 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
   const a = Math.sin(dLat / 2) ** 2 +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-// ---------------------------------------------------------------------------
-// Name similarity: check for shared distinctive words
-// ---------------------------------------------------------------------------
-const STOPWORDS = new Set(['the', 'a', 'an', 'of', 'at', 'in', 'and', 'or', 'for',
-  'skatepark', 'park', 'skate', 'skateparks', 'sports', 'complex', 'center',
-  'colorado', 'state', 'street', 'avenue', 'drive', 'road', 'way', 'st',
-  'ave', 'dr', 'blvd', 'rec', 'recreation', 'community', 'north', 'south', 'east', 'west'])
-
-function distinctiveWords(title) {
-  return title.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 2 && !STOPWORDS.has(w))
-}
-
-function namesShareDistinctiveWord(a, b) {
-  const wa = new Set(distinctiveWords(a))
-  return distinctiveWords(b).some(w => wa.has(w))
 }
 
 // ---------------------------------------------------------------------------
@@ -507,23 +499,29 @@ async function importOnePark({ parkUrl, admin, userId, existingSpots, skipUrls, 
     result.lighting = lighting
     result.description = description
 
-    // --- Duplicate / proximity check against existing spots ---
+    // --- Duplicate / proximity check (location only, name irrelevant) ---
+    // ≤50 m → skip; 50–200 m → add + flag in report
     if (existingSpots && lat && lng) {
+      let closestDup = null
       for (const ex of existingSpots) {
         if (!ex.latitude || !ex.longitude) continue
         const dist = haversineMeters(lat, lng, ex.latitude, ex.longitude)
-        if (dist <= 150) {
-          const sameName = namesShareDistinctiveWord(title, ex.title || '')
-          if (sameName) {
-            console.log(`  SKIP: duplicate of "${ex.title}" (${Math.round(dist)}m, id: ${ex.id})`)
-            result.action = 'skipped-duplicate'
-            result.duplicateOf = { id: ex.id, title: ex.title, dist: Math.round(dist) }
-            return result
-          } else {
-            console.log(`  FLAG: nearby spot "${ex.title}" (${Math.round(dist)}m) — different name, proceeding`)
+        if (dist <= 50) {
+          if (!closestDup || dist < closestDup.dist)
+            closestDup = { id: ex.id, title: ex.title, dist: Math.round(dist) }
+        } else if (dist <= 200) {
+          if (!result.nearbyFlag || dist < result.nearbyFlag.dist)
             result.nearbyFlag = { id: ex.id, title: ex.title, dist: Math.round(dist) }
-          }
         }
+      }
+      if (closestDup) {
+        console.log(`  SKIP: duplicate of "${closestDup.title}" (${closestDup.dist}m, id: ${closestDup.id})`)
+        result.action = 'skipped-duplicate'
+        result.duplicateOf = closestDup
+        return result
+      }
+      if (result.nearbyFlag) {
+        console.log(`  FLAG: nearby spot "${result.nearbyFlag.title}" (${result.nearbyFlag.dist}m) — proceeding`)
       }
     }
 
@@ -598,6 +596,79 @@ async function importOnePark({ parkUrl, admin, userId, existingSpots, skipUrls, 
 }
 
 // ---------------------------------------------------------------------------
+// Backfill lights times for today's Speak Easy spots
+// Fetches all speakeasyskate.com park pages, matches by coordinates,
+// and sets description = "Lights on till <time>." for spots that have
+// lighting='Lights' but an empty description.
+// ---------------------------------------------------------------------------
+async function backfillLightsTimes(admin, userId) {
+  const today = new Date().toISOString().slice(0, 10)
+
+  // Find spots created today by this user from speakeasyskate.com with Lights
+  const { data: allSpots, error: qErr } = await admin.from('spots')
+    .select('id, title, latitude, longitude, description')
+    .eq('added_by', userId)
+    .eq('credit_url', 'https://speakeasyskate.com/')
+    .eq('lighting', 'Lights')
+    .gte('created_at', `${today}T00:00:00.000Z`)
+  if (qErr) throw new Error(`Backfill query: ${qErr.message}`)
+
+  const spots = (allSpots || []).filter(s => !s.description || s.description.trim() === '')
+  if (!spots.length) { console.log('  No spots need backfill.'); return { updated: [], noTime: [] } }
+  console.log(`  Found ${spots.length} spot(s) needing backfill: ${spots.map(s => s.title).join(', ')}`)
+
+  // Collect all park URLs from listing pages
+  const allParkUrls = []
+  for (let p = 1; p <= 10; p++) {
+    try {
+      const listHtml = await fetchText(`https://speakeasyskate.com/skateparks/?_page=${p}`)
+      const links = extractParkLinks(listHtml)
+      if (!links.length) break
+      allParkUrls.push(...links)
+      await sleep(400)
+    } catch { break }
+  }
+  console.log(`  Scanning ${allParkUrls.length} park URLs for light times ...`)
+
+  // Fetch each park with Lights and build a coord→time map
+  const coordEntries = []
+  for (const url of allParkUrls) {
+    try {
+      await sleep(300)
+      const html = await fetchText(url)
+      const { lat, lng, lighting: pl, lightsTime } = parsePage(html)
+      if (lat && lng && pl === 'Lights') coordEntries.push({ url, lat, lng, lightsTime })
+    } catch { /* skip unreachable pages */ }
+  }
+
+  const updated = []
+  const noTime = []
+  for (const spot of spots) {
+    const match = coordEntries.find(e => haversineMeters(spot.latitude, spot.longitude, e.lat, e.lng) < 10)
+    if (!match) {
+      console.log(`  BACKFILL: no matching page found for "${spot.title}"`)
+      noTime.push(spot.title)
+      continue
+    }
+    if (!match.lightsTime) {
+      console.log(`  BACKFILL: "${spot.title}" — Lights=Yes but no time on page (${match.url})`)
+      noTime.push(spot.title)
+      continue
+    }
+    const desc = `Lights on till ${match.lightsTime}.`
+    const { data: updatedSpot, error: upErr } = await admin
+      .from('spots').update({ description: desc }).eq('id', spot.id).select().single()
+    if (upErr || !updatedSpot) {
+      console.log(`  BACKFILL: failed to update "${spot.title}": ${upErr?.message}`)
+    } else {
+      console.log(`  BACKFILL: "${spot.title}" → "${desc}"`)
+      updated.push({ title: spot.title, description: desc, id: spot.id })
+    }
+  }
+  return { updated, noTime }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -611,6 +682,24 @@ async function main() {
   const targetUser = users.find(u => u.email === 'taylorselgas@gmail.com')
   if (!targetUser) throw new Error('taylorselgas@gmail.com not found in auth.users')
   const userId = targetUser.id
+
+  // ── BACKFILL MODE: --backfill ──
+  if (doBackfill) {
+    console.log('\nSesh Wars — Speak Easy Lights Backfill')
+    console.log('─'.repeat(70))
+    const { updated, noTime } = await backfillLightsTimes(admin, userId)
+    console.log('\nBACKFILL RESULTS')
+    if (updated.length) {
+      console.log(`  Updated ${updated.length} spot(s):`)
+      for (const s of updated) console.log(`    ${s.title} → "${s.description}"`)
+    } else {
+      console.log('  No spots updated.')
+    }
+    if (noTime.length) {
+      console.log(`  Lights=Yes but no time found (${noTime.length}): ${noTime.join(', ')}`)
+    }
+    return
+  }
 
   // ── BATCH MODE: --page ──
   if (pageUrl) {
