@@ -23,7 +23,7 @@ _chromiumBase.use(StealthPlugin())
 const chromium = _chromiumBase
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -62,8 +62,11 @@ const PROGRESS_FILE = path.join(OUTPUT_DIR, 'dsl-progress.json')
 // Cookie cache: bypasses macOS Keychain cross-session encryption issues
 const COOKIE_FILE   = path.join(PROFILE_DIR, 'ig-cookies.json')
 
+const DSL_DIR = path.join(OUTPUT_DIR, 'dsl')
+
 mkdirSync(OUTPUT_DIR,  { recursive: true })
 mkdirSync(PROFILE_DIR, { recursive: true })
+mkdirSync(DSL_DIR,     { recursive: true })
 
 // Module-level context reference so login-recovery helpers can reach it
 // from anywhere without threading it through every call.
@@ -80,11 +83,17 @@ const limitIdx       = args.indexOf('--limit');       const limitArg      = limi
 const dryRun    = args.includes('--dry-run')
 const doLogin   = args.includes('--login')
 const doBrowser = args.includes('--browser')
+const collectNextIdx = args.indexOf('--collect-next')
+const collectNextN = collectNextIdx !== -1 ? parseInt(args[collectNextIdx + 1], 10) : 0
+const doCollectNext = collectNextN > 0
+const doUploadReady = args.includes('--upload-ready')
 
-if (!testUrl && !beforeUrl && !doLogin && !doBrowser) {
+if (!testUrl && !beforeUrl && !doLogin && !doBrowser && !doCollectNext && !doUploadReady) {
   console.error('Usage:')
-  console.error('  node scripts/import-dsl.mjs --browser                 (start persistent window)')
-  console.error('  node scripts/import-dsl.mjs --login                   (wait for login in running window)')
+  console.error('  node scripts/import-dsl.mjs --browser                      (start persistent window)')
+  console.error('  node scripts/import-dsl.mjs --login                        (wait for login in running window)')
+  console.error('  node scripts/import-dsl.mjs --collect-next <n>             (download next N posts to disk)')
+  console.error('  node scripts/import-dsl.mjs --upload-ready                 (upload posts with decision.json)')
   console.error('  node scripts/import-dsl.mjs --test <post-url> [--dry-run]')
   console.error('  node scripts/import-dsl.mjs --test <post-url> --update-spot <spot-id>')
   console.error('  node scripts/import-dsl.mjs --before <post-url> [--limit <n>] [--dry-run]')
@@ -1036,6 +1045,165 @@ async function getPostsBeforeUrl(page, targetUrl) {
 }
 
 // ---------------------------------------------------------------------------
+// --collect-next: scrape a post and download all photos to disk
+// ---------------------------------------------------------------------------
+async function collectPostToDisk(page, postUrl) {
+  const shortcode = postUrl.match(/\/p\/([A-Za-z0-9_-]+)/)?.[1]
+  if (!shortcode) throw new Error(`Cannot parse shortcode from ${postUrl}`)
+
+  const spotDir = path.join(DSL_DIR, shortcode)
+  mkdirSync(spotDir, { recursive: true })
+
+  const infoFile = path.join(spotDir, 'info.json')
+  if (existsSync(infoFile)) {
+    console.log(`  Already collected — loading from disk`)
+    return JSON.parse(readFileSync(infoFile, 'utf8'))
+  }
+
+  const post = await scrapePost(page, postUrl)
+  if (post.blocked) throw new Error('Instagram challenge/block detected')
+
+  console.log(`  Caption (${post.caption.length} chars): ${post.caption.slice(0, 120).replace(/\n/g, ' ')}…`)
+  if (post.locationName) console.log(`  Location tag: ${post.locationName}`)
+  console.log(`  Slides: ${post.slideCount}  Images: ${post.images.length}  Videos: ${post.videoCount}`)
+
+  // Multi-part detection
+  const mpMatch = post.caption.match(/\b(?:part|pt\.?)\s*(\d+)\s*(?:of|\/)\s*(\d+)\b/i)
+  const multiPart = mpMatch ? { num: parseInt(mpMatch[1]), total: parseInt(mpMatch[2]) } : null
+
+  // Download all photos
+  const photos = []
+  console.log(`  Downloading ${post.images.length} image(s)...`)
+  for (let i = 0; i < post.images.length; i++) {
+    const filename = `photo-${String(i + 1).padStart(2, '0')}.jpg`
+    try {
+      const buf = await fetchBinary(post.images[i])
+      writeFileSync(path.join(spotDir, filename), buf)
+      photos.push(filename)
+      process.stdout.write('.')
+    } catch {
+      process.stdout.write('✗')
+    }
+  }
+  if (post.images.length) console.log()
+
+  const info = {
+    url: postUrl, shortcode,
+    caption: post.caption,
+    location_name: post.locationName,
+    image_urls: post.images,
+    slide_count: post.slideCount,
+    image_count: post.images.length,
+    video_count: post.videoCount,
+    photos,
+    multi_part: multiPart,
+    collected_at: new Date().toISOString(),
+  }
+  writeFileSync(infoFile, JSON.stringify(info, null, 2))
+  return info
+}
+
+// ---------------------------------------------------------------------------
+// --upload-ready: geocode + dedupe + upload a spot from decision.json
+// ---------------------------------------------------------------------------
+async function uploadFromDecision(shortcode, admin, userId, existingSpots) {
+  const spotDir = path.join(DSL_DIR, shortcode)
+  const decisionFile = path.join(spotDir, 'decision.json')
+  if (!existsSync(decisionFile)) throw new Error(`No decision.json in ${spotDir}`)
+
+  const decision = JSON.parse(readFileSync(decisionFile, 'utf8'))
+
+  if (decision.action === 'skip') {
+    console.log(`  SKIP: ${decision.skip_reason || '(no reason)'}`)
+    return { action: 'skipped-decision', skip_reason: decision.skip_reason, url: `https://www.instagram.com/p/${shortcode}/` }
+  }
+  if (decision.action !== 'add') throw new Error(`Unknown decision action: "${decision.action}"`)
+
+  // Geocode
+  const geo = await geocodeAddress(decision.address)
+  if (!geo) throw new Error(`Geocode failed for "${decision.address}"`)
+  console.log(`  Geocoded: ${geo.lat}, ${geo.lng}`)
+  console.log(`  Address : ${geo.address}`)
+
+  // Dedupe check
+  let closestDup = null, nearbyFlag = null
+  for (const ex of (existingSpots || [])) {
+    if (!ex.latitude || !ex.longitude) continue
+    const dist = haversineMeters(geo.lat, geo.lng, ex.latitude, ex.longitude)
+    if (dist <= 50 && (!closestDup || dist < closestDup.dist)) {
+      closestDup = { id: ex.id, title: ex.title, dist: Math.round(dist) }
+    } else if (dist <= 200 && (!nearbyFlag || dist < nearbyFlag.dist)) {
+      nearbyFlag = { id: ex.id, title: ex.title, dist: Math.round(dist) }
+    }
+  }
+  if (closestDup) {
+    console.log(`  SKIP: duplicate of "${closestDup.title}" (${closestDup.dist}m)`)
+    return { action: 'skipped-duplicate', url: `https://www.instagram.com/p/${shortcode}/`, duplicateOf: closestDup }
+  }
+  if (nearbyFlag) console.log(`  FLAG: nearby "${nearbyFlag.title}" (${nearbyFlag.dist}m) — proceeding`)
+
+  // Load selected photos from disk
+  // Filenames may be "photo-01.jpg" (this dir) or "OTHERSC/photo-01.jpg" (combined multi-part)
+  const buffers = []
+  for (const filename of (decision.photos_selected || [])) {
+    const parts = filename.split('/')
+    const photoDir = parts.length > 1 ? path.join(DSL_DIR, parts[0]) : spotDir
+    const photoFile = path.join(photoDir, parts[parts.length - 1])
+    if (!existsSync(photoFile)) { console.log(`  WARNING: missing photo ${photoFile}`); continue }
+    buffers.push(readFileSync(photoFile))
+  }
+  if (!buffers.length) throw new Error('No photos loaded from disk')
+
+  console.log(`  Compressing ${buffers.length} photo(s)...`)
+  const compressed = await Promise.all(buffers.map(b => compressImage(b)))
+
+  const title = decision.title
+  const slug = slugify(title, Math.random().toString(36).slice(2, 6))
+
+  const photoUrls = await uploadPhotos(admin, compressed)
+
+  const payload = {
+    title, slug,
+    type: decision.type || 'Street',
+    features: decision.features || [],
+    bust_rating: decision.bust_rating || null,
+    lighting: decision.lighting || null,
+    is_multi_spot: decision.is_multi_spot || false,
+    description: decision.description || '',
+    address: geo.address, latitude: geo.lat, longitude: geo.lng,
+    photos: photoUrls,
+    added_by: userId, moderation_status: 'approved', visibility: 'public',
+    credit_name: '@denver_spot_locator',
+    credit_url: 'https://www.instagram.com/denver_spot_locator/',
+  }
+
+  const { data: spot, error: insertErr } = await admin.from('spots').insert(payload).select().single()
+  if (insertErr || !spot) {
+    await admin.storage.from('spot-photos').remove(photoUrls.map(storagePathFromUrl).filter(Boolean)).catch(() => {})
+    throw new Error(`Insert failed: ${insertErr?.message}`)
+  }
+
+  const fields = [
+    ['id', spot.id], ['slug', spot.slug], ['title', spot.title],
+    ['type', spot.type], ['features', JSON.stringify(spot.features)],
+    ['lighting', spot.lighting], ['bust_rating', spot.bust_rating],
+    ['is_multi_spot', spot.is_multi_spot], ['description', JSON.stringify(spot.description)],
+    ['address', spot.address], ['lat/lng', `${spot.latitude}, ${spot.longitude}`],
+    ['visibility', spot.visibility], ['moderation_status', spot.moderation_status],
+    ['added_by', spot.added_by], ['photos', spot.photos?.length],
+  ]
+  for (const [k, v] of fields) console.log(`    ${k.padEnd(18)}: ${v}`)
+  process.stdout.write('  Verify: ')
+  await verifyPhotos(spot.photos)
+  console.log('  ✓ Done')
+
+  return {
+    action: 'added', spotId: spot.id, url: `https://www.instagram.com/p/${shortcode}/`,
+    title, address: geo.address, lat: geo.lat, lng: geo.lng, photoCount: photoUrls.length, nearbyFlag,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // --browser mode: spawn a persistent Chromium that never closes
 // ---------------------------------------------------------------------------
 async function browserMode() {
@@ -1124,8 +1292,8 @@ async function loginMode() {
 async function main() {
   if (doBrowser) { await browserMode(); return }
 
-  const browser = await connectToBrowser()
-
+  // Admin client is needed by all non-browser modes — set it up first so
+  // --upload-ready can run without a browser.
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
@@ -1142,11 +1310,98 @@ async function main() {
   if (spotsErr) throw new Error(`Could not load existing spots: ${spotsErr.message}`)
   console.log(`Loaded ${existingSpots.length} existing spots.`)
 
+  // ── UPLOAD-READY mode (no browser required) ──
+  if (doUploadReady) {
+    const progress = loadProgress()
+    const shortcodes = readdirSync(DSL_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name)
+      .filter(sc => {
+        if (!existsSync(path.join(DSL_DIR, sc, 'decision.json'))) return false
+        return !progress.processed.includes(`https://www.instagram.com/p/${sc}/`)
+      })
+
+    console.log(`\nSesh Wars — Upload Ready (${shortcodes.length} pending)`)
+    console.log('─'.repeat(70))
+
+    const results = []
+    for (let i = 0; i < shortcodes.length; i++) {
+      const sc = shortcodes[i]
+      console.log(`\n[${i + 1}/${shortcodes.length}] ${sc}`)
+      try {
+        const result = await uploadFromDecision(sc, admin, userId, existingSpots)
+        results.push({ shortcode: sc, ...result })
+        const url = `https://www.instagram.com/p/${sc}/`
+        progress.processed.push(url)
+        if (result.action === 'added' && result.lat) {
+          existingSpots.push({ id: result.spotId, title: result.title, latitude: result.lat, longitude: result.lng })
+        }
+        saveProgress(progress)
+      } catch (e) {
+        console.error(`  ✗ FAILED: ${e.message}`)
+        results.push({ shortcode: sc, action: 'failed', error: e.message })
+      }
+    }
+
+    console.log('\n' + '═'.repeat(70))
+    console.log('UPLOAD RESULTS\n')
+    console.log(`  Added  : ${results.filter(r => r.action === 'added').length}`)
+    console.log(`  Skipped: ${results.filter(r => r.action?.startsWith('skipped')).length}`)
+    console.log(`  Failed : ${results.filter(r => r.action === 'failed').length}`)
+    process.exit(0)
+  }
+
+  const browser = await connectToBrowser()
+
   // Open a new tab for all scraping work — never touch the user's main Instagram tab
   console.log('\nConnecting to browser...')
   const page = await _context.newPage()
 
   await ensureLoggedIn(page)
+
+  // ── COLLECT-NEXT mode ──
+  if (doCollectNext) {
+    const progress = loadProgress()
+    const lastProcessed = progress.processed[progress.processed.length - 1]
+    if (!lastProcessed) {
+      console.error('No processed posts in progress file. Use --before to start.')
+      await page.close(); process.exit(1)
+    }
+
+    console.log(`\nSesh Wars — Collect Next ${collectNextN} Posts`)
+    console.log(`Starting after: ${lastProcessed}`)
+    console.log('─'.repeat(70))
+
+    const postUrls = await getPostsBeforeUrl(page, lastProcessed)
+    let n = 0
+    for (const postUrl of postUrls) {
+      if (n >= collectNextN) break
+      const sc = postUrl.match(/\/p\/([A-Za-z0-9_-]+)/)?.[1]
+      if (existsSync(path.join(DSL_DIR, sc, 'info.json'))) {
+        console.log(`\n[skip] Already collected: ${sc}`)
+        continue
+      }
+      n++
+      const delay = rand(3000, 6000)
+      console.log(`\n[${n}/${collectNextN}] ${postUrl}  (waiting ${(delay / 1000).toFixed(1)}s)`)
+      await sleep(delay)
+      try {
+        const info = await collectPostToDisk(page, postUrl)
+        console.log(`  ✓ ${info.photos.length} photos downloaded`)
+        if (info.multi_part) console.log(`  Multi-part: ${info.multi_part.num} of ${info.multi_part.total}`)
+        if (info.video_count > 0 && info.image_count === 0) console.log('  NOTE: Video-only post')
+      } catch (e) {
+        console.error(`  ✗ FAILED: ${e.message}`)
+        n-- // don't count failed toward the limit
+      }
+    }
+
+    console.log(`\n${'═'.repeat(70)}`)
+    console.log(`Collected ${n} posts → ${DSL_DIR}`)
+    console.log('Next: review photos + write decision.json per shortcode, then run --upload-ready')
+    await page.close()
+    process.exit(0)
+  }
 
   // ── TEST mode ──
   if (testUrl) {
