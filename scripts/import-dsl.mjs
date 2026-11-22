@@ -3,7 +3,9 @@
  * Import street spots from @denver_spot_locator Instagram posts.
  *
  * Usage:
+ *   node scripts/import-dsl.mjs --login
  *   node scripts/import-dsl.mjs --test <post-url> [--dry-run]
+ *   node scripts/import-dsl.mjs --test <post-url> --update-spot <spot-id>
  *   node scripts/import-dsl.mjs --before <post-url> [--dry-run]
  *
  * Credentials:
@@ -62,8 +64,9 @@ mkdirSync(PROFILE_DIR, { recursive: true })
 // CLI
 // ---------------------------------------------------------------------------
 const args = process.argv.slice(2)
-const testIdx   = args.indexOf('--test');   const testUrl   = testIdx  !== -1 ? args[testIdx  + 1] : null
-const beforeIdx = args.indexOf('--before'); const beforeUrl = beforeIdx !== -1 ? args[beforeIdx + 1] : null
+const testIdx        = args.indexOf('--test');        const testUrl       = testIdx        !== -1 ? args[testIdx        + 1] : null
+const beforeIdx      = args.indexOf('--before');      const beforeUrl     = beforeIdx      !== -1 ? args[beforeIdx      + 1] : null
+const updateSpotIdx  = args.indexOf('--update-spot'); const updateSpotId  = updateSpotIdx  !== -1 ? args[updateSpotIdx  + 1] : null
 const dryRun  = args.includes('--dry-run')
 const doLogin = args.includes('--login')
 
@@ -71,6 +74,7 @@ if (!testUrl && !beforeUrl && !doLogin) {
   console.error('Usage:')
   console.error('  node scripts/import-dsl.mjs --login')
   console.error('  node scripts/import-dsl.mjs --test <post-url> [--dry-run]')
+  console.error('  node scripts/import-dsl.mjs --test <post-url> --update-spot <spot-id>')
   console.error('  node scripts/import-dsl.mjs --before <post-url> [--dry-run]')
   process.exit(1)
 }
@@ -235,6 +239,30 @@ async function fetchBinary(url) {
   return Buffer.from(await res.arrayBuffer())
 }
 
+// Extract a complete JSON object/array from text starting at startIdx.
+// Handles nested structures and strings with escaped characters.
+function extractJsonObject(text, startIdx) {
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = startIdx; i < text.length; i++) {
+    const ch = text[i]
+    if (escaped) { escaped = false; continue }
+    if (inString) {
+      if (ch === '\\') escaped = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') { inString = true; continue }
+    if (ch === '{' || ch === '[') depth++
+    else if (ch === '}' || ch === ']') {
+      depth--
+      if (depth === 0) return text.slice(startIdx, i + 1)
+    }
+  }
+  return null
+}
+
 async function uploadPhotos(admin, bufs) {
   const urls = [], paths = []
   for (let i = 0; i < bufs.length; i++) {
@@ -300,35 +328,73 @@ async function ensureLoggedIn(page) {
 // Instagram: scrape one post page
 // ---------------------------------------------------------------------------
 async function scrapePost(page, url) {
-  const result = { caption: '', locationName: null, images: [], videoCount: 0, blocked: false }
+  const shortcode = url.match(/\/p\/([A-Za-z0-9_-]+)/)?.[1] ?? ''
+  const result = { caption: '', locationName: null, images: [], videoCount: 0, slideCount: 0, blocked: false }
 
-  // Intercept API responses that carry post data
+  // Intercept responses. Instagram embeds full post data in the main HTML page
+  // as a __bbox JSON block (new Polaris format). JSON API responses are also
+  // captured as a fallback for older-format posts.
   let apiMedia = null
   const onResponse = async (response) => {
     if (apiMedia) return
     const rurl = response.url()
-    if (!rurl.includes('instagram.com')) return
-    // Skip images/fonts/static assets
+    if (!rurl.includes('instagram.com') && !rurl.includes('graph.instagram.com')) return
     const ct = response.headers()['content-type'] ?? ''
-    if (!ct.includes('json') && !ct.includes('javascript') && !ct.includes('text')) return
-    try {
-      const json = await response.json()
-      const m =
-        json?.data?.shortcode_media     ??
-        json?.data?.xdt_shortcode_media ??
-        json?.data?.media               ??
-        json?.items?.[0]
-      if (m && (m.display_url || m.edge_sidecar_to_children || m.carousel_media || m.media_type !== undefined)) {
-        apiMedia = m
-      }
-    } catch {}
+
+    // JSON/JS API responses (old GraphQL / private API shape)
+    if (ct.includes('json') || ct.includes('javascript')) {
+      try {
+        const json = await response.json()
+        const m =
+          json?.data?.shortcode_media     ??
+          json?.data?.xdt_shortcode_media ??
+          json?.data?.media               ??
+          json?.items?.[0]
+        if (m && (m.display_url || m.edge_sidecar_to_children || m.carousel_media || m.media_type !== undefined)) {
+          apiMedia = m
+        }
+      } catch {}
+      return
+    }
+
+    // Main post page HTML — extract xig_polaris_media from embedded __bbox JSON.
+    // Instagram embeds the full media object (carousel_media, image_versions2, caption)
+    // in the page HTML rather than via a separate API call.
+    if (ct.includes('text/html') && shortcode && rurl.includes(`/p/${shortcode}`)) {
+      try {
+        const html = await response.text()
+        const polarisKey = '"xig_polaris_media":'
+        let searchFrom = 0
+        while (!apiMedia) {
+          const idx = html.indexOf(polarisKey, searchFrom)
+          if (idx === -1) break
+          const objStart = html.indexOf('{', idx + polarisKey.length)
+          if (objStart === -1) break
+          const objStr = extractJsonObject(html, objStart)
+          if (!objStr) { searchFrom = objStart + 1; continue }
+          let raw
+          try { raw = JSON.parse(objStr) } catch { searchFrom = objStart + 1; continue }
+          // Polaris wraps media in if_not_gated_logged_out for logged-in users
+          const inner = raw.if_not_gated_logged_out ?? raw
+          const carousel_media   = inner.carousel_media ?? null
+          const image_versions2  = inner.image_versions2 ?? raw.image_versions2 ?? null
+          const display_url      = inner.display_uri ?? raw.display_uri ?? null
+          const captionText      = inner.caption?.text ?? raw.caption?.text ?? ''
+          const location         = inner.location ?? raw.location ?? null
+          if (carousel_media || image_versions2 || display_url) {
+            apiMedia = { carousel_media, image_versions2, display_url, caption: { text: captionText }, location }
+          }
+          break
+        }
+      } catch {}
+    }
   }
 
   page.on('response', onResponse)
   try {
     await page.goto(url, { waitUntil: 'load', timeout: 60000 })
-  } catch { /* timeout on load is OK if content is present */ }
-  // Wait for CDN images to hydrate into the DOM, then settle
+  } catch {}
+  // Wait for CDN images, then give extra time for lazy API calls to settle
   try {
     await page.waitForFunction(
       () => [...document.querySelectorAll('img')].some(img =>
@@ -337,31 +403,41 @@ async function scrapePost(page, url) {
       { timeout: 10000 }
     )
   } catch {}
-  await sleep(1500)
+  await sleep(3000)
   page.off('response', onResponse)
 
-  // Try to extract embedded JSON from <script type="application/json"> tags on the page
+  // Embedded JSON scan: legacy window._sharedData and __additionalDataLoaded
   if (!apiMedia) {
     try {
       apiMedia = await page.evaluate(() => {
-        // Try window._sharedData (legacy)
+        // Legacy window._sharedData
         try {
-          const legacy = window._sharedData?.entry_data?.PostPage?.[0]?.graphql?.shortcode_media
-          if (legacy?.display_url) return legacy
+          const leg = window._sharedData?.entry_data?.PostPage?.[0]?.graphql?.shortcode_media
+          if (leg?.display_url) return leg
         } catch {}
-        // Scan <script type="application/json"> for media data
-        for (const el of document.querySelectorAll('script[type="application/json"]')) {
-          try {
-            const d = JSON.parse(el.textContent)
-            const flatten = (obj, depth = 0) => {
-              if (!obj || typeof obj !== 'object' || depth > 8) return null
-              if (obj.display_url || obj.edge_sidecar_to_children || obj.carousel_media) return obj
-              for (const v of Object.values(obj)) { const r = flatten(v, depth + 1); if (r) return r }
-              return null
+        // window.__additionalDataLoaded keyed by URL path
+        try {
+          if (window.__additionalDataLoaded) {
+            for (const v of Object.values(window.__additionalDataLoaded)) {
+              const m = v?.graphql?.shortcode_media ?? v?.media
+              if (m?.display_url || m?.carousel_media || m?.edge_sidecar_to_children) return m
             }
-            const found = flatten(d)
-            if (found) return found
-          } catch {}
+          }
+        } catch {}
+        // Walk every <script type="application/json"> looking for a media object
+        const isMedia = o => o && typeof o === 'object' && o.shortcode &&
+          (o.display_url || o.carousel_media || o.edge_sidecar_to_children || o.image_versions2)
+        const walk = (obj, depth = 0) => {
+          if (!obj || typeof obj !== 'object' || depth > 12) return null
+          if (isMedia(obj)) return obj
+          for (const v of (Array.isArray(obj) ? obj : Object.values(obj))) {
+            const r = walk(v, depth + 1)
+            if (r) return r
+          }
+          return null
+        }
+        for (const el of document.querySelectorAll('script[type="application/json"]')) {
+          try { const r = walk(JSON.parse(el.textContent)); if (r) return r } catch {}
         }
         return null
       })
@@ -378,25 +454,49 @@ async function scrapePost(page, url) {
 
   // ── API path ──
   if (apiMedia) {
-    result.caption       = apiMedia.edge_media_to_caption?.edges?.[0]?.node?.text ?? apiMedia.caption?.text ?? apiMedia.caption ?? ''
-    result.locationName  = apiMedia.location?.name ?? null
+    result.caption      = apiMedia.edge_media_to_caption?.edges?.[0]?.node?.text ?? apiMedia.caption?.text ?? apiMedia.caption ?? ''
+    result.locationName = apiMedia.location?.name ?? null
 
-    const isCarousel = apiMedia.__typename === 'GraphSidecar' || !!apiMedia.edge_sidecar_to_children
-    if (isCarousel) {
-      for (const edge of (apiMedia.edge_sidecar_to_children?.edges ?? [])) {
-        const node = edge.node
-        if (node.is_video || node.__typename === 'GraphVideo') { result.videoCount++; continue }
-        const res = node.display_resources ?? []
-        const imgUrl = res.length ? res[res.length - 1].src : node.display_url
-        if (imgUrl) result.images.push(imgUrl)
+    // Pick highest-resolution URL from a media node (old GraphQL or new Polaris shape)
+    const bestUrl = node => {
+      const candidates =
+        node.display_resources                    ??  // { src, config_width }
+        node.image_versions2?.candidates          ??  // { url, width }
+        []
+      if (candidates.length) {
+        const sorted = [...candidates].sort((a, b) =>
+          (b.config_width ?? b.width ?? 0) - (a.config_width ?? a.width ?? 0)
+        )
+        return sorted[0].src ?? sorted[0].url ?? null
       }
-    } else if (apiMedia.is_video || apiMedia.__typename === 'GraphVideo' || apiMedia.media_type === 2) {
-      result.videoCount++
-    } else {
-      const res = apiMedia.display_resources ?? []
-      const imgUrl = res.length ? res[res.length - 1].src : apiMedia.display_url
-      if (imgUrl) result.images.push(imgUrl)
+      return node.display_url ?? node.display_uri ?? null
     }
+    const isVideo = node =>
+      node.is_video || node.__typename === 'GraphVideo' ||
+      node.__typename === 'XIGPolarisVideoMedia' ||
+      node.media_type === 2 || !!node.video_url
+
+    // Carousels: edge_sidecar_to_children (old GraphQL) or carousel_media (new Polaris API)
+    const slides =
+      apiMedia.edge_sidecar_to_children?.edges?.map(e => e.node) ??
+      apiMedia.carousel_media ??
+      null
+
+    if (slides) {
+      result.slideCount = slides.length
+      for (const node of slides) {
+        if (isVideo(node)) { result.videoCount++; continue }
+        const u = bestUrl(node)
+        if (u) result.images.push(u)
+      }
+    } else if (isVideo(apiMedia)) {
+      result.slideCount = 1; result.videoCount++
+    } else {
+      result.slideCount = 1
+      const u = bestUrl(apiMedia)
+      if (u) result.images.push(u)
+    }
+    console.log(`    API data captured — ${result.slideCount} slides (${result.images.length} images, ${result.videoCount} videos)`)
     return result
   }
 
@@ -404,7 +504,6 @@ async function scrapePost(page, url) {
   console.log('    API data not captured — using DOM fallback')
 
   // Caption: Instagram no longer wraps posts in <article>; use broad selectors.
-  // Use innerText (not textContent) so <br> tags become \n, preserving line breaks.
   for (const sel of [
     'h1[dir="auto"]',
     'div[dir="auto"] > h1',
@@ -425,78 +524,189 @@ async function scrapePost(page, url) {
   }
 
   // Strip "username timestamp" prefix that DOM textContent merges before the real caption
-  // e.g. "denver_spot_locator 64w" injected before "Bank to Curb / Ditch Spot…"
   result.caption = result.caption
     .replace(/^@?[a-z0-9_.]+\s+\d+[wdhmy]o?\s*/i, '')
     .trim()
 
-  // Location tag link (no article prefix)
+  // Location tag link
   const locLink = await page.$('a[href*="/explore/locations/"]')
   if (locLink) result.locationName = (await locLink.textContent() || '').trim()
 
-  // Images — navigate carousel
-  result.images = await scrapeCarouselImages(page)
-
-  // Count video slides
-  result.videoCount = await page.$$eval('video', els => els.length)
+  // Images — navigate carousel by clicking Next
+  const carousel = await scrapeCarouselImages(page)
+  result.images     = carousel.images
+  result.videoCount = carousel.videoCount
+  result.slideCount = carousel.slideCount
 
   return result
 }
 
-// Navigate carousel by clicking Next, collecting one image per slide
+// Navigate carousel by clicking Next. Anchors detection to the Next button's
+// parent container so we find the main post carousel, not suggested-post images
+// that happen to be near the viewport center.
 async function scrapeCarouselImages(page) {
   const images = [], seen = new Set()
+  let videoCount = 0, slideCount = 0
 
-  const getBestImage = async () => {
-    // Find the largest Instagram CDN image on the page (excludes avatars/icons)
-    return page.evaluate(() => {
-      const CDN = ['cdninstagram.com', 'fbcdn.net']
-      const isCDN = src => CDN.some(d => src.includes(d))
-      // Pick the CDN img with the largest naturalWidth
-      let best = null, bestW = 0
-      for (const img of document.querySelectorAll('img')) {
-        if (!isCDN(img.src) || img.naturalWidth <= 400) continue
-        const srcset = img.getAttribute('srcset') ?? ''
-        let topUrl = img.src, topW = img.naturalWidth
-        for (const part of srcset.split(',')) {
-          const sp = part.trim().lastIndexOf(' ')
-          if (sp === -1) continue
-          const u = part.trim().slice(0, sp).trim()
-          const w = parseInt(part.trim().slice(sp + 1)) || 0
-          if (w > topW) { topUrl = u; topW = w }
-        }
-        if (topW > bestW) { best = topUrl; bestW = topW }
+  const getActiveSlide = () => page.evaluate(() => {
+    const CDN = ['cdninstagram.com', 'fbcdn.net']
+    const isCDN = src => CDN.some(d => src.includes(d))
+
+    const getBestUrl = img => {
+      const srcset = img.getAttribute('srcset') ?? ''
+      let topUrl = img.src, topW = img.naturalWidth
+      for (const part of srcset.split(',')) {
+        const sp = part.trim().lastIndexOf(' ')
+        if (sp === -1) continue
+        const u = part.trim().slice(0, sp).trim()
+        const w = parseInt(part.trim().slice(sp + 1)) || 0
+        if (w > topW) { topUrl = u; topW = w }
       }
-      return best
-    })
-  }
+      return topUrl
+    }
+
+    // Anchor to the Next button's container so we find the main post carousel,
+    // not suggested posts or other images that happen to be near viewport center.
+    const nextBtn = document.querySelector('button[aria-label*="Next"], button[aria-label*="next"]')
+    if (nextBtn) {
+      let container = nextBtn.parentElement
+      for (let d = 0; d < 15 && container; d++) {
+        const cdnImgs = [...container.querySelectorAll('img')]
+          .filter(img => isCDN(img.src) && img.naturalWidth > 400)
+        if (cdnImgs.length >= 2) {
+          // Carousel container found. Pick leftmost visible image (active slide).
+          let best = null, bestLeft = Infinity
+          for (const img of cdnImgs) {
+            const rect = img.getBoundingClientRect()
+            if (rect.width < 100 || rect.left < -50) continue
+            if (rect.left < bestLeft) {
+              bestLeft = rect.left
+              best = { isVideo: false, url: getBestUrl(img), cx: rect.left + rect.width / 2 }
+            }
+          }
+          if (best) return best
+          // Video slide: look for a video element in the container
+          const vid = [...container.querySelectorAll('video')]
+            .find(v => { const r = v.getBoundingClientRect(); return r.width > 100 && r.left >= -50 })
+          if (vid) {
+            const r = vid.getBoundingClientRect()
+            return { isVideo: true, url: null, cx: r.left + r.width / 2 }
+          }
+          break
+        }
+        container = container.parentElement
+      }
+    }
+
+    // Fallback: pick topmost, leftmost visible CDN image (single-image post or no Next button)
+    let best = null, bestScore = Infinity
+    for (const img of document.querySelectorAll('img')) {
+      if (!isCDN(img.src) || img.naturalWidth <= 400) continue
+      const rect = img.getBoundingClientRect()
+      if (rect.width < 100 || rect.left < -50 || rect.top < 0) continue
+      const score = rect.top * 10000 + rect.left
+      if (score < bestScore) {
+        bestScore = score
+        best = { isVideo: false, url: getBestUrl(img), cx: rect.left + rect.width / 2 }
+      }
+    }
+    return best
+  })
 
   for (let slide = 0; slide < 20; slide++) {
-    const imgUrl = await getBestImage()
-    if (imgUrl && !seen.has(imgUrl)) { seen.add(imgUrl); images.push(imgUrl) }
+    const active = await getActiveSlide()
+    if (!active) break
+    slideCount++
 
-    // After getting this slide's image, check if another slide exists
-    const nextBtn = await page.$('button[aria-label*="Next"], button[aria-label*="next"], [aria-label*="Next slide"], [aria-label*="next slide"]')
+    if (active.isVideo) {
+      videoCount++
+    } else if (active.url && !seen.has(active.url)) {
+      seen.add(active.url)
+      images.push(active.url)
+    }
+
+    const nextBtn = await page.$('button[aria-label*="Next"], button[aria-label*="next"]')
     if (!nextBtn) break
-    const prevUrl = await getBestImage()
+
     try { await nextBtn.click({ force: true }) }
     catch { await page.evaluate(btn => btn.click(), nextBtn) }
-    // Wait for the image to actually change
-    try {
-      await page.waitForFunction(
-        (prev) => {
-          const CDN = ['cdninstagram.com', 'fbcdn.net']
-          for (const img of document.querySelectorAll('img')) {
-            if (CDN.some(d => img.src.includes(d)) && img.naturalWidth > 400 && img.src !== prev) return true
-          }
-          return false
-        },
-        prevUrl, { timeout: 5000 }
-      )
-    } catch { await sleep(900) }
+
+    await sleep(1000)  // Wait for carousel animation to complete
   }
 
-  return images
+  console.log(`    DOM carousel — ${slideCount} slides (${images.length} images, ${videoCount} videos)`)
+  return { images, videoCount, slideCount }
+}
+
+// ---------------------------------------------------------------------------
+// Update an existing spot by appending new photos from a post
+// ---------------------------------------------------------------------------
+async function updateSpotPhotos({ spotId, postUrl, page, admin }) {
+  console.log(`\nUpdating spot ${spotId}...`)
+
+  // Fetch existing spot
+  const { data: spot, error: fetchErr } = await admin.from('spots').select('photos, title').eq('id', spotId).single()
+  if (fetchErr || !spot) throw new Error(`Could not fetch spot ${spotId}: ${fetchErr?.message}`)
+  const existingPhotos = spot.photos ?? []
+  console.log(`  Spot: "${spot.title}"`)
+  console.log(`  Existing photos: ${existingPhotos.length}`)
+
+  // Scrape post
+  const post = await scrapePost(page, postUrl)
+  if (post.blocked) throw new Error('Instagram challenge/block detected')
+  console.log(`  Scraped: ${post.slideCount} slides → ${post.images.length} images, ${post.videoCount} videos skipped`)
+
+  if (post.images.length === 0) throw new Error('No images found in post')
+
+  // Download all post images
+  console.log(`  Downloading ${post.images.length} image(s)...`)
+  const postBufs = []
+  for (let i = 0; i < post.images.length; i++) {
+    try { postBufs.push(await fetchBinary(post.images[i])) }
+    catch (e) { console.log(`    image [${i + 1}] SKIPPED: ${e.message}`) }
+  }
+  if (!postBufs.length) throw new Error('All image downloads failed')
+
+  // Download existing Supabase photos for pHash dedup comparison
+  console.log(`  Downloading ${existingPhotos.length} existing photo(s) for dedup...`)
+  const existingBufs = []
+  for (const url of existingPhotos) {
+    try { existingBufs.push(await fetchBinary(url)) }
+    catch { existingBufs.push(null) }
+  }
+
+  // Find genuinely new images (pHash distance > 10 from all existing)
+  const existingHashes = await Promise.all(existingBufs.map(b => b ? pHash(b) : null))
+  const newBufs = []
+  for (const buf of postBufs) {
+    const h = await pHash(buf)
+    if (!existingHashes.some(eh => eh && hammingDistance(h, eh) < 10)) {
+      newBufs.push(buf)
+    }
+  }
+  console.log(`  New unique images: ${newBufs.length} (${postBufs.length - newBufs.length} already exist)`)
+
+  if (newBufs.length === 0) {
+    console.log('  No new photos to add.')
+    return
+  }
+
+  // Compress and upload
+  const compressed = await Promise.all(newBufs.map(b => compressImage(b)))
+  const newUrls = await uploadPhotos(admin, compressed)
+
+  // Update spot: existing photos stay as-is (index 0 = cover), new photos appended
+  const updatedPhotos = [...existingPhotos, ...newUrls]
+  const { error: updateErr } = await admin.from('spots').update({ photos: updatedPhotos }).eq('id', spotId)
+  if (updateErr) {
+    await admin.storage.from('spot-photos').remove(newUrls.map(storagePathFromUrl).filter(Boolean)).catch(() => {})
+    throw new Error(`Update failed: ${updateErr.message}`)
+  }
+
+  console.log(`  Updated: ${updatedPhotos.length} total photos (${newUrls.length} new)`)
+  process.stdout.write('  Verify: ')
+  await verifyPhotos(updatedPhotos)
+  console.log('  ✓ Done')
 }
 
 // ---------------------------------------------------------------------------
@@ -525,7 +735,7 @@ async function importPost({ postUrl, page, admin, userId, existingSpots, opts = 
 
     console.log(`  Caption (${post.caption.length} chars): ${post.caption.slice(0, 120).replace(/\n/g, ' ')}…`)
     if (post.locationName) console.log(`  Location tag: ${post.locationName}`)
-    console.log(`  Images: ${post.images.length}  Videos: ${post.videoCount}`)
+    console.log(`  Slides: ${post.slideCount}  Images: ${post.images.length}  Videos: ${post.videoCount}`)
 
     // All-video post
     if (post.images.length === 0 && post.videoCount > 0) {
@@ -778,7 +988,7 @@ async function main() {
   if (spotsErr) throw new Error(`Could not load existing spots: ${spotsErr.message}`)
   console.log(`Loaded ${existingSpots.length} existing spots.`)
 
-  // Launch persistent-profile Chromium (headed so user can log in)
+  // Launch persistent-profile Chromium
   console.log('\nLaunching browser...')
   const context = await chromium.launchPersistentContext(PROFILE_DIR, {
     headless: false,
@@ -794,10 +1004,16 @@ async function main() {
     // ── TEST mode ──
     if (testUrl) {
       console.log('\nSesh Wars — Denver Spot Locator Import')
-      console.log(`Mode    : TEST${dryRun ? ' (DRY RUN)' : ''}`)
+      console.log(`Mode    : TEST${updateSpotId ? ' (UPDATE SPOT)' : ''}${dryRun ? ' (DRY RUN)' : ''}`)
       console.log(`URL     : ${testUrl}`)
+      if (updateSpotId) console.log(`Spot ID : ${updateSpotId}`)
       console.log('─'.repeat(70))
       console.log()
+
+      if (updateSpotId) {
+        await updateSpotPhotos({ spotId: updateSpotId, postUrl: testUrl, page, admin })
+        return
+      }
 
       const result = await importPost({ postUrl: testUrl, page, admin, userId, existingSpots, opts: { dryRun } })
 
