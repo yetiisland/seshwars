@@ -17,7 +17,10 @@
  * Cover previews:   scripts/import-output/<slug>-cover.jpg
  */
 
-import { chromium } from 'playwright'
+import { chromium as _chromiumBase } from 'playwright-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+_chromiumBase.use(StealthPlugin())
+const chromium = _chromiumBase
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
@@ -53,12 +56,18 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !MAPBOX_TOKEN) {
 // ---------------------------------------------------------------------------
 // Paths
 // ---------------------------------------------------------------------------
-const PROFILE_DIR = path.resolve(__dirname, '.ig-profile')
-const OUTPUT_DIR  = path.resolve(__dirname, 'import-output')
+const PROFILE_DIR   = path.resolve(__dirname, '.ig-profile')
+const OUTPUT_DIR    = path.resolve(__dirname, 'import-output')
 const PROGRESS_FILE = path.join(OUTPUT_DIR, 'dsl-progress.json')
+// Cookie cache: bypasses macOS Keychain cross-session encryption issues
+const COOKIE_FILE   = path.join(PROFILE_DIR, 'ig-cookies.json')
 
 mkdirSync(OUTPUT_DIR,  { recursive: true })
 mkdirSync(PROFILE_DIR, { recursive: true })
+
+// Module-level context reference so login-recovery helpers can reach it
+// from anywhere without threading it through every call.
+let _context = null
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -67,15 +76,18 @@ const args = process.argv.slice(2)
 const testIdx        = args.indexOf('--test');        const testUrl       = testIdx        !== -1 ? args[testIdx        + 1] : null
 const beforeIdx      = args.indexOf('--before');      const beforeUrl     = beforeIdx      !== -1 ? args[beforeIdx      + 1] : null
 const updateSpotIdx  = args.indexOf('--update-spot'); const updateSpotId  = updateSpotIdx  !== -1 ? args[updateSpotIdx  + 1] : null
-const dryRun  = args.includes('--dry-run')
-const doLogin = args.includes('--login')
+const limitIdx       = args.indexOf('--limit');       const limitArg      = limitIdx       !== -1 ? parseInt(args[limitIdx + 1], 10) : Infinity
+const dryRun    = args.includes('--dry-run')
+const doLogin   = args.includes('--login')
+const doBrowser = args.includes('--browser')
 
-if (!testUrl && !beforeUrl && !doLogin) {
+if (!testUrl && !beforeUrl && !doLogin && !doBrowser) {
   console.error('Usage:')
-  console.error('  node scripts/import-dsl.mjs --login')
+  console.error('  node scripts/import-dsl.mjs --browser                 (start persistent window)')
+  console.error('  node scripts/import-dsl.mjs --login                   (wait for login in running window)')
   console.error('  node scripts/import-dsl.mjs --test <post-url> [--dry-run]')
   console.error('  node scripts/import-dsl.mjs --test <post-url> --update-spot <spot-id>')
-  console.error('  node scripts/import-dsl.mjs --before <post-url> [--dry-run]')
+  console.error('  node scripts/import-dsl.mjs --before <post-url> [--limit <n>] [--dry-run]')
   process.exit(1)
 }
 
@@ -298,30 +310,55 @@ function saveProgress(p) {
 }
 
 // ---------------------------------------------------------------------------
-// Instagram: ensure logged in
+// Instagram: login helpers
 // ---------------------------------------------------------------------------
+
+// Return true if the current page URL signals a login/challenge wall.
+function isLoginPage(url) {
+  return url.includes('accounts/login') || url.includes('/challenge')
+}
+
+// Wait indefinitely (3s poll) for a sessionid cookie to appear in the context.
+// Never navigates — the user logs in manually in the Chromium window.
+async function waitForLoginNoLimit() {
+  console.log('  Login needed in the Chromium window — log in and complete any 2FA.')
+  console.log('  Waiting with no time limit...')
+  while (true) {
+    const cookies = await _context.cookies('https://www.instagram.com')
+    if (cookies.some(c => c.name === 'sessionid' && c.value)) {
+      console.log('  Logged in — continuing.')
+      try { writeFileSync(COOKIE_FILE, JSON.stringify(cookies, null, 2)) } catch {}
+      await sleep(1500)
+      return
+    }
+    await sleep(3000)
+  }
+}
+
 async function ensureLoggedIn(page) {
   console.log('  Checking Instagram login status...')
-  await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 })
-  await sleep(2500)
 
-  const needsLogin = await page.$('input[name="username"]') !== null
-  if (!needsLogin) { console.log('  Already logged in.'); return }
-
-  console.log('\n  Please log in to Instagram in the browser window that just opened.')
-  console.log('  The script will continue automatically once login is detected (up to 5 min).\n')
-
-  // Wait for the username field to disappear (login complete)
-  await page.waitForSelector('input[name="username"]', { state: 'detached', timeout: 300000 })
-  await sleep(2500)
-
-  // Dismiss any post-login dialogs ("Save your login info?", "Turn on notifications?")
-  for (const label of ['Not Now', 'Not now', 'Skip']) {
-    const btn = await page.$(`button:has-text("${label}")`)
-    if (btn) { await btn.click(); await sleep(1000) }
+  // Check cookies that are already in the connected browser context first.
+  // With CDP connection the browser's live cookies are already accessible.
+  let cookies = await _context.cookies('https://www.instagram.com')
+  if (cookies.some(c => c.name === 'sessionid' && c.value)) {
+    console.log('  Already logged in.')
+    return
   }
 
-  console.log('  Logged in successfully.')
+  // Navigate to homepage so the browser loads any cookies from disk into memory,
+  // then re-check. Do not navigate away from whatever Instagram page is current.
+  await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {})
+  await sleep(2000)
+
+  cookies = await _context.cookies('https://www.instagram.com')
+  if (cookies.some(c => c.name === 'sessionid' && c.value)) {
+    console.log('  Logged in.')
+    return
+  }
+
+  // Not logged in — wait indefinitely without touching the page.
+  await waitForLoginNoLimit()
 }
 
 // ---------------------------------------------------------------------------
@@ -394,6 +431,14 @@ async function scrapePost(page, url) {
   try {
     await page.goto(url, { waitUntil: 'load', timeout: 60000 })
   } catch {}
+  // If Instagram redirected to login/challenge, wait for the user to log in
+  // then reload the target page — do NOT close the browser.
+  if (isLoginPage(page.url())) {
+    page.off('response', onResponse)
+    await waitForLoginNoLimit()
+    page.on('response', onResponse)
+    try { await page.goto(url, { waitUntil: 'load', timeout: 60000 }) } catch {}
+  }
   // Wait for CDN images, then give extra time for lazy API calls to settle
   try {
     await page.waitForFunction(
@@ -895,10 +940,10 @@ async function getPostsBeforeUrl(page, targetUrl) {
   console.log(`  Looking for posts older than ${targetUrl}`)
 
   const collected = []
+  const seenShortcodes = new Set()
   let pastTarget = false
-  let seenShortcodes = new Set()
 
-  // Intercept profile timeline API responses
+  // Also intercept legacy graphql API responses when available
   const handler = async (response) => {
     const rurl = response.url()
     if (!rurl.includes('graphql') && !rurl.includes('/api/')) return
@@ -915,62 +960,171 @@ async function getPostsBeforeUrl(page, targetUrl) {
       }
     } catch {}
   }
-
   page.on('response', handler)
+
   await page.goto('https://www.instagram.com/denver_spot_locator/', { waitUntil: 'load', timeout: 60000 })
+  // Handle login redirect before attempting any scraping
+  if (isLoginPage(page.url())) {
+    page.off('response', handler)
+    await waitForLoginNoLimit()
+    page.on('response', handler)
+    await page.goto('https://www.instagram.com/denver_spot_locator/', { waitUntil: 'load', timeout: 60000 })
+  }
   await sleep(3000)
 
-  // Scroll down to load more posts until target is found (up to 20 scrolls)
-  for (let i = 0; i < 20 && !pastTarget; i++) {
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
-    await sleep(rand(1500, 2500))
+  // Bring the browser to front so the viewport is visible — required for
+  // IntersectionObserver callbacks to fire when scrolling programmatically.
+  await page.bringToFront()
+
+  // Scrape post links from DOM + scroll. Instagram's grid always has <a href="/p/{sc}/">
+  // links regardless of API format, so this works with both legacy graphql and new Polaris.
+  // The scrollable container is #scrollview (not document.body or main).
+  let noNewPostsCount = 0
+  for (let scroll = 0; scroll < 50; scroll++) {
+    const countBefore = seenShortcodes.size
+
+    // Collect all post shortcodes visible in the grid.
+    // When logged in, Instagram uses full hrefs: /denver_spot_locator/p/{sc}/
+    // When logged out, it uses: /p/{sc}/  — the regex handles both.
+    const links = await page.evaluate(() => {
+      const seen = new Set()
+      return [...document.querySelectorAll('a[href*="/p/"]')]
+        .map(a => a.getAttribute('href'))
+        .filter(h => h && h.includes('/p/'))
+        .filter(h => { if (seen.has(h)) return false; seen.add(h); return true })
+    })
+
+    for (const href of links) {
+      const sc = href.match(/\/p\/([A-Za-z0-9_-]+)/)?.[1]
+      if (!sc || seenShortcodes.has(sc)) continue
+      seenShortcodes.add(sc)
+      if (sc === targetShortcode) { pastTarget = true; continue }
+      if (pastTarget) collected.push(`https://www.instagram.com/p/${sc}/`)
+    }
+
+    // If we've found the target and all posts after it are collected, stop
+    if (pastTarget && seenShortcodes.size === countBefore) break
+
+    // Scroll: use Playwright's scrollIntoViewIfNeeded on the last visible post
+    // anchor — this is more reliable than programmatic sv.scrollTo() for triggering
+    // Instagram's IntersectionObserver-based infinite scroll.
+    const lastLink = page.locator('a[href*="/p/"]').last()
+    try { await lastLink.scrollIntoViewIfNeeded({ timeout: 3000 }) } catch {}
+
+    // Also scroll #scrollview directly as a belt-and-suspenders approach
+    await page.evaluate(() => {
+      const sv = document.getElementById('scrollview')
+      if (sv) sv.scrollTo({ top: sv.scrollHeight, behavior: 'smooth' })
+    })
+    await sleep(rand(2000, 3000))
+
+    // Track consecutive iterations with no new posts to detect end-of-feed
+    if (seenShortcodes.size === countBefore) {
+      noNewPostsCount++
+      if (noNewPostsCount >= 3) break  // 3 scrolls with no new posts = end of feed
+    } else {
+      noNewPostsCount = 0
+    }
   }
 
-  await sleep(1000)
+  await sleep(500)
   page.off('response', handler)
 
-  if (!pastTarget) console.log('  Warning: target post not found in profile grid — may need more scrolling')
-  console.log(`  Found ${collected.length} posts older than target`)
+  if (!pastTarget) console.log('  Warning: target post not found in profile grid')
+  console.log(`  Found ${collected.length} posts older than target (${seenShortcodes.size} total posts scanned)`)
   return collected
 }
 
 // ---------------------------------------------------------------------------
-// Login-only mode: open browser, wait for sessionid cookie, then close
+// --browser mode: spawn a persistent Chromium that never closes
 // ---------------------------------------------------------------------------
-async function loginMode() {
-  console.log('Launching browser for Instagram login...')
-  const context = await chromium.launchPersistentContext(PROFILE_DIR, {
-    headless: false,
-    viewport: { width: 1280, height: 900 },
-    args: ['--no-sandbox', '--disable-blink-features=AutomationControlled'],
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  })
-  const page = await context.newPage()
-  await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded', timeout: 30000 })
-  console.log('Browser open. Log in to Instagram. Waiting up to 10 minutes...')
+async function browserMode() {
+  const { execSync, spawn } = await import('node:child_process')
 
-  const deadline = Date.now() + 10 * 60 * 1000
-  while (Date.now() < deadline) {
-    const cookies = await context.cookies('https://www.instagram.com')
-    if (cookies.some(c => c.name === 'sessionid' && c.value)) {
-      console.log('Logged in. Saving profile...')
-      await sleep(3000)
-      await context.close()
-      console.log('Done. Run your import command.')
-      return
-    }
-    await sleep(2000)
+  // Kill any stale instance on port 9222
+  try { execSync('pkill -f "remote-debugging-port=9222"') } catch {}
+  await sleep(800)
+
+  // Get playwright's bundled Chromium executable
+  const { chromium: pwCore } = await import('playwright-core')
+  const execPath = pwCore.executablePath()
+
+  const child = spawn(execPath, [
+    `--user-data-dir=${PROFILE_DIR}`,
+    '--remote-debugging-port=9222',
+    '--no-sandbox',
+    '--disable-blink-features=AutomationControlled',
+    '--password-store=basic',
+    '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'https://www.instagram.com/',
+  ], { detached: true, stdio: 'ignore' })
+  child.unref()
+
+  // Wait for the debug endpoint to be ready
+  let ready = false
+  for (let i = 0; i < 20; i++) {
+    await sleep(500)
+    try {
+      const r = await fetch('http://localhost:9222/json/version')
+      if (r.ok) { ready = true; break }
+    } catch {}
   }
 
-  await context.close()
-  console.log('Login timed out after 10 minutes.')
+  if (!ready) {
+    console.error('Chromium did not start in time. Check port 9222.')
+    process.exit(1)
+  }
+
+  console.log(`Chromium is running (PID ${child.pid}) — http://localhost:9222`)
+  console.log(`Profile : ${PROFILE_DIR}`)
+  console.log(`Opening : https://www.instagram.com/`)
+  console.log('Log in if needed. Close the window yourself when done.')
+  // Exit the Node process — the browser stays running detached
+}
+
+// ---------------------------------------------------------------------------
+// Connect to the running --browser window over CDP
+// ---------------------------------------------------------------------------
+async function connectToBrowser() {
+  let browser
+  try {
+    browser = await chromium.connectOverCDP('http://localhost:9222', { timeout: 8000 })
+  } catch {
+    console.error('No Chromium window running. Start one first:')
+    console.error('  node scripts/import-dsl.mjs --browser')
+    process.exit(1)
+  }
+
+  const contexts = browser.contexts()
+  if (!contexts.length) {
+    console.error('CDP connected but no browser contexts found.')
+    process.exit(1)
+  }
+  _context = contexts[0]
+  console.log('Connected to running Chromium window.')
+  return browser
+}
+
+// ---------------------------------------------------------------------------
+// --login mode: connect to running browser, wait for session, save cookies
+// ---------------------------------------------------------------------------
+async function loginMode() {
+  const browser = await connectToBrowser()
+  _context = browser.contexts()[0]
+  console.log('Watching for Instagram login...')
+  await waitForLoginNoLimit()
+  console.log('Done. Cookies saved. Run your import command.')
+  // Disconnect without closing the browser
+  process.exit(0)
 }
 
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
-  if (doLogin) { await loginMode(); return }
+  if (doBrowser) { await browserMode(); return }
+
+  const browser = await connectToBrowser()
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -988,110 +1142,113 @@ async function main() {
   if (spotsErr) throw new Error(`Could not load existing spots: ${spotsErr.message}`)
   console.log(`Loaded ${existingSpots.length} existing spots.`)
 
-  // Launch persistent-profile Chromium
-  console.log('\nLaunching browser...')
-  const context = await chromium.launchPersistentContext(PROFILE_DIR, {
-    headless: false,
-    viewport: { width: 1280, height: 900 },
-    args: ['--no-sandbox', '--disable-blink-features=AutomationControlled'],
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  })
-  const page = await context.newPage()
+  // Open a new tab for all scraping work — never touch the user's main Instagram tab
+  console.log('\nConnecting to browser...')
+  const page = await _context.newPage()
 
-  try {
-    await ensureLoggedIn(page)
+  await ensureLoggedIn(page)
 
-    // ── TEST mode ──
-    if (testUrl) {
-      console.log('\nSesh Wars — Denver Spot Locator Import')
-      console.log(`Mode    : TEST${updateSpotId ? ' (UPDATE SPOT)' : ''}${dryRun ? ' (DRY RUN)' : ''}`)
-      console.log(`URL     : ${testUrl}`)
-      if (updateSpotId) console.log(`Spot ID : ${updateSpotId}`)
-      console.log('─'.repeat(70))
-      console.log()
+  // ── TEST mode ──
+  if (testUrl) {
+    console.log('\nSesh Wars — Denver Spot Locator Import')
+    console.log(`Mode    : TEST${updateSpotId ? ' (UPDATE SPOT)' : ''}${dryRun ? ' (DRY RUN)' : ''}`)
+    console.log(`URL     : ${testUrl}`)
+    if (updateSpotId) console.log(`Spot ID : ${updateSpotId}`)
+    console.log('─'.repeat(70))
+    console.log()
 
-      if (updateSpotId) {
-        await updateSpotPhotos({ spotId: updateSpotId, postUrl: testUrl, page, admin })
-        return
-      }
-
-      const result = await importPost({ postUrl: testUrl, page, admin, userId, existingSpots, opts: { dryRun } })
-
-      console.log('\n' + '═'.repeat(70))
-      console.log('RESULT')
-      console.log(`  action     : ${result.action}`)
-      if (result.spotId)      console.log(`  spot_id    : ${result.spotId}`)
-      if (result.title)       console.log(`  title      : ${result.title}`)
-      if (result.address)     console.log(`  address    : ${result.address}`)
-      if (result.lat)         console.log(`  coords     : ${result.lat}, ${result.lng}`)
-      if (result.features.length) console.log(`  features   : ${result.features.join(', ')}`)
-      if (result.photoCount)  console.log(`  photos     : ${result.photoCount}`)
-      if (result.videoCount)  console.log(`  videos     : ${result.videoCount} (skipped)`)
-      if (result.nearbyFlag)  console.log(`  nearby     : "${result.nearbyFlag.title}" (${result.nearbyFlag.dist}m)`)
-      if (result.duplicateOf) console.log(`  dup of     : "${result.duplicateOf.title}" (${result.duplicateOf.dist}m)`)
-      if (result.error)       console.log(`  error      : ${result.error}`)
-      return
+    if (updateSpotId) {
+      await updateSpotPhotos({ spotId: updateSpotId, postUrl: testUrl, page, admin })
+      await page.close()
+      process.exit(0)
     }
 
-    // ── BEFORE mode ──
-    if (beforeUrl) {
-      console.log('\nSesh Wars — Denver Spot Locator Batch Import')
-      console.log(`Mode    : BEFORE ${beforeUrl}${dryRun ? ' (DRY RUN)' : ''}`)
-      console.log('─'.repeat(70))
+    const result = await importPost({ postUrl: testUrl, page, admin, userId, existingSpots, opts: { dryRun } })
 
-      const progress  = loadProgress()
-      const postUrls  = await getPostsBeforeUrl(page, beforeUrl)
-      const results   = []
-      let   blocked   = false
-
-      for (let i = 0; i < postUrls.length; i++) {
-        const pUrl = postUrls[i]
-        if (progress.processed.includes(pUrl)) {
-          console.log(`\n[${i + 1}/${postUrls.length}] SKIP (already in progress file): ${pUrl}`)
-          continue
-        }
-
-        const delay = rand(4000, 8000)
-        console.log(`\n[${i + 1}/${postUrls.length}] ${pUrl}  (waiting ${(delay / 1000).toFixed(1)}s)`)
-        await sleep(delay)
-
-        const result = await importPost({ postUrl: pUrl, page, admin, userId, existingSpots, opts: { dryRun } })
-        results.push(result)
-
-        if (result.blocked) {
-          console.log('\n  ⚠  Instagram challenge detected — saving progress and stopping.')
-          blocked = true
-          saveProgress({ ...progress, lastBlock: pUrl })
-          break
-        }
-
-        progress.processed.push(pUrl)
-        if (result.action === 'failed') progress.failed = [...(progress.failed || []), { url: pUrl, reason: result.error }]
-        saveProgress(progress)
-
-        if (result.action === 'added' && result.lat) {
-          existingSpots.push({ id: result.spotId, title: result.title, latitude: result.lat, longitude: result.lng })
-        }
-      }
-
-      // Batch summary
-      console.log('\n' + '═'.repeat(80))
-      console.log('BATCH RESULTS\n')
-      const added    = results.filter(r => r.action === 'added').length
-      const skipped  = results.filter(r => r.action?.startsWith('skipped')).length
-      const failed   = results.filter(r => r.action === 'failed').length
-      console.log(`  Added  : ${added}`)
-      console.log(`  Skipped: ${skipped}`)
-      console.log(`  Failed : ${failed}`)
-      if (blocked) console.log('  ⚠ Stopped early due to Instagram challenge')
-      const noAddr = results.filter(r => r.action === 'skipped-no-address')
-      if (noAddr.length) { console.log('\n  No address found:'); noAddr.forEach(r => console.log(`    ${r.url}`)) }
-      const nearby = results.filter(r => r.nearbyFlag)
-      if (nearby.length) { console.log('\n  Nearby flags:'); nearby.forEach(r => console.log(`    ${r.title} near "${r.nearbyFlag.title}" (${r.nearbyFlag.dist}m)`)) }
-    }
-  } finally {
-    await context.close()
+    console.log('\n' + '═'.repeat(70))
+    console.log('RESULT')
+    console.log(`  action     : ${result.action}`)
+    if (result.spotId)      console.log(`  spot_id    : ${result.spotId}`)
+    if (result.title)       console.log(`  title      : ${result.title}`)
+    if (result.address)     console.log(`  address    : ${result.address}`)
+    if (result.lat)         console.log(`  coords     : ${result.lat}, ${result.lng}`)
+    if (result.features.length) console.log(`  features   : ${result.features.join(', ')}`)
+    if (result.photoCount)  console.log(`  photos     : ${result.photoCount}`)
+    if (result.videoCount)  console.log(`  videos     : ${result.videoCount} (skipped)`)
+    if (result.nearbyFlag)  console.log(`  nearby     : "${result.nearbyFlag.title}" (${result.nearbyFlag.dist}m)`)
+    if (result.duplicateOf) console.log(`  dup of     : "${result.duplicateOf.title}" (${result.duplicateOf.dist}m)`)
+    if (result.error)       console.log(`  error      : ${result.error}`)
+    await page.close()
+    process.exit(0)
   }
+
+  // ── BEFORE mode ──
+  if (beforeUrl) {
+    console.log('\nSesh Wars — Denver Spot Locator Batch Import')
+    console.log(`Mode    : BEFORE ${beforeUrl}${dryRun ? ' (DRY RUN)' : ''}`)
+    console.log('─'.repeat(70))
+
+    const progress  = loadProgress()
+    const postUrls  = await getPostsBeforeUrl(page, beforeUrl)
+    const results   = []
+    let   blocked   = false
+    let   attempted = 0
+
+    for (let i = 0; i < postUrls.length; i++) {
+      if (attempted >= limitArg) {
+        console.log(`\n[limit reached: ${limitArg}] stopping.`)
+        break
+      }
+
+      const pUrl = postUrls[i]
+      if (progress.processed.includes(pUrl)) {
+        console.log(`\n[${i + 1}/${postUrls.length}] SKIP (already in progress file): ${pUrl}`)
+        continue
+      }
+
+      attempted++
+      const delay = rand(4000, 8000)
+      console.log(`\n[${attempted}/${Number.isFinite(limitArg) ? limitArg : postUrls.length}] ${pUrl}  (waiting ${(delay / 1000).toFixed(1)}s)`)
+      await sleep(delay)
+
+      const result = await importPost({ postUrl: pUrl, page, admin, userId, existingSpots, opts: { dryRun } })
+      results.push(result)
+
+      if (result.blocked) {
+        console.log('\n  ⚠  Instagram challenge detected — saving progress and stopping.')
+        blocked = true
+        saveProgress({ ...progress, lastBlock: pUrl })
+        break
+      }
+
+      progress.processed.push(pUrl)
+      if (result.action === 'failed') progress.failed = [...(progress.failed || []), { url: pUrl, reason: result.error }]
+      saveProgress(progress)
+
+      if (result.action === 'added' && result.lat) {
+        existingSpots.push({ id: result.spotId, title: result.title, latitude: result.lat, longitude: result.lng })
+      }
+    }
+
+    // Batch summary
+    console.log('\n' + '═'.repeat(80))
+    console.log('BATCH RESULTS\n')
+    const added    = results.filter(r => r.action === 'added').length
+    const skipped  = results.filter(r => r.action?.startsWith('skipped')).length
+    const failed   = results.filter(r => r.action === 'failed').length
+    console.log(`  Added  : ${added}`)
+    console.log(`  Skipped: ${skipped}`)
+    console.log(`  Failed : ${failed}`)
+    if (blocked) console.log('  ⚠ Stopped early due to Instagram challenge')
+    const noAddr = results.filter(r => r.action === 'skipped-no-address')
+    if (noAddr.length) { console.log('\n  No address found:'); noAddr.forEach(r => console.log(`    ${r.url}`)) }
+    const nearby = results.filter(r => r.nearbyFlag)
+    if (nearby.length) { console.log('\n  Nearby flags:'); nearby.forEach(r => console.log(`    ${r.title} near "${r.nearbyFlag.title}" (${r.nearbyFlag.dist}m)`)) }
+  }
+
+  // Close only the tab we opened — leave the browser and all other tabs running
+  await page.close()
+  process.exit(0)
 }
 
 main().catch(err => {

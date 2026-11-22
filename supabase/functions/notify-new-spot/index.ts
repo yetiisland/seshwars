@@ -19,6 +19,16 @@ async function getUsername(userId: string): Promise<string> {
   }
 }
 
+async function getAdminUserId(): Promise<string | null> {
+  try {
+    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    const { data: { users } } = await sb.auth.admin.listUsers({ perPage: 1000 })
+    return users.find(u => u.email === 'taylorselgas@gmail.com')?.id ?? null
+  } catch {
+    return null
+  }
+}
+
 serve(async (req) => {
   try {
     const body = await req.json()
@@ -122,6 +132,13 @@ serve(async (req) => {
     // Branch 2: new spot added
     // ---------------------------------------------------------------
     const spot = body.record
+
+    // Suppress notification for admin-added spots (imports, bulk adds, etc.)
+    const adminUserId = await getAdminUserId()
+    if (adminUserId && spot.added_by === adminUserId) {
+      return new Response('OK (admin-added spot, notification suppressed)', { status: 200 })
+    }
+
     const addedBy = await getUsername(spot.added_by)
     const spotUrl = `https://seshwars.com/#/spots/${spot.slug || spot.id}`
     const coverPhoto = Array.isArray(spot.photos) && spot.photos.length > 0 ? spot.photos[0] : null
