@@ -212,8 +212,10 @@ function extractAddress(caption) {
 // Mapbox forward geocoding — returns null if result is not address/poi level
 async function geocodeAddress(rawAddress) {
   // Append Denver Colorado hint for intersections (no street number = more ambiguous)
+  // Skip if address already specifies a city/state
   const hasNumber = /^\d/.test(rawAddress)
-  const query = hasNumber ? rawAddress : `${rawAddress}, Denver, Colorado`
+  const hasCity = /\b(boulder|aurora|lakewood|englewood|arvada|westminster|thornton|broomfield|golden|fort collins|greeley|pueblo|colorado springs|northglenn|centennial|highlands ranch|parker|commerce city|longmont|loveland)\b/i.test(rawAddress)
+  const query = (hasNumber || hasCity) ? rawAddress : `${rawAddress}, Denver, Colorado`
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
     `?access_token=${MAPBOX_TOKEN}` +
     `&country=US` +
@@ -1132,7 +1134,7 @@ async function uploadFromDecision(shortcode, admin, userId, existingSpots) {
     const dist = haversineMeters(geo.lat, geo.lng, ex.latitude, ex.longitude)
     if (dist <= 50 && (!closestDup || dist < closestDup.dist)) {
       closestDup = { id: ex.id, title: ex.title, dist: Math.round(dist) }
-    } else if (dist <= 200 && (!nearbyFlag || dist < nearbyFlag.dist)) {
+    } else if (dist <= 300 && (!nearbyFlag || dist < nearbyFlag.dist)) {
       nearbyFlag = { id: ex.id, title: ex.title, dist: Math.round(dist) }
     }
   }
@@ -1382,7 +1384,7 @@ async function main() {
         continue
       }
       n++
-      const delay = rand(3000, 6000)
+      const delay = rand(4000, 8000)
       console.log(`\n[${n}/${collectNextN}] ${postUrl}  (waiting ${(delay / 1000).toFixed(1)}s)`)
       await sleep(delay)
       try {
