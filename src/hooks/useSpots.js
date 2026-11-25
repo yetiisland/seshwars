@@ -1,17 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { fetchAll } from '../lib/fetchAll'
-
-// All columns needed by list/map/filter components. credit_name and
-// credit_url are excluded — they're only shown in SpotDetail, which does
-// its own full select('*') when it opens.
-const INDEX_COLS = [
-  'id', 'slug', 'title', 'type', 'photos',
-  'bust_rating', 'lighting', 'features', 'description', 'is_multi_spot',
-  'visibility', 'moderation_status', 'added_by',
-  'latitude', 'longitude', 'address',
-  'created_at', 'updated_at',
-].join(',')
 
 const LS_SAVED_KEY = 'seshwars_saved_spots'
 const STALE_MS = 30_000
@@ -105,56 +93,45 @@ export function useSpots() {
     if (!force && _spotsReady && Date.now() - _lastFetched < STALE_MS) return
     if (!_spotsReady) setLoading(true)
     _lastFetched = Date.now()
-    const t0 = performance.now()
-    let spotsData, reviewsData, reportsData
-    try {
-      ;[spotsData, reviewsData, reportsData] = await Promise.all([
-        fetchAll(() => supabase.from('spots').select(INDEX_COLS).order('created_at', { ascending: false }).order('id')),
-        fetchAll(() => supabase.from('spot_reviews').select('spot_id,rating').order('id')),
-        fetchAll(() => supabase.from('spot_reports').select('spot_id,report_type,custom_text').order('created_at', { ascending: false }).order('id')),
-      ])
-    } catch (err) {
-      console.error('fetchSpots failed:', err.message)
-      setLoading(false)
-      return
-    }
-    _lastSpotsSizeKB = Math.round(JSON.stringify(spotsData).length / 1024 * 10) / 10
-    if (import.meta.env.DEV) {
-      const ms = Math.round(performance.now() - t0)
-      const pages = Math.ceil(spotsData.length / 1000)
-      console.log(`[spots] ${spotsData.length} spots in ${ms}ms · ${pages} page${pages !== 1 ? 's' : ''} · ${_lastSpotsSizeKB}KB index payload`)
-    }
-    const rMap = {}
-    for (const r of reviewsData) {
-      if (!rMap[r.spot_id]) rMap[r.spot_id] = { sum: 0, count: 0 }
-      rMap[r.spot_id].sum += r.rating
-      rMap[r.spot_id].count++
-    }
-    const repMap = {}
-    for (const r of reportsData) {
-      if (!repMap[r.spot_id]) repMap[r.spot_id] = { count: 0, most_recent: r.report_type, most_recent_custom: r.custom_text }
-      repMap[r.spot_id].count++
-    }
-    const merged = spotsData.map(s => {
-      const r = rMap[s.id]
-      const rep = repMap[s.id]
-      return {
-        ...s,
-        avg_rating: r ? parseFloat((r.sum / r.count).toFixed(1)) : null,
-        rating_count: r ? r.count : 0,
-        report_count: rep?.count || 0,
-        most_recent_report: rep?.most_recent || null,
-        most_recent_report_custom: rep?.most_recent_custom || null,
+    const [spotsRes, reviewsRes, reportsRes] = await Promise.all([
+      supabase.from('spots').select('*').order('created_at', { ascending: false }),
+      supabase.from('spot_reviews').select('spot_id, rating'),
+      supabase.from('spot_reports').select('spot_id, report_type, custom_text').order('created_at', { ascending: false }),
+    ])
+    if (!spotsRes.error && spotsRes.data) {
+      _lastSpotsSizeKB = Math.round(JSON.stringify(spotsRes.data).length / 1024 * 10) / 10
+      const rMap = {}
+      for (const r of (reviewsRes.data || [])) {
+        if (!rMap[r.spot_id]) rMap[r.spot_id] = { sum: 0, count: 0 }
+        rMap[r.spot_id].sum += r.rating
+        rMap[r.spot_id].count++
       }
-    })
-    const fp = spotsFingerprint(merged)
-    if (fp !== _lastFingerprint) {
-      _lastFingerprint = fp
-      _cachedSpots = merged
-      _spotsReady = true
-      setSpots(merged)
-    } else {
-      _spotsReady = true
+      const repMap = {}
+      for (const r of (reportsRes.data || [])) {
+        if (!repMap[r.spot_id]) repMap[r.spot_id] = { count: 0, most_recent: r.report_type, most_recent_custom: r.custom_text }
+        repMap[r.spot_id].count++
+      }
+      const merged = spotsRes.data.map(s => {
+        const r = rMap[s.id]
+        const rep = repMap[s.id]
+        return {
+          ...s,
+          avg_rating: r ? parseFloat((r.sum / r.count).toFixed(1)) : null,
+          rating_count: r ? r.count : 0,
+          report_count: rep?.count || 0,
+          most_recent_report: rep?.most_recent || null,
+          most_recent_report_custom: rep?.most_recent_custom || null,
+        }
+      })
+      const fp = spotsFingerprint(merged)
+      if (fp !== _lastFingerprint) {
+        _lastFingerprint = fp
+        _cachedSpots = merged
+        _spotsReady = true
+        setSpots(merged)
+      } else {
+        _spotsReady = true
+      }
     }
     setLoading(false)
   }, [])
