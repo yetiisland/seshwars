@@ -1,19 +1,19 @@
 // Paginates a Supabase query past the 1,000-row default PostgREST cap.
 // buildQuery() must return a fresh query builder each call — it is called
-// once for the exact count (HEAD), then once per page for data.
+// once per page. Pages are fetched sequentially until a page returns fewer
+// rows than pageSize (indicating the last page).
 // Stable ordering on the query is the caller's responsibility.
 export async function fetchAll(buildQuery, pageSize = 1000) {
-  const { count, error: countErr } = await buildQuery()
-    .select('*', { count: 'exact', head: true })
-  if (countErr) throw new Error(`fetchAll count: ${countErr.message}`)
-  if (!count) return []
-  const pages = await Promise.all(
-    Array.from({ length: Math.ceil(count / pageSize) }, (_, i) =>
-      buildQuery().range(i * pageSize, Math.min((i + 1) * pageSize - 1, count - 1))
-    )
-  )
-  for (const page of pages) {
-    if (page.error) throw new Error(`fetchAll page: ${page.error.message}`)
+  const rows = []
+  let page = 0
+  while (true) {
+    const from = page * pageSize
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1)
+    if (error) throw new Error(`fetchAll page ${page}: ${error.message}`)
+    if (!data || data.length === 0) break
+    rows.push(...data)
+    if (data.length < pageSize) break
+    page++
   }
-  return pages.flatMap(p => p.data)
+  return rows
 }

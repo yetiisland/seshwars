@@ -10,7 +10,7 @@ const INDEX_COLS = [
   'bust_rating', 'lighting', 'features', 'description', 'is_multi_spot',
   'visibility', 'moderation_status', 'added_by',
   'latitude', 'longitude', 'address',
-  'created_at', 'updated_at',
+  'created_at',
 ].join(',')
 
 const LS_SAVED_KEY = 'seshwars_saved_spots'
@@ -38,7 +38,7 @@ export function getLastSpotsPayloadSizeKB() {
 }
 
 function spotsFingerprint(arr) {
-  return arr.map(s => `${s.id}:${s.updated_at}:${s.report_count}`).join('|')
+  return arr.map(s => `${s.id}:${s.created_at}:${s.report_count}`).join('|')
 }
 
 // useSpots() is called exactly once (App.jsx), but mergeSpotIntoCache/
@@ -114,9 +114,22 @@ export function useSpots() {
         fetchAll(() => supabase.from('spot_reports').select('spot_id,report_type,custom_text').order('created_at', { ascending: false }).order('id')),
       ])
     } catch (err) {
-      console.error('fetchSpots failed:', err.message)
-      setLoading(false)
-      return
+      // Paginated load failed — fall back to the original single-page load so
+      // the app never shows 0 spots because of a pagination error.
+      console.error('[spots] paginated load failed, falling back to single-page:', err.message)
+      const [spotsRes, reviewsRes, reportsRes] = await Promise.all([
+        supabase.from('spots').select('*').order('created_at', { ascending: false }),
+        supabase.from('spot_reviews').select('spot_id,rating'),
+        supabase.from('spot_reports').select('spot_id,report_type,custom_text').order('created_at', { ascending: false }),
+      ])
+      if (spotsRes.error || !spotsRes.data) {
+        console.error('[spots] fallback also failed — keeping last good data:', spotsRes.error?.message)
+        setLoading(false)
+        return
+      }
+      spotsData = spotsRes.data
+      reviewsData = reviewsRes.data || []
+      reportsData = reportsRes.data || []
     }
     _lastSpotsSizeKB = Math.round(JSON.stringify(spotsData).length / 1024 * 10) / 10
     if (import.meta.env.DEV) {
